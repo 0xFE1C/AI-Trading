@@ -57,10 +57,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   unreadNotificationsCount = 0,
   onOpenNotifications,
 }) => {
-  const { t, formatCurrency } = useLanguage();
+  const { t } = useLanguage();
   const isAuto = status?.isAutoTradingActive ?? false;
   const mode = status?.mode ?? 'paper';
-  const balance = status?.balanceIdr ?? 0;
 
   const currentTabTitle = t(`header.tab.${activeTab}.title`, 'Trading Terminal');
   const currentTabSubtitle = t(`header.tab.${activeTab}.subtitle`, 'Live chart monitoring, active orders, and multi-agent AI research');
@@ -140,12 +139,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               <Zap className="w-3 h-3 text-indigo-200" />
               <span className="hidden sm:inline">{t('header.viewMode.pro', 'Pro')}</span>
             </button>
-          </div>
-
-          {/* Quick Balance Pill */}
-          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/50 text-xs font-mono">
-            <span className="text-slate-400">{t('header.balance', 'Balance')}:</span>
-            <span className="font-bold text-slate-200">{formatCurrency(balance)}</span>
           </div>
 
           {/* Paper / Live Mode Toggle */}
