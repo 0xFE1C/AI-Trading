@@ -13,10 +13,10 @@
 
   <!-- Title -->
   <text x="50" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="800" fill="#f8fafc">
-    📂 PETA ARSITEKTUR STRUKTUR DIREKTORI PROYEK
+    📂 PROJECT DIRECTORY ARCHITECTURE MAP
   </text>
   <text x="50" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#94a3b8">
-    Struktur modular memisahkan Frontend Client (PWA), Core Quantitative Engine, Multi-Agent Swarm, dan Test Suite.
+    Modular architecture separating Frontend Client (PWA), Core Quantitative Engine, Multi-Agent Swarm, and Test Suite.
   </text>
 
   <!-- Box 1: client/ (Frontend PWA) -->
@@ -37,10 +37,10 @@
     <text x="175" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">API client, REST transport &amp; mock fallbacks</text>
 
     <text x="16" y="134" font-family="monospace" font-size="11" fill="#38bdf8" font-weight="600">client/src/utils/</text>
-    <text x="155" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Generator PDF resmi, ekspor CSV &amp; formatters</text>
+    <text x="155" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Official PDF generator, CSV export &amp; formatters</text>
 
     <text x="16" y="160" font-family="monospace" font-size="11" fill="#38bdf8" font-weight="600">client/src/types/</text>
-    <text x="155" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Definisi TypeScript antarmuka trading &amp; bot</text>
+    <text x="155" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">TypeScript definitions for trading &amp; bot interfaces</text>
   </g>
 
   <!-- Box 2: src/services/ (Backend Micro-Services) -->
@@ -52,16 +52,16 @@
     </text>
 
     <text x="16" y="56" font-family="monospace" font-size="11" fill="#34d399" font-weight="600">signals/</text>
-    <text x="100" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Section 9 deterministik (RSI, EMA, ATR, Depth, Threat, Regime)</text>
+    <text x="100" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Deterministic Section 9 (RSI, EMA, ATR, Depth, Threat, Regime)</text>
 
     <text x="16" y="82" font-family="monospace" font-size="11" fill="#34d399" font-weight="600">trading/</text>
     <text x="100" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Pure Risk Guard 9 Gates, Trailing Ratchet, Auto-Set Capital</text>
 
     <text x="16" y="108" font-family="monospace" font-size="11" fill="#34d399" font-weight="600">agents/</text>
-    <text x="100" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">10 Analis Riset AI &amp; Blackboard Bus outbox SQLite</text>
+    <text x="100" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">10 AI Swarm Analysts &amp; Blackboard SQLite outbox</text>
 
     <text x="16" y="134" font-family="monospace" font-size="11" fill="#34d399" font-weight="600">indodax/</text>
-    <text x="100" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Client bursa Indodax REST &amp; WS dengan 6s in-flight cache</text>
+    <text x="100" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Indodax REST &amp; WS client with 6s in-flight cache</text>
 
     <text x="16" y="160" font-family="monospace" font-size="11" fill="#34d399" font-weight="600">whatsapp/ &amp; telegram/</text>
     <text x="195" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Baileys Multi-Device &amp; Official Telegram Bot</text>
@@ -76,19 +76,19 @@
     </text>
 
     <text x="16" y="56" font-family="monospace" font-size="11" fill="#c084fc" font-weight="600">src/server.ts</text>
-    <text x="135" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Entry point Express server &amp; event websocket</text>
+    <text x="135" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Express server entry point &amp; WebSocket event stream</text>
 
     <text x="16" y="82" font-family="monospace" font-size="11" fill="#c084fc" font-weight="600">src/api/routes.ts</text>
-    <text x="155" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">REST endpoints terproteksi Zero-Trust Admin Token</text>
+    <text x="155" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">REST endpoints secured with Zero-Trust Admin Token</text>
 
     <text x="16" y="108" font-family="monospace" font-size="11" fill="#c084fc" font-weight="600">src/db/index.ts</text>
-    <text x="145" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">SQLite WAL engine, skema tabel, relasi &amp; indeks</text>
+    <text x="145" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">SQLite WAL engine, schemas, relations &amp; indexes</text>
 
     <text x="16" y="134" font-family="monospace" font-size="11" fill="#c084fc" font-weight="600">src/services/auth/</text>
     <text x="165" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Token rotation service &amp; timingSafeEqual auth</text>
 
     <text x="16" y="160" font-family="monospace" font-size="11" fill="#c084fc" font-weight="600">src/services/backup/</text>
-    <text x="175" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Auto-snapshot live database backup berkala</text>
+    <text x="175" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Automated live database snapshot service</text>
   </g>
 
   <!-- Box 4: tests/, docs/, & 1-Click Launchers -->
@@ -96,22 +96,22 @@
     <rect width="485" height="185" rx="12" fill="url(#dirCardBg)" stroke="#f59e0b" stroke-width="1.5" filter="url(#dirGlow)" />
     <rect x="0" y="0" width="485" height="32" rx="12" fill="#d97706" />
     <text x="16" y="21" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">
-      📁 tests/, docs/, &amp; Launchers — QA &amp; Eksekusi
+      📁 tests/, docs/, &amp; Launchers — QA &amp; Execution
     </text>
 
     <text x="16" y="56" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">tests/</text>
     <text x="85" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">95 Unit &amp; integration tests covering all critical paths</text>
 
     <text x="16" y="82" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">docs/assets/</text>
-    <text x="125" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Banner &amp; diagram arsitektur SVG resolusi tinggi</text>
+    <text x="125" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">High-resolution SVG banners &amp; architecture diagrams</text>
 
     <text x="16" y="108" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">start.bat / start.ps1</text>
-    <text x="180" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Launcher 1-klik otomatis untuk Windows</text>
+    <text x="180" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">1-Click automated launcher for Windows</text>
 
     <text x="16" y="134" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">start.sh</text>
-    <text x="95" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Launcher otomatis untuk Linux &amp; macOS</text>
+    <text x="95" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Automated launcher for Linux &amp; macOS</text>
 
     <text x="16" y="160" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">docker-compose.yml</text>
-    <text x="175" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Konfigurasi container production multi-stage</text>
+    <text x="175" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">Multi-stage production container configuration</text>
   </g>
 </svg>

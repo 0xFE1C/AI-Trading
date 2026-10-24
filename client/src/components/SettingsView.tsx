@@ -44,6 +44,7 @@ import {
 } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { Toast } from './Toast';
+import { LanguageSelector } from './LanguageSelector';
 
 export type SettingsSubTab = 'ai' | 'risk' | 'indodax' | 'security';
 
@@ -1629,6 +1630,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {/* ========================================================================= */}
       {currentSubTab === 'security' && (
         <div className="space-y-6">
+          {/* Language Preference Section */}
+          <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80">
+              <Globe className="h-4 w-4 text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">
+                Language / Preferensi Bahasa
+              </h3>
+            </div>
+            <LanguageSelector variant="settings" />
+          </div>
           {/* Admin Token & Auto-Rotation Management Section */}
           <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">

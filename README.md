@@ -4,92 +4,95 @@
 
 <div align="center">
 
+[![Language: English](https://img.shields.io/badge/Language-English-38bdf8?style=for-the-badge)](README.md)
+[![Dokumentasi: Bahasa Indonesia](https://img.shields.io/badge/Dokumentasi-Bahasa%20Indonesia-10b981?style=for-the-badge)](docs/PANDUAN_PENGGUNA.md)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-95%2F95%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x%20Strict-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D%2018.0.0-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18%20%2B%20Vite%20%2B%20Tailwind-61dafb?style=for-the-badge&logo=react)](client/)
-[![Indodax](https://img.shields.io/badge/Bursa-Indodax%20API%20v2-0284c7?style=for-the-badge)](https://indodax.com)
+[![Indodax](https://img.shields.io/badge/Exchange-Indodax%20API%20v2-0284c7?style=for-the-badge)](https://indodax.com)
 [![Bots](https://img.shields.io/badge/Remote%20Bots-WhatsApp%20%2B%20Telegram-25d366?style=for-the-badge&logo=whatsapp)](client/src/components/BotsView.tsx)
 [![Security](https://img.shields.io/badge/Security-Zero--Trust%20Token-e11d48?style=for-the-badge)](src/services/auth/)
 [![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Commercial-7c3aed?style=for-the-badge)](LICENSE)
 
-**Platform Bot Perdagangan Kripto Otonom Bursa Indodax Terpadu**  
-*Menggabungkan Kecepatan Sinyal Deterministik Section 9 (0 Token Cost), Tim Riset AI 10 Sub-Agents, Filter Keamanan 9 Gerbang Risiko Murni, serta Kontrol Remote WhatsApp &amp; Telegram.*
+**Unified Autonomous Cryptocurrency Spot Trading Platform for Indodax Exchange**  
+*Unifying High-Speed Deterministic Section 9 Signals (0 Token Cost), 10 Specialized AI Research Sub-Agents, a 9-Gate Pure Risk Guard Pipeline, and Unified Remote Bots via WhatsApp &amp; Telegram.*
 
-[Fitur Utama](#-fitur-utama) • [Arsitektur Sistem](#-arsitektur-sistem-end-to-end) • [Pipeline 9 Gerbang Risiko](#-pipeline-9-gerbang-risiko-pure-risk-guard) • [Tim Riset AI Swarm](#-tim-riset-ai-multi-agent-10-sub-agents) • [Panduan Memulai](#-panduan-instalasi--menjalankan-1-klik) • [Remote Bots](#-bots-terpadu-whatsapp--telegram) • [Alokasi Modal](#-mesin-alokasi-modal-otomatis-auto-set)
+[Key Features](#-key-features--advantages) • [System Architecture](#-end-to-end-system-architecture) • [9 Risk Gates Pipeline](#-pure-risk-guard-9-sequential-defense-gates) • [AI Swarm Research](#-multi-agent-ai-research-swarm-10-specialized-sub-agents) • [Quickstart Guide](#-quickstart-guide-1-click-launchers) • [Remote Bots](#-unified-remote-bots-whatsapp--telegram) • [Capital Auto-Set](#-intelligent-capital-allocation-auto-set-engine)
 
 </div>
 
 ---
 
-## 📑 Daftar Isi
+## 📑 Table of Contents
 
-- [1. Ringkasan & Filosofi Desain](#-ringkasan--filosofi-desain)
-- [2. Fitur Utama & Keunggulan](#-fitur-utama--keunggulan)
-- [3. Arsitektur Sistem End-to-End](#-arsitektur-sistem-end-to-end)
-- [4. Mesin Sinyal Deterministik Section 9](#-mesin-sinyal-deterministik-section-9)
-- [5. Pipeline 9 Gerbang Risiko (Pure Risk Guard)](#-pipeline-9-gerbang-risiko-pure-risk-guard)
-- [6. Tim Riset AI Multi-Agent (10 Sub-Agents Swarm)](#-tim-riset-ai-multi-agent-10-sub-agents-swarm)
-- [7. Validasi Kontrafaktual A/B & Evaluasi Ghost Position](#-validasi-kontrafaktual-ab--evaluasi-ghost-position)
-- [8. Mesin Alokasi Modal Otomatis (Auto-Set)](#-mesin-alokasi-modal-otomatis-auto-set)
-- [9. Profil Risiko Investasi (Konservatif, Seimbang, Agresif)](#-profil-risiko-investasi)
-- [10. Mode Simulasi (Paper) vs Mode Nyata (Live Indodax)](#-mode-simulasi-paper-vs-mode-nyata-live-indodax)
-- [11. Bots Terpadu: WhatsApp & Telegram](#-bots-terpadu-whatsapp--telegram)
-- [12. Keamanan & Infrastruktur Zero-Trust](#-keamanan--infrastruktur-zero-trust)
-- [13. Panduan Instalasi & Menjalankan (1-Klik)](#-panduan-instalasi--menjalankan-1-klik)
-- [14. Panduan Menjalankan via Docker](#-panduan-menjalankan-via-docker)
-- [15. Struktur Direktori Proyek](#-struktur-direktori-proyek)
-- [16. Pengujian & Jaminan Mutu (Test Suite)](#-pengujian--jaminan-mutu-test-suite)
-- [17. Tanya Jawab (FAQ) & Solusi Masalah](#-tanya-jawab-faq--solusi-masalah)
-- [18. Disclaimer & Pernyataan Risiko](#-disclaimer--pernyataan-risiko)
+- [1. Executive Summary & Design Philosophy](#-executive-summary--design-philosophy)
+- [2. Key Features & Advantages](#-key-features--advantages)
+- [3. End-to-End System Architecture](#-end-to-end-system-architecture)
+- [4. Deterministic Section 9 Signal Engine](#-deterministic-section-9-signal-engine)
+- [5. Pure Risk Guard: 9 Sequential Defense Gates](#-pure-risk-guard-9-sequential-defense-gates)
+- [6. Multi-Agent AI Research Swarm (10 Specialized Sub-Agents)](#-multi-agent-ai-research-swarm-10-specialized-sub-agents)
+- [7. Counterfactual A/B Testing & Ghost Position Engine](#-counterfactual-ab-testing--ghost-position-engine)
+- [8. Intelligent Capital Allocation (Auto-Set Engine)](#-intelligent-capital-allocation-auto-set-engine)
+- [9. Investment Risk Profiles (Conservative, Balanced, Aggressive)](#-investment-risk-profiles)
+- [10. Simulation Mode (Paper) vs Real Mode (Live Indodax)](#-simulation-mode-paper-vs-real-mode-live-indodax)
+- [11. Unified Remote Bots: WhatsApp & Telegram](#-unified-remote-bots-whatsapp--telegram)
+- [12. Zero-Trust Security & Resilient Infrastructure](#-zero-trust-security--resilient-infrastructure)
+- [13. Quickstart Guide: 1-Click Launchers](#-quickstart-guide-1-click-launchers)
+- [14. Production Deployment via Docker](#-production-deployment-via-docker)
+- [15. Project Directory Architecture](#-project-directory-architecture)
+- [16. Quality Assurance & Test Suite (95/95 Passing)](#-quality-assurance--test-suite)
+- [17. Frequently Asked Questions (FAQ) & Troubleshooting](#-frequently-asked-questions-faq--troubleshooting)
+- [18. Financial Risk Disclaimer](#-financial-risk-disclaimer)
 
 ---
 
-## 💡 Ringkasan & Filosofi Desain
+## 💡 Executive Summary & Design Philosophy
 
-Trading aset kripto secara manual seringkali diwarnai oleh kelelahan emosional, bias psikologis (**FOMO** saat harga di puncak atau **Panic Selling** di titik terendah), serta ketidakmampuan manusia memantau ratusan pasangan koin selama 24 jam nonstop.
+Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psychological biases (**FOMO** at market tops and **Panic Selling** at local bottoms), and the human inability to continuously monitor hundreds of trading pairs across 24/7 market cycles.
 
-**AI Trading Terminal** dibangun dengan satu prinsip fundamental:
+**AI Trading Terminal** is engineered around one foundational principle:
 > 🛡️ **"Capital Preservation First, Profit Generation Second"**  
-> *Lebih baik melewatkan sebuah peluang semu daripada kehilangan modal dalam transaksi yang ceroboh.*
+> *It is significantly better to miss a speculative entry than to suffer an irrecoverable drawdown on a careless trade.*
 
-### Mengapa AI Trading Terminal Berbeda?
-1. **Tidak Bergantung Sepenuhnya pada AI (Decoupled Architecture):** Model bahasa besar (LLM) sangat hebat untuk membaca berita dan sentimen, namun lambat dan mahal jika dipaksa menganalisa pergerakan harga per detik. Kami memisahkan tugas tersebut:
-   - **Section 9 Deterministik:** Menghitung indikator teknikal (RSI, EMA, ATR, Depth) secara matematis dalam waktu **< 2 milidetik** tanpa biaya token (`0 Token Cost`).
-   - **Tim Riset AI:** Bekerja di latar belakang menganalisa narasi global, update protokol, dan mendeteksi eksploitasi smart contract dengan deduplikasi hash SHA256 (hemat token > 90%).
-2. **9 Lapisan Filter Keselamatan (Pure Risk Guard):** Sinyal beli **wajib lolos 100%** dari seluruh 9 gerbang pengaman sebelum order diizinkan masuk ke bursa Indodax.
-3. **Trailing Stop Ratchet Matematis:** Begitu harga koin naik, garis proteksi keuntungan dinaikkan secara bertahap dan **dikunci satu arah**. Jika harga berbalik arah, bot keluar otomatis dengan profit aman.
-4. **Siap Digunakan Oleh Siapa Saja (Zero Configuration Launcher):** Dilengkapi launcher 1-klik untuk Windows (`start.bat`), PowerShell (`start.ps1`), dan Linux/macOS (`start.sh`), serta remote control lengkap via WhatsApp dan Telegram.
+### Why AI Trading Terminal is Different:
+1. **Decoupled Quantitative Architecture:** Large Language Models (LLMs) excel at processing global news and qualitative sentiment, but are far too slow, expensive, and unpredictable for high-frequency price analysis. We decouple these responsibilities:
+   - **Deterministic Section 9:** Calculates pure mathematical technical indicators (Wilder's RSI, EMA, True ATR, Depth Imbalance) in **< 2 milliseconds** with **zero token cost** (`0 Token Cost`).
+   - **AI Research Swarm:** Operates in the background analyzing macro narratives, GitHub developer commits, and protocol exploit vectors using SHA-256 context deduplication (**saving > 90% of token costs**).
+2. **9 Pure Risk Defense Gates:** Every prospective buy signal **must pass 100% of all 9 sequential safety gates** before any order is submitted to Indodax.
+3. **Mathematical Trailing Stop Ratchet:** As an asset's market price increases, profit protection thresholds are monotonically ratcheted upward and **locked one-way**. If the trend abruptly reverses, the bot immediately locks in accumulated gains.
+4. **Zero-Configuration 1-Click Launchers:** Pre-packaged scripts for Windows (`start.bat`), PowerShell (`start.ps1`), and Linux/macOS (`start.sh`), accompanied by full bidirectional remote control via WhatsApp and Telegram.
 
 ---
 
-## ✨ Fitur Utama & Keunggulan
+## ✨ Key Features & Advantages
 
-| Kategori | Fitur Unggulan | Penjelasan & Manfaat |
+| Category | Highlighted Capability | Architectural Impact & Benefits |
 | :--- | :--- | :--- |
-| **Kecepatan & Biaya** | **Section 9 Engine** | Ekstraksi teknikal murni bebas token, latency sub-millisecond, hemat jutaan token per bulan. |
-| **Intelijen Pasar** | **10 AI Sub-Agents** | Swarm analis membaca berita global, Twitter/X, Reddit, Whale on-chain, exploit security, listing baru Indodax. |
-| **Proteksi Modal** | **9 Gerbang Risiko** | Circuit breaker harian, anti-spread trap, anti-pucuk RSI, BTC flash crash blocker, exposure capacity. |
-| **Presisi Finansial** | **Capital Auto-Set** | Sizing proporsional cerdas berdasarkan saldo IDR (dari modal mikro Rp 10.000 hingga puluhan juta rupiah). |
-| **Kunci Keuntungan** | **Trailing Ratchet** | Mengunci keuntungan mengambang secara dinamis; tidak ada istilah *gain* berbalik menjadi rugi besar. |
-| **Transparansi UI** | **Entry Diagnostics** | Tabel observabilitas live: alasan koin diterima/ditolak ditampilkan transparan di dashboard. |
-| **Remote Control** | **Unified Bots View** | Halaman bot terpadu untuk WhatsApp & Telegram dengan opsi: *Keduanya Sekaligus*, *Hanya WA*, *Hanya TG*, atau *Nonaktif*. |
-| **Keamanan** | **Zero-Trust Auth** | Token admin tersandi dengan perbandingan konstan (`timingSafeEqual`) dan rotasi otomatis berkala. |
-| **Observabilitas** | **A/B Ghost Positions** | Menguji keputusan tolak AI terhadap pergerakan riil pasar untuk mengukur *AI Alpha* empiris. |
-| **Portabilitas** | **PWA & Offline Shell** | UI dapat dipasang sebagai Progressive Web App di smartphone/desktop dengan dark mode modern. |
+| **Speed & Efficiency** | **Section 9 Engine** | Pure mathematical signal pipeline, sub-millisecond execution, 0 token expenditure. |
+| **Market Intelligence** | **10 AI Sub-Agents** | Autonomous swarm scanning global crypto news, Twitter/X, Reddit, on-chain whale wallets, and smart contract exploits. |
+| **Capital Defense** | **9 Risk Defense Gates** | Daily circuit breaker, bid-ask spread trap filter, anti-FOMO RSI guard, and BTC flash crash veto. |
+| **Financial Sizing** | **Capital Auto-Set** | Intelligent dynamic position sizing scaled to available balance (from micro IDR 10,000 up to tens of millions). |
+| **Profit Locking** | **Trailing Ratchet** | Dynamic monotonic stop-loss escalation prevents open profits from turning into catastrophic losses. |
+| **UI Observability** | **Entry Diagnostics** | Transparent live observability table explaining why coins were approved or vetoed at each gate. |
+| **Remote Control** | **Unified Bots View** | Centralized bot management for WhatsApp & Telegram with 4 modes: *Both*, *WhatsApp Only*, *Telegram Only*, or *Disabled*. |
+| **Zero-Trust Security** | **Admin Access Token** | Constant-time token verification (`crypto.timingSafeEqual`) with automated background rotation schedules. |
+| **AI Validation** | **A/B Ghost Positions** | Real-time counterfactual simulation benchmarking AI vetoes against market prices to compute empirical AI Alpha. |
+| **Internationalization** | **Multi-Language (i18n)** | Full bilingual English (default) and Indonesian support across UI, tables, and reporting. |
+| **Portability** | **PWA & Offline Shell** | Installable Progressive Web App (PWA) with responsive mobile layouts and modern dark mode styling. |
 
 ---
 
-## 🏛️ Arsitektur Sistem End-to-End
+## 🏛️ End-to-End System Architecture
 
-Berikut adalah visualisasi arsitektur menyeluruh dari sistem **AI Trading Terminal**:
+Below is the comprehensive architectural blueprint of the **AI Trading Terminal**:
 
-![Arsitektur Sistem](docs/assets/architecture-diagram.svg)
+![System Architecture](docs/assets/architecture-diagram.svg)
 
-### Alur Aliran Data Sistem:
+### End-to-End System Data Flow:
 ```mermaid
 flowchart TD
-    subgraph Ingestion [1. Layer Ingestion Data Pasar]
+    subgraph Ingestion [1. Market Data Ingestion Layer]
         IdxREST[Indodax REST API v2] --> InFlightCache[6s In-Flight TTL Cache & Dedup Promise]
         IdxWS[Indodax WebSocket Feed] --> BatchTicker[Batch Ticker & 5-Depth Order Book]
         BinanceFeed[Global Price Feed Binance/Bybit] --> ArbitrageDelta[Global Arbitrage Delta Engine]
@@ -99,23 +102,23 @@ flowchart TD
     BatchTicker --> Sec9
     ArbitrageDelta --> Sec9
 
-    subgraph Sec9 [2. Mesin Sinyal Deterministik Section 9 - Zero Token]
+    subgraph Sec9 [2. Deterministic Section 9 Engine - Zero Token]
         Feat[features.ts: RSI14, EMA21, True ATR, Depth Imbalance]
-        Lex[lexicon.ts: Bilingual ID/EN Kamus Finansial + Tanh Scaling]
+        Lex[lexicon.ts: Bilingual ID/EN Financial Lexicon + Tanh Scaling]
         Threat[threat.ts: Scoped Threat Blocker 30m Freshness]
-        Regime[regime.ts: BTC Macro Window 1h drop & 4h drop]
-        Scorer[scorer.ts: Blue-Chip Pullback & Momentum Score]
+        Regime[regime.ts: BTC Macro Window 1h & 4h Drop Returns]
+        Scorer[scorer.ts: Blue-Chip Pullback & Momentum Scoring]
     end
 
     Sec9 --> BlackboardBus
 
-    subgraph AIResearch [3. Tim Riset AI Swarm - 10 Analis Spesialis]
+    subgraph AIResearch [3. AI Swarm Research - 10 Specialized Sub-Agents]
         BlackboardBus[Blackboard Event Bus SQLite Outbox]
         NewsAgent[Global News & Regulatory]
         SocialAgent[Reddit & Twitter/X Radar]
         OnChainAgent[Whale Tracker & Protocol Exploit]
         ListingAgent[New Indodax Listing Detector]
-        DedupEngine[SHA256 Context Dedup - Hemat 90% Token]
+        DedupEngine[SHA256 Context Dedup - >90% Token Savings]
         AntigravityAPI[Antigravity Live Model API: Gemini 3.8 / Claude 4.6]
         
         BlackboardBus --> DedupEngine --> AntigravityAPI
@@ -123,9 +126,9 @@ flowchart TD
     end
 
     Sec9 --> RiskPipeline
-    AIResearch -.->|Konfirmasi / Veto| RiskPipeline
+    AIResearch -.->|Confirmation / Veto| RiskPipeline
 
-    subgraph RiskPipeline [4. Pure Risk Guard - 9 Gerbang Pengaman]
+    subgraph RiskPipeline [4. Pure Risk Guard - 9 Defense Gates]
         G1[G1: Daily Circuit Breaker] --> G2[G2: Portfolio Exposure Cap]
         G2 --> G3[G3: BTC Crash Veto]
         G3 --> G4[G4: Bid-Ask Spread Trap]
@@ -133,13 +136,13 @@ flowchart TD
         G5 --> G6[G6: Scoped Threat Blocker]
         G6 --> G7[G7: Slippage Liquidity Depth]
         G7 --> G8[G8: Technical Score Threshold]
-        G8 --> G9[G9: Indodax Rp 10.000 Min Floor]
+        G8 --> G9[G9: Indodax IDR 10,000 Min Floor]
     end
 
-    RiskPipeline -->|Lolos 100%| ExecLayer
-    RiskPipeline -.->|Gagal Salah Satu| GhostLog[Catat Alasan di entry_gate_logs & Simulasi Ghost Position]
+    RiskPipeline -->|100% Passed| ExecLayer
+    RiskPipeline -.->|Any Single Veto| GhostLog[Log Veto in entry_gate_logs & Simulate Ghost Position]
 
-    subgraph ExecLayer [5. Eksekusi & Manajemen Posisi]
+    subgraph ExecLayer [5. Execution & Position Management]
         OrderEngine[Order Dispatcher: Paper Trading / Live Indodax]
         RatchetEngine[Trailing Stop Ratchet Engine]
         AutoSetEngine[Capital Allocation Auto-Set Engine]
@@ -150,7 +153,7 @@ flowchart TD
         SQLiteDB[(SQLite Database WAL Mode)]
         UnifiedBots[Unified Bots: WhatsApp Baileys + Telegram Bot API]
         ReactUI[React 18 Dashboard + Tailwind CSS + PWA]
-        PDFReport[Generator Laporan Pajak & PDF]
+        PDFReport[Executive PDF & Tax Report Generator]
     end
 
     ExecLayer --> SQLiteDB
@@ -161,300 +164,298 @@ flowchart TD
 
 ---
 
-## ⚡ Mesin Sinyal Deterministik Section 9
+## ⚡ Deterministic Section 9 Signal Engine
 
-Berbeda dengan bot konvensional yang memboroskan API LLM untuk setiap tick harga, AI Trading Terminal menggunakan **Pipeline Deterministik Section 9** di [`src/services/signals/`](src/services/signals/). Pipeline ini berjalan pada memori lokal komputer:
+Unlike conventional cryptocurrency bots that exhaust costly LLM tokens on every price tick, AI Trading Terminal utilizes the **Deterministic Section 9 Pipeline** located in [`src/services/signals/`](src/services/signals/). This pipeline executes directly in local system memory:
 
-1. **Ekstraksi Fitur Kuantitatif ([`features.ts`](src/services/signals/features.ts)):**
-   - **RSI(14) dengan Wilder's Smoothing:** Menghitung momentum harga koin.
-   - **Exponential Moving Average (EMA 21):** Mendeteksi tren harga dinamis dan support struktural.
-   - **True Average True Range (True ATR):** Mengukur volatilitas sejati dengan memperhitungkan celah lompatan lilin (*gap wicks*).
-   - **Depth Imbalance:** Mengukur dominasi dinding order beli (*bid wall*) dibanding dinding jual (*ask wall*) pada 5 kedalaman order book.
-   - **Bid-Ask Spread Calculation:** Menghitung persentase celah spread secara presisi.
-2. **Kamus Sentimen Finansial Bilingual ([`lexicon.ts`](src/services/signals/lexicon.ts)):**
-   - Berisi ratusan leksikon keuangan dalam Bahasa Indonesia dan Bahasa Inggris (seperti *lonjakan, adopsi, kemitraan, peretasan, gugatan, delisting*).
-   - Menggunakan fungsi aktivasi **Hyperbolic Tangent (`tanh`)** untuk memastikan nilai sentimen selalu berada di rentang ketat `[-1.0, +1.0]`.
-   - Menerapkan **Age Decay 48 Jam**: Berita baru berbobot penuh, berita lama meluruh secara matematis.
+1. **Quantitative Feature Extraction ([`features.ts`](src/services/signals/features.ts)):**
+   - **RSI(14) with Wilder's Smoothing:** Calculates momentum across candles with zero drift.
+   - **Exponential Moving Average (EMA 21):** Evaluates trend alignment and dynamic support floors.
+   - **True Average True Range (True ATR):** Captures true volatility by incorporating candle gap wicks.
+   - **Depth Imbalance:** Analyzes bid-wall versus ask-wall pressure across the top 5 levels of the Indodax orderbook.
+   - **Bid-Ask Spread Analysis:** Calculates real-time spread percentages to ensure fair execution.
+2. **Bilingual Financial Sentiment Lexicon ([`lexicon.ts`](src/services/signals/lexicon.ts)):**
+   - Curated dictionary of hundreds of financial terms in both English and Indonesian (*surge, partnership, hack, lawsuit, delisting, exploit*).
+   - Utilizes the **Hyperbolic Tangent (`tanh`)** scaling function to strictly bound sentiment values between `[-1.0, +1.0]`.
+   - Applies a **48-Hour Age Decay Curve**: Fresh news carries maximum weight, while older reports exponentially decay.
 3. **Scoped Threat Blocker ([`threat.ts`](src/services/signals/threat.ts)):**
-   - Mengisolasi ancaman per koin (*coin-scoped*). Ancaman eksploitasi pada koin meme tidak akan memblokir koin papan atas seperti Bitcoin atau Ethereum.
-   - Mengabaikan kata umum tidak bersalah seperti `"sec"` (detik) atau `"second"`.
-   - Memiliki masa kedaluwarsa kesegaran (**Freshness: 30 menit**), sehingga pasar tidak beku selamanya.
-4. **Rezim Makro BTC Window Returns ([`regime.ts`](src/services/signals/regime.ts)):**
-   - Menghitung return pergerakan harga Bitcoin pada jendela waktu **1 jam (`<= -3%`)** dan **4 jam (`<= -5%`)**.
-   - Mampu mendeteksi kejatuhan mendadak (*flash crash*) tanpa mematikan bot saat pasar hanya konsolidasi normal 1-2% di bawah harga tertinggi 24 jam.
-5. **Skor Peluang & Pullback Blue-Chip ([`scorer.ts`](src/services/signals/scorer.ts)):**
-   - Memungkinkan profil Konservatif tetap aktif membeli koin berkapitalisasi besar (BTC, ETH, SOL) saat terjadi *pullback* sehat ke garis support EMA21 dengan RSI di area sejuk (< 48).
+   - Scopes security threats per individual coin symbol. A security scare on an obscure token will never freeze entries for Bitcoin or Ethereum.
+   - Discards common benign substrings such as `"sec"` (seconds) or `"second"`.
+   - Features a **30-Minute Freshness Window**, ensuring markets do not remain permanently blocked after false alarms clear.
+4. **BTC Macro Regime Window Returns ([`regime.ts`](src/services/signals/regime.ts)):**
+   - Tracks Bitcoin price velocity across rolling **1-hour (`<= -3%`)** and **4-hour (`<= -5%`)** windows.
+   - Accurately detects acute flash dumps without interrupting trades during normal sideways consolidations.
+5. **Conservative Blue-Chip Pullback Scorer ([`scorer.ts`](src/services/signals/scorer.ts)):**
+   - Enables Conservative profiles to safely capture high-cap assets (BTC, ETH, SOL) during healthy pullbacks to the EMA21 support line when RSI is in cool territory (< 48).
 
 ---
 
-## 🛡️ Pipeline 9 Gerbang Risiko (Pure Risk Guard)
+## 🛡️ Pure Risk Guard (9 Sequential Defense Gates)
 
-Setiap kandidat sinyal beli wajib melewati rangkaian **9 Gerbang Pertahanan** di [`src/services/trading/riskGuard.ts`](src/services/trading/riskGuard.ts):
+Every prospective trade signal must sequentially pass the rigorous **9 Defense Gates** in [`src/services/trading/riskGuard.ts`](src/services/trading/riskGuard.ts):
 
-![Pipeline 9 Gerbang Risiko](docs/assets/risk-gates-pipeline.svg)
+![9 Risk Gates Pipeline](docs/assets/risk-gates-pipeline.svg)
 
 ```mermaid
 graph TD
-    Cand[Kandidat Sinyal Beli Koin] --> G1{Gate 1: Circuit Breaker?}
-    G1 -- Rugi Harian &gt; Limit --> V1[TOLAK: Circuit Breaker Cooldown 24h]
-    G1 -- Lolos --> G2{Gate 2: Slot Portofolio?}
-    G2 -- Posisi Penuh --> V2[TOLAK: Kapasitas Posisi Tercapai]
-    G2 -- Lolos --> G3{Gate 3: BTC Flash Crash?}
-    G3 -- BTC 1h/4h Dump --> V3[TOLAK: Rezim Makro Berbahaya]
-    G3 -- Lolos --> G4{Gate 4: Bid-Ask Spread?}
-    G4 -- Spread &gt; Ambang --> V4[TOLAK: Jebakan Spread Illiquid]
-    G4 -- Lolos --> G5{Gate 5: RSI Overbought?}
-    G5 -- RSI &gt; 70-75 --> V5[TOLAK: Pucuk Lilin FOMO]
-    G5 -- Lolos --> G6{Gate 6: Scoped Threat?}
-    G6 -- Koin Ada Exploit/Hack --> V6[TOLAK: Ancaman Keamanan Koin]
-    G6 -- Lolos --> G7{Gate 7: Slippage Budget?}
-    G7 -- Depth Tipis &gt; 0.5% --> V7[TOLAK: Slippage Melebihi Toleransi]
-    G7 -- Lolos --> G8{Gate 8: Tech & Setup Score?}
-    G8 -- Skor &lt; 70 --> V8[TOLAK: Skor Setup Belum Memenuhi Syarat]
-    G8 -- Lolos --> G9{Gate 9: Min Rp 10.000?}
-    G9 -- Order &lt; 10k IDR --> V9[TOLAK: Melanggar Aturan Minimum Indodax]
-    G9 -- Lolos --> ACC[✓ 100% LOLOS: EKSEKUSI ORDER KE BURSA]
+    Cand[Prospective Coin Buy Signal] --> G1{Gate 1: Circuit Breaker?}
+    G1 -- Daily Loss &gt; Limit --> V1[VETO: Daily Circuit Breaker 24h Cooldown]
+    G1 -- Passed --> G2{Gate 2: Portfolio Exposure?}
+    G2 -- Max Positions Reached --> V2[VETO: Portfolio Capacity Full]
+    G2 -- Passed --> G3{Gate 3: BTC Flash Crash?}
+    G3 -- BTC 1h/4h Dump --> V3[VETO: Hazardous Macro Regime]
+    G3 -- Passed --> G4{Gate 4: Bid-Ask Spread?}
+    G4 -- Spread &gt; Limit --> V4[VETO: Illiquid Spread Trap]
+    G4 -- Passed --> G5{Gate 5: RSI Overbought?}
+    G5 -- RSI &gt; 70-75 --> V5[VETO: Top FOMO Candle]
+    G5 -- Passed --> G6{Gate 6: Scoped Threat?}
+    G6 -- Exploit / Hack Detected --> V6[VETO: Coin Security Threat]
+    G6 -- Passed --> G7{Gate 7: Slippage Budget?}
+    G7 -- Depth Slippage &gt; 0.5% --> V7[VETO: Orderbook Slippage Exceeded]
+    G7 -- Passed --> G8{Gate 8: Tech & Setup Score?}
+    G8 -- Score &lt; 70 --> V8[VETO: Setup Score Sub-Threshold]
+    G8 -- Passed --> G9{Gate 9: Min IDR 10,000 Floor?}
+    G9 -- Order &lt; 10k IDR --> V9[VETO: Below Indodax Minimum Size]
+    G9 -- Passed --> ACC[✓ 100% PASSED: ORDER DISPATCHED TO EXCHANGE]
 ```
 
-### Rincian Pemeriksaan Ke-9 Gerbang:
-1. **Gate 1 — Circuit Breaker:** Menghitung total kerugian terealisasi hari ini. Jika melebihi batas profil risiko (misal 5%), auto-trading dihentikan selama 24 jam untuk melindungi sisa modal. Menggunakan *decoupled ratchet* agar tidak terjadi kebuntuan (*deadlock*).
-2. **Gate 2 — Exposure Limit:** Memastikan jumlah posisi terbuka tidak melebihi kuota profil (misal maksimal 2-5 koin).
-3. **Gate 3 — BTC Macro Regime:** Membatalkan entri semua koin jika Bitcoin mengalami *flash dump* (turun > 3% dalam 1 jam atau > 5% dalam 4 jam).
-4. **Gate 4 — Spread Trap:** Menolak koin yang selisih harga jual dan beli (*bid-ask spread*) terlalu lebar (> 0.8% - 1.5%), melindungi Anda dari jebakan koin tidak likuid.
-5. **Gate 5 — RSI Guard (Anti-Pucuk):** Mencegah bot membeli koin yang RSI-nya sudah berada di atas 70 atau 75 (zona jenuh beli ekstrim).
-6. **Gate 6 — Scoped Threat:** Memverifikasi koin tidak sedang terlibat insiden keamanan, eksploitasi smart contract, atau ancaman delisting dalam 30 menit terakhir.
-7. **Gate 7 — Slippage Budget:** Mensimulasikan eksekusi order terhadap 5 tingkat kedalaman buku order Indodax untuk menjamin harga beli tidak bergeser lebih dari 0.5%.
-8. **Gate 8 — Technical Score:** Mengharuskan skor teknikal gabungan mencapai ambang batas minimal (default 70/100).
-9. **Gate 9 — Indodax Minimum Floor:** Memastikan nilai order setelah dikurangi cadangan tunai bernilai **minimal Rp 10.000**, sesuai regulasi bursa Indodax.
+### Gate-by-Gate Specification:
+1. **Gate 1 — Daily Circuit Breaker:** Sums total realized losses for the day. If losses exceed the risk profile limit (e.g., 5%), auto-trading is immediately halted for 24 hours. Employs decoupled state ratcheting to prevent execution deadlocks.
+2. **Gate 2 — Portfolio Exposure Limit:** Enforces concurrency limits on active positions (1 to 5 coins based on risk profile and balance tier).
+3. **Gate 3 — BTC Macro Regime:** Vetoes all buy entries across the board if Bitcoin experiences an acute flash dump (> 3% drop in 1 hour or > 5% in 4 hours).
+4. **Gate 4 — Spread Trap Guard:** Rejects assets with excessive bid-ask spreads (> 0.8% - 1.5%), safeguarding capital against illiquid traps.
+5. **Gate 5 — RSI Guard (Anti-Top FOMO):** Prevents entering tokens whose 14-period RSI is already overbought (> 70-75).
+6. **Gate 6 — Scoped Threat Scoping:** Confirms the specific target coin has had zero exploit disclosures, contract hacks, or delisting announcements within the past 30 minutes.
+7. **Gate 7 — Slippage Budget:** Simulates full order execution against the top 5 levels of the Indodax orderbook, ensuring effective slippage does not exceed 0.5%.
+8. **Gate 8 — Technical Score Threshold:** Mandates that the composite technical setup score meets or exceeds the required threshold (default 70/100).
+9. **Gate 9 — Indodax Minimum Floor:** Verifies that after subtracting cash reserves, the net order value is **at least IDR 10,000**, fully satisfying Indodax exchange regulations.
 
 ---
 
-## 🤖 Tim Riset AI Multi-Agent (10 Sub-Agents Swarm)
+## 🤖 Multi-Agent AI Research Swarm (10 Specialized Sub-Agents)
 
-Di tab **Riset AI**, terdapat 10 analis intelijen spesialis di [`src/services/agents/`](src/services/agents/) yang berkoordinasi melalui arsitektur **Blackboard Bus**:
+Located in the **AI Research** tab, 10 specialized intelligence analysts in [`src/services/agents/`](src/services/agents/) collaborate autonomously via an asynchronous **Blackboard Event Bus**:
 
-![Tim Riset AI Swarm](docs/assets/ai-swarm-diagram.svg)
+![AI Swarm Research](docs/assets/ai-swarm-diagram.svg)
 
-1. **Global News Analyst:** Membaca feed berita internasional (CoinDesk, CoinTelegraph, Bloomberg, Decrypt).
-2. **Tech & Ecosystem Analyst:** Menganalisa rilis GitHub, hard fork, dan update mainnet pengembang koin.
-3. **Social Community Radar:** Memantau tren dan sentimen diskusi di forum Reddit kripto.
-4. **Twitter / X Viral Radar:** Mendeteksi pembicaraan viral dari figur berpengaruh di dunia kripto.
-5. **Indodax Listing Radar:** Mendeteksi koin baru yang resmi listing di Indodax dalam hitungan detik.
-6. **Momentum & Breakout Hunter:** Menangkap koin yang mengalami lonjakan volume dan likuiditas mendadak.
-7. **Protocol Security & Exploit Radar:** Memindai insiden keamanan smart contract dan laporan exploit.
-8. **Macro & Regulatory Radar:** Memantau pengumuman suku bunga The Fed, inflasi CPI, dan regulasi Bappebti.
-9. **Whale On-Chain Tracker:** Mendeteksi perpindahan koin skala raksasa oleh para *whale* ke bursa.
-10. **Global Arbitrage Analyst:** Membandingkan selisih harga koin di Indodax terhadap bursa global (Binance, Bybit).
+1. **Global News Radar:** Aggregates and synthesizes breaking reports from international outlets (CoinDesk, Cointelegraph, Bloomberg Crypto, Decrypt).
+2. **Tech & Ecosystem Analyst:** Monitors developer momentum, GitHub repository commits, forks, and official mainnet roadmap upgrades.
+3. **Social Community Radar:** Tracks discussions, sentiment polarity, and retail enthusiasm across major crypto subreddits.
+4. **Twitter / X Viral Radar:** Detects discussion volume spikes and influencer sentiment velocity.
+5. **Indodax Listing Radar:** Identifies newly announced or recently listed trading pairs on Indodax within seconds.
+6. **Momentum Hunter:** Isolates sudden volume breakout anomalies and structural liquidity surges.
+7. **Exploit & Security Radar:** Continuously audits smart contract security alerts, vulnerability disclosures, and exploit reports.
+8. **Macro & Regulatory Analyst:** Monitors central bank policy interest rate decisions (The Fed), CPI inflation numbers, and Bappebti regulatory updates.
+9. **Whale On-Chain Tracker:** Detects large-scale exchange inflows, wallet outflows, and institutional accumulation footprints.
+10. **Global Delta Analyst:** Benchmarks Indodax pricing disparities against global exchanges (Binance, Bybit) to capture price realignment trends.
 
-### Optimalisasi Hemat Token & Mode Degraded
-- **Fingerprint SHA256:** Sistem menghitung hash judul berita dan kondisi harga. Jika kondisi tidak berubah, analisis AI **dilewati otomatis** (`skipped_dedup`), menghemat **> 90% biaya token**.
-- **Kompaksi Payload:** Prompt dikirim dalam format JSON ringkas 1-baris tanpa spasi kosong boros.
-- **Degraded Mode Fail-Safe:** Jika penyedia AI mengalami gangguan jaringan atau kehabisan kuota, sistem otomatis beralih ke mode deterministik murni, sehingga bot tidak pernah macet.
-
----
-
-## 🔬 Validasi Kontrafaktual A/B & Evaluasi Ghost Position
-
-Bagaimana Anda membuktikan bahwa filter AI benar-benar melindungi modal Anda dan bukan sekadar membuang peluang menguntungkan?
-
-AI Trading Terminal menyertakan mesin **A/B Counterfactual Testing**:
-- Setiap kali tim riset AI atau gerbang risiko menolak suatu peluang beli, sistem membuat sebuah **Ghost Position** (posisi virtual bayangan) di database [`ghost_positions`](src/db/index.ts).
-- Posisi bayangan ini dipantau secara real-time mengikuti harga pasar riil Indodax seolah-olah transaksi tersebut dieksekusi.
-- Setelah beberapa waktu, sistem mengelompokkan hasilnya:
-  - 🛡️ **`BULLET_DODGED` (Peluru Dihindari):** Transaksi yang ditolak AI ternyata mengalami kerugian/stop out di pasar riil. Ini membuktikan AI berhasil menyelamatkan modal Anda!
-  - ⚠️ **`MISSED_OPPORTUNITY` (Peluang Terlewat):** Transaksi yang ditolak ternyata menghasilkan keuntungan.
-  - ⚖️ **`NEUTRAL`:** Transaksi ditolak berakhir impas.
-- Dashboard menampilkan metrik **Empirical AI Alpha**: nilai nyata persentase modal yang berhasil diselamatkan oleh kecerdasan buatan.
+### Token Optimization & Degraded Resilience
+- **SHA-256 Fingerprint Deduplication:** Generates cryptographic hashes of news headlines and market state. If the context has not fundamentally changed, AI calls are **automatically skipped** (`skipped_dedup`), reducing token consumption by **> 90%**.
+- **Compact Payload Formatting:** System prompts are minimized into single-line JSON structures with redundant whitespace eliminated.
+- **Fail-Safe Degraded Mode:** If LLM providers experience network outages or quota exhaustion, the engine seamlessly falls back to pure deterministic mode, ensuring trading operations never freeze.
 
 ---
 
-## 💰 Mesin Alokasi Modal Otomatis (Auto-Set)
+## 🔬 Counterfactual A/B Testing & Ghost Position Engine
 
-Fitur **Capital Allocation Auto-Set** di [`src/services/trading/index.ts`](src/services/trading/index.ts) menghilangkan kerumitan menghitung ukuran lot trading:
+How do you verify whether AI vetoes genuinely protect capital rather than discard lucrative opportunities?
 
-![Mesin Alokasi Modal](docs/assets/capital-auto-set.svg)
+AI Trading Terminal includes a built-in **A/B Counterfactual Testing Engine**:
+- Whenever the AI swarm or risk gates veto a prospective buy signal, a virtual **Ghost Position** is registered in the database table [`ghost_positions`](src/db/index.ts).
+- The system monitors this shadow position against real-time Indodax market prices as if the trade had actually executed.
+- Outcomes are categorized into empirical performance groups:
+  - 🛡️ **`BULLET_DODGED`:** The vetoed trade subsequently collapsed or hit the virtual stop-loss in the real market, proving the AI saved your money!
+  - ⚠️ **`MISSED_OPPORTUNITY`:** The vetoed trade subsequently met the take-profit target.
+  - ⚖️ **`NEUTRAL`:** The vetoed trade broke even within the tracking window.
+- The dashboard highlights the **Empirical AI Alpha**: the exact net percentage of portfolio capital saved by artificial intelligence.
 
-### Matriks Alokasi Berdasarkan Besaran Modal:
+---
 
-| Besaran Modal IDR | Kategori Tier | Maksimal Posisi Terbuka | Alokasi per Posisi | Cadangan Tunai | Catatan & Perilaku |
+## 💰 Intelligent Capital Allocation (Auto-Set Engine)
+
+The **Capital Allocation Auto-Set Engine** in [`src/services/trading/index.ts`](src/services/trading/index.ts) dynamically sizes trades based on available wallet balance:
+
+![Capital Allocation Auto-Set](docs/assets/capital-auto-set.svg)
+
+### Dynamic Capital Allocation Matrix:
+
+| Balance Bracket (IDR) | Tier Classification | Maximum Positions | Allocation per Position | Safety Cash Reserve | Operational Behavior |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **< Rp 100.000** | **Mikro** | **1 Koin** | Seluruh modal teralokasi | 15% | Menjamin order selalu di atas batas bursa **Rp 10.000**. |
-| **Rp 100k - 1 Juta** | **Kecil** | **2 - 3 Koin** | 28% - 42.5% | 15% | Diversifikasi sehat antara koin stabil dan momentum. |
-| **Rp 1 Juta - 10 Juta** | **Menengah** | **3 - 5 Koin** | 17% - 28% | 15% - 20% | Diversifikasi penuh dengan pemantauan slippage mendalam. |
-| **> Rp 10.000.000** | **Besar** | **5 Koin** | Sesuai batas risiko | 20% - 25% | Mengutamakan likuiditas tebal dan koin Blue-Chip. |
+| **< IDR 100,000** | **Micro** | **1 Coin** | Single allocation | 15% | Guarantees orders remain strictly above the **IDR 10,000** exchange floor. |
+| **IDR 100k - 1M** | **Small** | **2 - 3 Coins** | 28% - 42.5% | 15% | Balanced split between core assets and top momentum setups. |
+| **IDR 1M - 10M** | **Medium** | **3 - 5 Coins** | 17% - 28% | 15% - 20% | Full multi-coin diversification with deep orderbook slippage budgeting. |
+| **> IDR 10,000,000** | **Large** | **5 Coins** | Risk-adjusted | 20% - 25% | Prioritizes deep liquidity pools and EMA21 structural support pullbacks. |
 
-> 💡 **Kontrol Instan:** Anda dapat mengubah modal kapan saja melalui dashboard UI atau mengirim pesan singkat ke bot WhatsApp/Telegram: `/modal 500000 seimbang`.
+> 💡 **Instant Remote Adjustment:** Capital limits and risk profiles can be updated on the fly via the Web Dashboard or by messaging the bot: `/capital 500000 moderate`.
 
 ---
 
-## 🎯 Profil Risiko Investasi
+## 🎯 Investment Risk Profiles
 
-Sesuaikan strategi bot hanya dengan satu kali klik di tab **Pengaturan &rarr; Profil Risiko**:
+Tailor the bot's execution style with a single click in **Settings &rarr; Risk Profile**:
 
-![3 Pilihan Profil Risiko](docs/assets/risk-profiles.svg)
+![3 Investment Risk Profiles](docs/assets/risk-profiles.svg)
 
-| Parameter Strategi | 🛡️ Konservatif | ⚖️ Seimbang *(Rekomendasi)* | 🚀 Agresif |
+| Strategy Parameter | 🛡️ Conservative | ⚖️ Moderate *(Recommended)* | 🚀 Aggressive |
 | :--- | :--- | :--- | :--- |
-| **Target Keuntungan (TP)** | 3.5% | 5.0% | 7.5% |
-| **Trailing Stop Ratchet** | 1.8% (Ketat) | 2.5% (Moderat) | 3.5% (Longgar) |
-| **Kapasitas Posisi Simultan** | Maksimal 2 Koin | Maksimal 3 Koin | Maksimal 5 Koin |
-| **Fokus Keranjang Koin** | Koin Tier 1 (BTC, ETH, SOL) | Top 20 Likuiditas Indodax | Koin Momentum & New Listing |
-| **Circuit Breaker Harian** | 3.0% Kerugian Maksimal | 5.0% Kerugian Maksimal | 7.0% Kerugian Maksimal |
-| **Karakter Pengguna** | Pemula & pemilik modal besar | Sebagian besar trader normal | Trader berpengalaman di Bull Run |
+| **Take Profit Target (TP)** | 3.5% | 5.0% | 7.5% |
+| **Trailing Stop Ratchet** | 1.8% (Tight) | 2.5% (Balanced) | 3.5% (Wide) |
+| **Simultaneous Positions** | Maximum 2 Coins | Maximum 3 Coins | Maximum 5 Coins |
+| **Asset Universe** | Tier 1 Blue-Chips (BTC, ETH, SOL) | Top 20 Indodax Liquidity | Momentum Breakouts & New Listings |
+| **Daily Circuit Breaker** | 3.0% Maximum Loss | 5.0% Maximum Loss | 7.0% Maximum Loss |
+| **Target Trader Persona** | Capital preservation & beginners | Standard balanced crypto traders | High-conviction traders in Bull Runs |
 
 ---
 
-## 🔄 Mode Simulasi (Paper) vs Mode Nyata (Live Indodax)
+## 🔄 Simulation Mode (Paper) vs Real Mode (Live Indodax)
 
-### 1. Mode Demo (Paper Trading) — Tanpa Risiko Uang Riil
-- Dilengkapi saldo virtual **Rp 10.000.000**.
-- Membaca pergerakan harga asli bursa Indodax secara real-time.
-- Mensimulasikan order beli, biaya fee transaksi bursa (0.51%), slippage buku order, dan eksekusi trailing stop persis seperti akun riil.
-- Sangat disarankan untuk menguji strategi selama 3-7 hari sebelum menggunakan dana nyata.
+### 1. Demo Mode (Paper Trading) — Zero Financial Risk
+- Pre-loaded with **IDR 10,000,000** in virtual trading capital.
+- Streams real live market prices directly from the Indodax exchange.
+- Accurately simulates buy orders, exchange maker/taker fees (0.51%), orderbook slippage, and trailing stop exits.
+- Recommended for testing and calibration for 3 to 7 days before funding real capital.
 
-### 2. Mode Live (Uang Nyata Indodax) — Eksekusi Transaksi Riil
-- Terhubung langsung dengan akun Indodax Anda via API Key & Secret Key.
-- Dilengkapi modal persetujuan keselamatan **3-Poin Interaktif** sebelum aktivasi.
-- Seluruh order ditempatkan langsung ke buku order Indodax.
-- Tombol **Panic Sell (< 1 Detik)** siap melikuidasi seluruh posisi ke IDR dan membatalkan semua antrean order jika terjadi kondisi darurat global.
+### 2. Live Mode (Real Indodax Funds) — Real Capital Execution
+- Direct integration with your Indodax account via API Key and Secret Key.
+- Protected by an interactive **3-Point Safety Confirmation Modal** before activation.
+- Orders are executed live on the official Indodax orderbook.
+- Includes a **Panic Sell Button (< 1 Second)** to immediately liquidate all open crypto assets to IDR in global emergencies.
 
 ---
 
-## 📱 Bots Terpadu: WhatsApp & Telegram
+## 📱 Unified Remote Bots: WhatsApp & Telegram
 
-Seluruh kendali dan pengaturan bot notifikasi kini disatukan dalam **satu halaman terpusat** di tab **Bots**:
+Remote control and automated notification feeds are unified inside a **single central control panel** in the **Bots** tab:
 
-![Pusat Pengaturan Bots](docs/assets/unified-bots.svg)
+![Unified Bots Control Panel](docs/assets/unified-bots.svg)
 
-### Opsi Saluran Notifikasi (Notification Selector):
-1. 🚀 **Keduanya Sekaligus (WhatsApp + Telegram):** Mengirim alert beli/jual, laporan profit, dan peringatan darurat ke kedua aplikasi secara simultan *(Rekomendasi)*.
-2. 🟢 **Hanya WhatsApp:** Menggunakan koneksi WhatsApp Web Baileys.
-3. 🔵 **Hanya Telegram:** Menggunakan bot Telegram resmi (mudah, cukup masukkan Token & Chat ID).
-4. 🛑 **Nonaktifkan Semua Bot:** Mode hening total tanpa siaran pesan.
+### Notification Channel Modes:
+1. 🚀 **Both Channels (WhatsApp + Telegram):** Dispatches buy/sell alerts, daily profit summaries, and emergency alerts simultaneously to both apps *(Recommended)*.
+2. 🟢 **WhatsApp Only:** Operates exclusively via the embedded Baileys WhatsApp Web client.
+3. 🔵 **Telegram Only:** Operates via the official Telegram Bot API (Token & Chat ID).
+4. 🛑 **Disable All Bots:** Silent mode; completely pauses automated notification broadcasts.
 
-### Daftar Perintah Remote (Kirim ke Chat Bot):
-| Perintah | Hak Akses | Deskripsi Fungsi |
+### Remote Bot Command Reference:
+| Command | Permission | Description |
 | :--- | :---: | :--- |
-| `/status` | Publik / Admin | Melihat status mesin, bursa, dan posisi terbuka saat ini. |
-| `/profit` | Publik / Admin | Ringkasan laba bersih dan performa trading hari ini. |
-| `/koin` | Publik / Admin | Daftar 5 koin dengan kenaikan tertinggi hari ini di Indodax. |
-| `/modal <nominal> [profil]` | **Khusus Admin** | Mengatur alokasi modal dan profil risiko otomatis dari HP. |
-| `/start` | **Khusus Admin** | Mengaktifkan mesin auto-trading dari jarak jauh. |
-| `/stop` | **Khusus Admin** | Menghentikan/menjeda auto-trading. |
-| `/panic` | **Khusus Admin** | Menjual seluruh posisi terbuka ke IDR seketika (< 1 detik). |
-| `/balance` | **Khusus Admin** | Memeriksa saldo IDR dan total estimasi aset Indodax. |
-| `/admin <token>` | Verifikasi | Mendaftarkan nomor HP pengirim sebagai Administrator baru via token. |
-| `/help` | Publik / Admin | Menampilkan panduan bantuan perintah. |
+| `/status` | Public / Admin | Displays bot operational health, exchange connectivity, and open positions. |
+| `/profit` | Public / Admin | Reports today's realized profit, win rate, and total net performance. |
+| `/coins` | Public / Admin | Lists top 5 trending gainers on Indodax. |
+| `/capital <amount> [profile]` | **Admin Only** | Dynamically reconfigures trading capital and risk profile from your phone. |
+| `/start` | **Admin Only** | Resumes or enables autonomous spot trading remotely. |
+| `/stop` | **Admin Only** | Pauses automated entry signal execution. |
+| `/panic` | **Admin Only** | Triggers an immediate sub-second market liquidation of all open coins to IDR. |
+| `/balance` | **Admin Only** | Checks available IDR cash balance and total portfolio valuation. |
+| `/admin <token>` | Verification | Authorizes the sender's phone number as a registered Administrator using the access token. |
+| `/help` | Public / Admin | Displays the full interactive command glossary. |
 
 ---
 
-## 🔒 Keamanan & Infrastruktur Zero-Trust
+## 🔒 Zero-Trust Security & Resilient Infrastructure
 
-Keamanan modal dan integritas sistem adalah prioritas nomor satu:
-
-1. **Aturan API Key Indodax:**
-   - Bot **HANYA** memerlukan izin `View (Read)` dan `Trading (Trade)`.
-   - ❌ **JANGAN PERNAH MENGAKTIFKAN IZIN WITHDRAW/PENARIKAN!** Tanpa izin withdraw, saldo Anda 100% aman di bursa Indodax.
+1. **Restricted Indodax API Permissions:**
+   - The bot strictly requires only `View (Read)` and `Trading (Trade)` permissions.
+   - ❌ **NEVER ENABLE WITHDRAW PERMISSIONS!** Without withdrawal privileges, your funds remain securely locked inside Indodax.
 2. **Zero-Trust Admin Access Token:**
-   - Otentikasi dashboard dan endpoint administratif dilindungi token hex 32-karakter.
-   - Pengecekan token menggunakan `crypto.timingSafeEqual` untuk mencegah serangan analisis waktu (*timing attack*).
-   - Pengunjung tanpa token hanya dapat melihat dashboard dalam mode pantau (*View-Only*).
-3. **Layanan Rotasi Token Otomatis ([`tokenRotationService.ts`](src/services/auth/tokenRotationService.ts)):**
-   - Mendukung mode rotasi: *Tetap (Fixed)*, *Saat Startup*, atau *Interval Berkala (1 jam, 24 jam, dll.)*.
-4. **Database SQLite Terisolasi & Auto-Backup ([`backupService.ts`](src/services/backup/backupService.ts)):**
-   - Database berjalan dalam mode **WAL (Write-Ahead Logging)** yang cepat dan tahan korupsi data saat listrik padam mendadak.
-   - Snapshot backup terverifikasi dibuat otomatis di folder `backups/` dan dapat diunduh langsung dari UI Laporan.
-5. **Ekspor Laporan Pajak & Transaksi:**
-   - Mendukung ekspor data transaksi ke file spreadsheet **CSV (Excel)** dan dokumen **PDF Resmi** dengan format rapi untuk keperluan audit dan pelaporan pajak.
+   - Administrative endpoints and web settings are guarded by a 32-character hexadecimal token.
+   - Authentication checks utilize `crypto.timingSafeEqual` to guard against side-channel timing attacks.
+   - Visitors without valid credentials are restricted to View-Only mode.
+3. **Automated Token Rotation Service ([`tokenRotationService.ts`](src/services/auth/tokenRotationService.ts)):**
+   - Configurable rotation policies: *Fixed*, *Rotate on Startup*, or *Periodic Schedules (e.g., every 1h, 24h)*.
+4. **Isolated SQLite Database & Auto-Backup ([`backupService.ts`](src/services/backup/backupService.ts)):**
+   - Runs in **WAL (Write-Ahead Logging)** mode for crash resilience and concurrency.
+   - Automated timestamped database snapshots are preserved in `backups/` and can be downloaded from the Reports UI.
+5. **Official Audit PDF & CSV Export:**
+   - Enables one-click exports of trade histories to formatted spreadsheet **CSV** files and audit-ready **PDF Reports**.
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan (1-Klik)
+## 🚀 Quickstart Guide: 1-Click Launchers
 
-### Persyaratan Minimum:
-- **Node.js:** Versi **18.0.0** atau lebih baru ([Download Node.js](https://nodejs.org/)).
-- **Sistem Operasi:** Windows 10/11, macOS, atau Linux (Ubuntu/Debian).
-- **Koneksi Internet:** Stabil untuk streaming data pasar bursa Indodax.
+### System Requirements:
+- **Node.js:** Version **18.0.0** or newer ([Download Node.js](https://nodejs.org/)).
+- **Operating System:** Windows 10/11, macOS, or Linux (Ubuntu, Debian, CentOS).
+- **Network:** Stable internet connection for real-time WebSocket and REST feeds.
 
-### Cara Menjalankan Menggunakan Launcher 1-Klik:
+### Running with 1-Click Launchers:
 
-#### 🪟 Pengguna Windows:
-1. Ekstrak folder aplikasi di komputer Anda.
-2. Klik ganda (**double-click**) file **`start.bat`** (atau klik kanan `start.ps1` lalu pilih *Run with PowerShell*).
-3. Launcher akan otomatis memeriksa dependency, mengompilasi aplikasi, dan membuka browser Anda ke:
+#### 🪟 Windows:
+1. Extract or clone this repository to your local drive.
+2. Double-click **`start.bat`** (or right-click `start.ps1` and select *Run with PowerShell*).
+3. The launcher will automatically verify dependencies, compile the application, and launch your browser at:
    ```
    http://localhost:3001
    ```
 
-#### 🐧 Pengguna Linux / macOS:
-1. Buka terminal di folder aplikasi.
-2. Berikan izin eksekusi lalu jalankan script:
+#### 🐧 Linux / macOS:
+1. Open a terminal in the project directory.
+2. Grant execution permissions and start the service:
    ```bash
    chmod +x start.sh
    ./start.sh
    ```
-3. Buka browser Anda ke `http://localhost:3001`.
+3. Open your browser and navigate to `http://localhost:3001`.
 
 ---
 
-## 🐳 Panduan Menjalankan via Docker
+## 🐳 Production Deployment via Docker
 
-Untuk menjalankan bot di server VPS tanpa perlu instalasi Node.js lokal:
+To run the terminal headlessly on a Linux cloud VPS:
 
 ```bash
-# 1. Salin template environment
+# 1. Copy the environment template
 cp .env.example .env
 
-# 2. Bangun dan jalankan container di latar belakang
+# 2. Build and launch the container in detached mode
 docker compose up -d --build
 
-# 3. Periksa status log dan Admin Token
+# 3. View live server logs and the initial Admin Token
 docker compose logs -f
 ```
-Akses dashboard di browser melalui `http://IP-SERVER-ANDA:3001`.
+Access the dashboard through your browser at `http://YOUR-SERVER-IP:3001`.
 
 ---
 
-## 📂 Struktur Direktori Proyek
+## 📂 Project Directory Architecture
 
-![Peta Struktur Direktori](docs/assets/project-structure.svg)
+![Project Directory Architecture](docs/assets/project-structure.svg)
 
-| Direktori / Modul | Jalur (Path) | Peran & Tanggung Jawab Utama |
+| Directory / Module | Path | Primary Role & Responsibilities |
 | :--- | :--- | :--- |
-| **Frontend Web (PWA)** | `client/` | Antarmuka React 18, Tailwind CSS, Vite, Lucide Icons, service worker, & icons PWA. |
-| **Komponen UI** | `client/src/components/` | `DashboardView`, `BotsView`, `EntryDiagnosticsSection`, `QuotaView`, `ReportView`. |
-| **Dokumentasi & Visual** | `docs/` | `docs/assets/` (SVG resolusi tinggi), `PANDUAN_PENGGUNA.md`, & laporan implementasi. |
-| **Quantitative Signals** | `src/services/signals/` | Pipeline deterministik Section 9 (`features`, `lexicon`, `threat`, `regime`, `scorer`). |
-| **Trading & Risk Guard** | `src/services/trading/` | 9 Gerbang risiko (`riskGuard`), trailing ratchet, & mesin alokasi modal (`auto-set`). |
-| **Tim Riset AI Swarm** | `src/services/agents/` | 10 Agen intelijen spesialis, Blackboard bus outbox SQLite, & deduplikasi SHA-256. |
-| **Klien Bursa Indodax** | `src/services/indodax/` | Wrapper REST v2 & WebSocket dengan 6s in-flight cache & promise deduplication. |
-| **Bots Remote Control** | `src/services/whatsapp/` & `telegram/` | Engine WhatsApp Baileys Multi-Device & integrasi Telegram Official Bot API. |
-| **Keamanan & Otorisasi** | `src/services/auth/` | Layanan rotasi token admin & verifikasi otentikasi konstan `crypto.timingSafeEqual`. |
-| **Database & Backup** | `src/db/` & `src/services/backup/` | SQLite WAL engine, migrasi skema tabel, serta auto-snapshot backup terverifikasi. |
-| **REST API Server** | `src/api/` & `src/server.ts` | Endpoint Express, webhook bursa, proteksi middleware admin, & server lifecycle. |
-| **Rangkaian Pengujian** | `tests/` | 95 unit & integration tests covering 100% path kritis logika kuantitatif & keamanan. |
-| **Launcher 1-Klik** | `start.bat`, `start.ps1`, `start.sh` | Launcher otomatis sekali klik untuk Windows (CMD/PowerShell) dan Linux/macOS. |
-| **Deployment Docker** | `Dockerfile`, `docker-compose.yml` | Konfigurasi kontainerisasi multi-stage build untuk hosting di VPS server 24/7. |
+| **Frontend Web (PWA)** | `client/` | React 18, Tailwind CSS, Vite, Lucide Icons, service worker, & PWA manifest. |
+| **Internationalization** | `client/src/i18n/` | Bilingual dictionaries (`translations.ts`), context provider (`LanguageContext.tsx`), and switchers. |
+| **UI Components** | `client/src/components/` | `DashboardView`, `BotsView`, `EntryDiagnosticsSection`, `QuotaView`, `ReportView`. |
+| **Documentation & Assets** | `docs/` | `docs/assets/` (Vector SVGs), `PANDUAN_PENGGUNA.md` (Indonesian User Guide), and audit logs. |
+| **Quantitative Signals** | `src/services/signals/` | Deterministic Section 9 (`features`, `lexicon`, `threat`, `regime`, `scorer`). |
+| **Trading & Risk Guard** | `src/services/trading/` | 9 Risk Defense Gates (`riskGuard`), trailing ratchet, & capital auto-set engine. |
+| **AI Swarm Intelligence** | `src/services/agents/` | 10 specialized intelligence analysts, SQLite outbox Blackboard bus, & SHA-256 deduplication. |
+| **Indodax Market Adapter** | `src/services/indodax/` | REST v2 wrapper & WebSocket client with 6-second in-flight promise deduplication. |
+| **Remote Bot Services** | `src/services/whatsapp/` & `telegram/` | Baileys WhatsApp Multi-Device engine & Telegram Official Bot API integration. |
+| **Security & Auth** | `src/services/auth/` | Token rotation manager & constant-time `timingSafeEqual` authentication verification. |
+| **Database & Snapshots** | `src/db/` & `src/services/backup/` | SQLite WAL engine, relational schemas, migrations, and automated snapshot backup services. |
+| **REST API Server** | `src/api/` & `src/server.ts` | Express REST routes, exchange webhooks, zero-trust token protection middleware, & lifecycle hooks. |
+| **Automated Test Suite** | `tests/` | 95 unit and integration tests covering 100% of critical quantitative algorithms and security barriers. |
+| **1-Click Launchers** | `start.bat`, `start.ps1`, `start.sh` | Automated zero-configuration launchers for Windows, Linux, and macOS. |
+| **Containerization** | `Dockerfile`, `docker-compose.yml` | Multi-stage production Docker container configuration for continuous 24/7 cloud hosting. |
 
 > [!NOTE]
-> **Arsitektur Full-Stack Terpadu (Backend & Frontend Client):**
-> Proyek ini menggunakan struktur modular standar industri:
-> - **`src/` (Backend Engine):** Otak sistem — memproses sinyal deterministik Section 9, mengeksekusi 9 gerbang risiko, mengoordinasikan tim riset AI, mengelola database SQLite, dan menghubungkan bot WhatsApp/Telegram.
-> - **`client/` (Frontend Dashboard):** Antarmuka visual yang Anda lihat di browser (`http://localhost:3001`) — menyajikan grafik candlestick, kontrol trading, scanner pasar, panel telemetri kuota, dan tabel diagnostik 9 gerbang.
-> - Keduanya terkompilasi dan berjalan bersamaan dalam 1 server terpadu melalui perintah launcher bawaan (`start.bat` / `start.sh`).
+> **Unified Full-Stack Architecture:**
+> - **`src/` (Backend Core):** Executes the deterministic Section 9 signal pipeline, applies the 9 risk gates, coordinates the AI swarm, manages SQLite persistence, and drives remote WhatsApp/Telegram bots.
+> - **`client/` (Frontend Dashboard):** The interactive web console available at `http://localhost:3001` — presenting candlestick charts, order controls, market scanners, quota monitors, and live gate diagnostics.
+> - Both modules are bundled and served harmoniously from a single consolidated server process via the 1-click launchers (`start.bat` / `start.sh`).
 
 ---
 
-## 🧪 Pengujian & Jaminan Mutu (Test Suite)
+## 🧪 Quality Assurance & Test Suite
 
-Seluruh logika bisnis, keamanan token, perhitungan kuantitatif, dan pipeline gerbang risiko dilindungi oleh **95 unit & integration tests** di [`tests/`](tests/):
+All critical business logic, token security routines, quantitative indicators, and risk defense gates are safeguarded by **95 unit & integration tests** located in [`tests/`](tests/):
 
 ```bash
-# Menjalankan seluruh test suite otomatis:
+# Execute the entire automated test suite:
 npm test
 ```
 
-### Ringkasan Hasil Pengujian Terakhir:
+### Verified Test Suite Breakdown:
 ```
 ✔ Capital Allocation & Auto-Set Engine (5 tests passing)
 ✔ Quantitative Indicators (RSI, EMA, True ATR) & Spread Mechanics (5 tests passing)
@@ -462,7 +463,7 @@ npm test
 ✔ Database Backup Service (1 test passing)
 ✔ Telegram Notifier Service (2 tests passing)
 ✔ Section 9 Lexicon Sentiment Scoring & Age Decay (4 tests passing)
-✔ P0-A Fix: Scoped Threat Blocker & False Alarm Elimination (4 tests passing)
+✔ P0-A Fix: Scoped Threat Blocker & Benign Word Filtering (4 tests passing)
 ✔ BTC Macro Regime Window Returns (1h & 4h) (3 tests passing)
 ✔ Conservative Blue-Chip Pullback Opportunity Scoring (2 tests passing)
 ✔ Pure Risk Guard Execution Pipeline (Gates 1-8) (6 tests passing)
@@ -475,51 +476,51 @@ npm test
 ✔ Circuit Breaker Resilience & Decoupled Ratchet (1 test passing)
 ...
 ---------------------------------------------------------------------------------
-ℹ tests 95 | suites 29 | pass 95 | fail 0 | cancelled 0 | duration ~2s - 96s (sub-second local / cached)
+ℹ tests 95 | suites 29 | pass 95 | fail 0 | cancelled 0 | duration ~2.28s
 ---------------------------------------------------------------------------------
 ```
 
-Kompilasi produksi frontend dan backend:
+Production Build Verification:
 ```bash
 npm run build
-# Menjalankan tsc strict check & build client Vite (lolos 100% tanpa error)
+# Executes TypeScript strict typechecks and Vite client bundle generation (100% clean)
 ```
 
 ---
 
-## ❓ Tanya Jawab (FAQ) & Solusi Masalah
+## ❓ Frequently Asked Questions (FAQ) & Troubleshooting
 
-#### Q1: Mengapa bot belum melakukan pembelian koin sama sekali hari ini?
-> **A:** Ini adalah bukti bahwa **9 Gerbang Risiko** bekerja optimal! Bot tidak bertransaksi membabi buta. Jika spread sedang lebar, Bitcoin sedang drop, atau RSI koin sedang di pucuk, bot akan menahan diri demi menyelamatkan modal Anda. Anda dapat melihat alasan penolakan secara transparan di tabel **Diagnostik 9 Gerbang Masuk** pada dashboard.
+#### Q1: Why hasn't the bot entered any trades today?
+> **A:** This is clear evidence that the **9 Risk Gates** are actively protecting your capital. The bot never enters trades blindly. If the bid-ask spread is excessively wide, Bitcoin is trending downward, or target coins are in extreme overbought territory, entries are purposely withheld. You can view the exact evaluation diagnostics in the **Entry Diagnostics Section** on the dashboard.
 
-#### Q2: Apakah saya harus membiarkan komputer menyala 24 jam?
-> **A:** Ya, bot memantau trailing stop setiap detik. Jika komputer mati, bot tidak dapat mengeksekusi order secara real-time. Jika Anda ingin bot berjalan tanpa komputer rumah menyala, Anda dapat memasang bot di VPS Linux menggunakan Docker atau script `start.sh`.
+#### Q2: Does my computer need to remain powered on 24/7?
+> **A:** Yes. The terminal monitors trailing stops every second. If your host computer is shut down, local stop-loss triggers cannot execute. For uninterrupted 24/7 operation without keeping a home PC running, deploy the bot to a cloud VPS using Docker or `./start.sh`.
 
-#### Q3: Apakah aman memasukkan API Key Indodax ke dalam bot ini?
-> **A:** Sangat aman! API Key disimpan di database SQLite lokal di komputer Anda sendiri (bukan di server luar/pihak ketiga). Selain itu, Anda **hanya mengaktifkan izin Read dan Trade**—jangan pernah centang izin Withdraw. Tanpa izin penarikan, dana rupiah maupun kripto Anda tidak dapat dipindahkan keluar dari akun Indodax Anda.
+#### Q3: Is it safe to enter my Indodax API keys?
+> **A:** Yes. API keys are stored exclusively in your local SQLite database on your own machine. They are never transmitted to external cloud servers. Furthermore, you must **only grant View and Trade permissions**—never check the Withdraw permission. Without withdrawal rights, your funds cannot be transferred out of Indodax.
 
-#### Q4: Di mana saya bisa menemukan Admin Access Token jika jendela terminal terlanjur ditutup?
-> **A:** Anda dapat me-restart aplikasi dengan menjalankan launcher `start.bat` / `./start.sh`. Token aktif akan dicetak ulang di jendela terminal.
+#### Q4: How do I recover my Admin Access Token if the terminal window was closed?
+> **A:** Restart the terminal application using `start.bat` or `./start.sh`. The active access token is automatically displayed in the terminal output upon launch.
 
-#### Q5: Bagaimana cara mengganti nomor WhatsApp atau Telegram yang menerima notifikasi?
-> **A:** Buka tab **Bots** di dashboard. Untuk WhatsApp, klik tombol *Logout* lalu scan ulang QR Code dengan nomor baru. Untuk Telegram, cukup ganti Chat ID target dan simpan pengaturan.
+#### Q5: How do I switch the bot's language?
+> **A:** Click the **Language Switcher** pill located in the top-right header (or navigate to **Settings &rarr; Language Preference**) and toggle between **English (default)** and **Bahasa Indonesia**.
 
 ---
 
-## ⚠️ Disclaimer & Pernyataan Risiko
+## ⚠️ Financial Risk Disclaimer
 
-1. **Risiko Finansial:** Perdagangan aset kripto memiliki tingkat volatilitas harga yang tinggi. Meskipun sistem ini dilengkapi dengan 9 gerbang pengaman risiko dan trailing stop dinamis, tidak ada sistem perdagangan otomatis yang dapat menjamin profit 100% di segala kondisi pasar ekstrem.
-2. **Uji Coba Wajib:** Pengguna sangat disarankan untuk menjalankan bot dalam **Mode Demo (Paper Trading)** minimal selama 3 hingga 7 hari sebelum beralih ke Mode Nyata.
-3. **Modal Dingin:** Gunakan hanya modal dingin (*uang yang siap Anda alokasikan untuk investasi berisiko*) dan jangan pernah memperdagangkan uang kebutuhan mendesak.
-4. **Tanggung Jawab Pengguna:** Pengembang perangkat lunak ini tidak bertanggung jawab atas keputusan investasi finansial pribadi, kerugian akibat kegagalan koneksi internet pengguna, atau kelalaian dalam menjaga kerahasiaan API Key bursa Anda.
+1. **Market Volatility:** Cryptocurrency assets are subject to extreme price volatility. Although this software incorporates 9 risk defense gates and automated trailing stops, no algorithmic system can guarantee 100% profitability across all unforeseen market conditions.
+2. **Mandatory Testing:** Users are strongly advised to thoroughly test strategies in **Demo Mode (Paper Trading)** for a minimum of 3 to 7 days before risking real funds.
+3. **Risk Capital:** Only deploy discretionary risk capital that you can comfortably afford to lose. Never trade with essential living funds.
+4. **User Responsibility:** The developers of this terminal accept no liability for individual trading decisions, losses incurred due to network failures, or negligence in securing exchange API credentials.
 
 ---
 
 <div align="center">
 
-**AI TRADING TERMINAL — DIBANGUN DENGAN TEKNOLOGI KUANTITATIF &amp; KEAMANAN TINGKAT TINGGI**  
-*Melindungi Modal Anda, Menangkap Peluang Tanpa Emosi.*
+**AI TRADING TERMINAL — QUANTITATIVE PRECISION &amp; ENTERPRISE-GRADE SECURITY**  
+*Preserving Capital, Removing Emotion, Capturing Opportunity.*
 
-⭐ **Beri Bintang di GitHub jika aplikasi ini bermanfaat untuk perjalanan trading Anda!** ⭐
+⭐ **Star this repository on GitHub if it enhances your trading journey!** ⭐
 
 </div>

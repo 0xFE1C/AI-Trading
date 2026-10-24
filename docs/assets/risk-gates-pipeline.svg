@@ -22,10 +22,10 @@
 
   <!-- Title -->
   <text x="50" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="800" fill="#f8fafc">
-    🛡️ PIPELINE 9 GERBANG RISIKO (PURE RISK GUARD)
+    🛡️ PURE RISK GUARD (9 SEQUENTIAL GATES PIPELINE)
   </text>
   <text x="50" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#94a3b8">
-    Setiap calon sinyal beli diwajibkan melewati seluruh gerbang secara sekuensial. Kegagalan di 1 gerbang membatalkan entri seketika.
+    Every prospective buy signal must sequentially pass all 9 risk gates. Any single failure triggers an immediate abort.
   </text>
 
   <!-- Flow Line Background -->
@@ -38,8 +38,8 @@
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#0284c7"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 1: Circuit Breaker</text>
     <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Max Daily Drawdown</text>
-    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Halt entri jika rugi harian</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Cooldown 24h decoupled</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Halts entries on daily loss</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">24h decoupled cooldown</text>
   </g>
 
   <!-- Gate 2: Exposure Capacity -->
@@ -47,9 +47,9 @@
     <rect width="180" height="100" rx="10" fill="url(#gateCardBg)" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadowBox)"/>
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#0284c7"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 2: Exposure Limit</text>
-    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Kapasitas Slot Posisi</text>
-    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Batas: 1 - 5 koin simultan</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Cegah over-leverage</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Position Slot Capacity</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Limit: 1 - 5 coins</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Prevents over-exposure</text>
   </g>
 
   <!-- Gate 3: BTC Regime -->
@@ -59,7 +59,7 @@
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 3: BTC Regime</text>
     <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Flash Crash Blocker</text>
     <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">BTC 1h &lt; -3% / 4h &lt; -5%</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Veto pasar saat dump</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Market veto during dump</text>
   </g>
 
   <!-- Gate 4: Spread Trap -->
@@ -68,8 +68,8 @@
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#0284c7"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 4: Spread Trap</text>
     <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Bid-Ask Gap Check</text>
-    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Batas spread &lt; 0.8% - 1.5%</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Cegah jebakan illiquid</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Spread limit &lt; 0.8% - 1.5%</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Prevents illiquid traps</text>
   </g>
 
   <!-- Gate 5: RSI Guard -->
@@ -77,9 +77,9 @@
     <rect width="180" height="100" rx="10" fill="url(#gateCardBg)" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadowBox)"/>
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#0284c7"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 5: RSI Guard</text>
-    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Anti-Pucuk FOMO</text>
-    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">RSI(14) wajib &lt; 70-75</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Tolak candle jenuh beli</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Anti-FOMO Top Shield</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">RSI(14) must be &lt; 70-75</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Rejects overbought candles</text>
   </g>
 
   <!-- Connecting Line Down to Row 2 -->
@@ -91,9 +91,9 @@
     <rect width="180" height="100" rx="10" fill="url(#gateCardBg)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadowBox)"/>
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#d97706"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 6: Threat Scoping</text>
-    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Insiden &amp; Exploit Radar</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Incident &amp; Exploit Radar</text>
     <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Scoped per coin (30m fresh)</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">Veto koin bermasalah</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">Vetoes compromised assets</text>
   </g>
 
   <!-- Gate 7: Slippage Budget -->
@@ -101,9 +101,9 @@
     <rect width="180" height="100" rx="10" fill="url(#gateCardBg)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadowBox)"/>
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#d97706"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 7: Slippage Budget</text>
-    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Simulasi Fill Kedalaman</text>
-    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Top 5 Asks buku order</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">Tolak jika slippage &gt; 0.5%</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Order Depth Fill Sim</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Top 5 Asks orderbook walk</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">Rejects if slippage &gt; 0.5%</text>
   </g>
 
   <!-- Gate 8: Technical Score -->
@@ -111,7 +111,7 @@
     <rect width="180" height="100" rx="10" fill="url(#gateCardBg)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadowBox)"/>
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#d97706"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 8: Tech &amp; Setup</text>
-    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Ambang Skor Minimal</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Minimum Threshold</text>
     <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Score &gt;= 70 (Pullback/Mom)</text>
     <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">EMA21 + Buyer depth wall</text>
   </g>
@@ -121,25 +121,25 @@
     <rect width="180" height="100" rx="10" fill="url(#gateCardBg)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadowBox)"/>
     <rect x="0" y="0" width="180" height="26" rx="10" fill="#d97706"/>
     <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Gate 9: Min Indodax Floor</text>
-    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Regulasi Bursa Indodax</text>
-    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Nominal order &gt;= Rp 10.000</text>
-    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">Cegah order rejected exchange</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Indodax Exchange Rules</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Order nominal &gt;= IDR 10,000</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#f59e0b">Prevents exchange rejection</text>
   </g>
 
   <!-- Final Destination: ALL PASSED -> ORDER EXECUTED -->
   <g transform="translate(870, 255)">
     <rect width="180" height="100" rx="10" fill="url(#passGrad)" stroke="#34d399" stroke-width="2" filter="url(#shadowBox)"/>
     <text x="90" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#ffffff" text-anchor="middle">
-      ✓ 100% LOLOS
+      ✓ 100% PASSED
     </text>
     <text x="90" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ecfdf5" text-anchor="middle">
-      EKSEKUSI ORDER
+      ORDER EXECUTED
     </text>
     <text x="90" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#d1fae5" text-anchor="middle">
-      Order Dikirim ke Indodax
+      Dispatched to Indodax
     </text>
     <text x="90" y="92" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">
-      &amp; Trailing Ratchet Aktif
+      &amp; Trailing Ratchet Active
     </text>
   </g>
 
@@ -147,7 +147,7 @@
   <g transform="translate(50, 375)">
     <circle cx="8" cy="8" r="5" fill="#ef4444"/>
     <text x="22" y="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
-      <tspan fill="#f87171" font-weight="700">Jika GAGAL di tahap manapun:</tspan> Order dibatalkan seketika, alasan disimpan di <tspan fill="#38bdf8">entry_gate_logs</tspan>, dan dipantau sebagai <tspan fill="#a855f7">Ghost Position</tspan> untuk mengukur Alpha AI.
+      <tspan fill="#f87171" font-weight="700">If FAILED at any gate:</tspan> Order is aborted instantly, logged in <tspan fill="#38bdf8">entry_gate_logs</tspan>, and tracked as a <tspan fill="#a855f7">Ghost Position</tspan> to benchmark AI Alpha.
     </text>
   </g>
 </svg>

@@ -5,9 +5,8 @@ import {
   BarChart3,
   Bot,
   Settings,
-  ShieldCheck,
-  Eye,
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface MobileBottomNavProps {
   activeTab: string;
@@ -20,12 +19,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onSelectTab,
   isAdmin,
 }) => {
+  const { t } = useLanguage();
+
   const navItems = [
-    { id: 'dashboard', label: 'Terminal', icon: LayoutDashboard },
-    { id: 'scanner', label: 'Scanner', icon: Radar },
-    { id: 'reports', label: 'Laporan', icon: BarChart3 },
-    { id: 'agents', label: 'Riset AI', icon: Bot },
-    { id: 'settings', label: 'Setting', icon: Settings },
+    { id: 'dashboard', label: t('nav.dashboard', 'Terminal'), icon: LayoutDashboard },
+    { id: 'scanner', label: t('nav.scanner', 'Scanner'), icon: Radar },
+    { id: 'reports', label: t('nav.reports', 'Reports'), icon: BarChart3 },
+    { id: 'agents', label: t('nav.agents', 'AI Research'), icon: Bot },
+    { id: 'settings', label: t('nav.settings', 'Settings'), icon: Settings },
   ];
 
   return (

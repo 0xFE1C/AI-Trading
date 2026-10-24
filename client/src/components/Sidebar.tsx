@@ -4,9 +4,7 @@ import {
   Radio,
   Layers,
   TrendingUp,
-  MessageSquare,
   Sliders,
-  Zap,
   Activity,
   Play,
   Pause,
@@ -14,14 +12,12 @@ import {
   Lock,
   Unlock,
   ShieldCheck,
-  ShieldAlert,
   LogOut,
   X,
   ExternalLink,
   Eye,
   Gauge,
   FileText,
-  Globe,
   Gamepad2,
   BookOpen,
   Bot,
@@ -29,6 +25,7 @@ import {
 import { SystemStatus } from '../types';
 import { isStaticHost } from '../services/api';
 import { brandConfig } from '../brand.config';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -63,32 +60,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onStartTutorial,
   onOpenGlossary,
 }) => {
+  const { t, formatCurrency } = useLanguage();
   const isAuto = status?.isAutoTradingActive ?? false;
   const mode = status?.mode ?? 'paper';
   const balance = status?.balanceIdr ?? 0;
 
   const navSections = [
     {
-      title: 'Utama',
+      title: t('sidebar.section.main', 'Main'),
       items: [
-        { id: 'dashboard', label: 'Terminal Trading', icon: BarChart3, badge: 'Live' },
-        { id: 'reports', label: 'Laporan & Kinerja', icon: FileText, badge: 'PDF' },
+        { id: 'dashboard', label: t('nav.dashboard', 'Trading Terminal'), icon: BarChart3, badge: 'Live' },
+        { id: 'reports', label: t('nav.reports', 'Reports & Performance'), icon: FileText, badge: 'PDF' },
       ],
     },
     {
-      title: 'Riset & Analisa',
+      title: t('sidebar.section.research', 'Research & Analysis'),
       items: [
-        { id: 'scanner', label: 'Market Scanner', icon: Radio },
-        { id: 'agents', label: 'Tim Riset AI (10 Analis)', icon: Layers, badge: '10' },
+        { id: 'scanner', label: t('nav.scanner', 'Market Scanner'), icon: Radio },
+        { id: 'agents', label: t('nav.agents', 'AI Research (10 Swarm)'), icon: Layers, badge: '10' },
       ],
     },
     {
-      title: 'Sistem & Tools',
+      title: t('sidebar.section.system', 'System & Tools'),
       items: [
-        { id: 'backtest', label: 'Backtest Strategi', icon: TrendingUp },
-        { id: 'bots', label: 'Bots (WA & Telegram)', icon: Bot },
-        { id: 'quota', label: 'Kuota AI', icon: Gauge },
-        { id: 'settings', label: 'Pengaturan Sistem', icon: Sliders },
+        { id: 'backtest', label: t('nav.backtest', 'Strategy Backtest'), icon: TrendingUp },
+        { id: 'bots', label: t('nav.bots', 'Bots (WA & Telegram)'), icon: Bot },
+        { id: 'quota', label: t('nav.quota', 'AI Quota'), icon: Gauge },
+        { id: 'settings', label: t('nav.settings', 'System Settings'), icon: Sliders },
       ],
     },
   ];
@@ -98,117 +96,116 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop Overlay */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={onCloseMobile}
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden transition-opacity"
         />
       )}
 
-      {/* Main Sidebar */}
+      {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#070b13] border-r border-slate-800/80 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed top-0 bottom-0 left-0 z-50 flex w-72 flex-col border-r border-slate-800/80 bg-[#070b13] transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          isOpenMobile ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         }`}
       >
-        {/* Brand & Connection Header */}
-        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
+        {/* Brand Header */}
+        <div className="flex h-16 items-center justify-between px-5 border-b border-slate-800/80 bg-[#070b13]">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-lg shadow-blue-500/10">
-              <Zap className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 p-0.5 shadow-lg shadow-blue-500/20">
+              <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-slate-950">
+                <BarChart3 className="h-5 w-5 text-blue-400" />
+              </div>
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold tracking-tight text-slate-100 text-base">{brandConfig.appName}</span>
-                <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 border border-slate-700">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold tracking-tight text-white text-base">
+                  {brandConfig.appName}
+                </span>
+                <span className="rounded bg-blue-500/20 px-1 py-0.2 text-[9px] font-mono font-bold text-blue-300 border border-blue-500/30">
                   {brandConfig.version}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  isStaticHost
-                    ? 'bg-amber-400'
-                    : isWsConnected
-                    ? 'bg-emerald-400 animate-pulse'
-                    : 'bg-rose-500'
-                }`} />
-                <span>
-                  {isStaticHost
-                    ? 'Mode Demo (Data Simulasi)'
-                    : isWsConnected
-                    ? 'Feed Indodax Terhubung'
-                    : 'Menghubungkan Feed...'}
-                </span>
-              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                {t('brand.tagline', 'Autonomous Spot Trading')}
+              </p>
             </div>
           </div>
 
-          {/* Close button for mobile drawer */}
+          {/* Close button for mobile */}
           <button
             onClick={onCloseMobile}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden"
+            title="Tutup Menu"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Portfolio Mini Card */}
-        <div className="p-3.5 mx-3 mt-3 rounded-xl border border-slate-800/80 bg-slate-900/40 space-y-2">
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span className="uppercase tracking-wider font-medium text-[10px]">Saldo Portofolio</span>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold border ${
-              mode === 'live'
-                ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
-                : 'border-amber-500/30 bg-amber-950/40 text-amber-400'
-            }`}>
-              {mode.toUpperCase()}
+        {/* Live Network & Market Status Badge */}
+        <div className="px-4 py-2 border-b border-slate-800/60 bg-slate-900/30 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  isWsConnected ? 'bg-emerald-400' : 'bg-rose-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  isWsConnected ? 'bg-emerald-500' : 'bg-rose-500'
+                }`}
+              />
+            </span>
+            <span className="text-[11px] text-slate-300 font-mono">
+              {isWsConnected ? 'INDODAX WS: LIVE' : 'WS: RECONNECTING'}
             </span>
           </div>
-          <div className="text-lg font-bold font-mono text-slate-100">
-            Rp {balance.toLocaleString('id-ID')}
-          </div>
-          <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[11px]">
-            <span className="text-slate-400">Status Bot:</span>
-            <span className={`font-mono font-semibold flex items-center gap-1 ${
-              isAuto ? 'text-emerald-400' : 'text-slate-400'
-            }`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${isAuto ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-              {isAuto ? 'RUNNING' : 'PAUSED'}
-            </span>
-          </div>
+
+          <span className="text-[10px] font-mono text-slate-400">
+            {status?.mode === 'live' ? '🔴 LIVE' : '🟢 DEMO'}
+          </span>
         </div>
 
-        {/* Navigation Items Grouped by Category */}
-        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
-          {navSections.map((sec) => (
-            <div key={sec.title} className="space-y-1">
-              <div className="px-3 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                {sec.title}
+        {/* Navigation Menus */}
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+          {navSections.map((section, idx) => (
+            <div key={idx} className="space-y-1">
+              <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {section.title}
               </div>
-              {sec.items.map((item) => {
+              {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id || (item.id === 'bots' && activeTab === 'whatsapp');
-                const tourAttr = item.id === 'settings' ? 'nav-settings' : item.id === 'dashboard' ? 'nav-dashboard' : undefined;
+
                 return (
                   <button
                     key={item.id}
-                    data-tour={tourAttr}
                     onClick={() => {
                       setActiveTab(item.id);
-                      onCloseMobile();
+                      if (isOpenMobile) onCloseMobile();
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                    className={`group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 font-semibold'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                        ? 'bg-blue-600/15 text-blue-400 font-semibold border border-blue-500/30 shadow-sm'
+                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                      <span className="truncate">{item.label}</span>
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        className={`h-4 w-4 transition-colors ${
+                          isActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'
+                        }`}
+                      />
+                      <span>{item.label}</span>
                     </div>
+
                     {item.badge && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                        isActive ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'
-                      }`}>
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                          isActive
+                            ? 'bg-blue-500/30 text-blue-300 border border-blue-400/30'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                      >
                         {item.badge}
                       </span>
                     )}
@@ -218,34 +215,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ))}
 
-          {/* Quick Action Controls in Sidebar */}
-          <div className="pt-4 mt-2 border-t border-slate-800/80 space-y-2">
-            <div className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Kontrol Trading</span>
-              {!isAdmin && (
-                <span className="flex items-center gap-1 text-[10px] text-amber-400 lowercase font-mono">
-                  <Lock className="h-3 w-3" /> view only
-                </span>
-              )}
+          {/* Quick Portfolio Balance Card */}
+          <div className="mt-4 p-3 rounded-xl border border-slate-800 bg-slate-900/40 space-y-1.5 font-mono">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-sans">
+              <span>{t('header.balance', 'Balance')}</span>
+              <span className="text-[10px] text-blue-400 font-mono">IDR</span>
             </div>
+            <div className="text-sm font-bold text-slate-100 truncate">
+              {formatCurrency(balance)}
+            </div>
+          </div>
 
-            {/* Toggle Auto Trading */}
+          {/* Quick Engine Status Action */}
+          <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/30 space-y-2">
             <button
               onClick={onToggleTrading}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
                 isAuto
-                  ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-950/40'
-                  : 'border-slate-800 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60'
+                  ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
               }`}
             >
               <div className="flex items-center gap-2">
                 {isAuto ? <Pause className="h-3.5 w-3.5 text-emerald-400" /> : <Play className="h-3.5 w-3.5 text-slate-400" />}
-                <span>{isAuto ? 'Auto Trading: Aktif' : 'Auto Trading: Pause'}</span>
+                <span>{isAuto ? t('header.autoTrading.active', 'AUTO TRADING: ACTIVE') : t('header.autoTrading.paused', 'AUTO TRADING: PAUSED')}</span>
               </div>
               {!isAdmin && <Lock className="h-3 w-3 text-slate-500" />}
             </button>
 
-            {/* Toggle Paper / Live Mode */}
+            {/* Mode Switcher */}
             <button
               onClick={onToggleMode}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono font-medium border transition-colors ${
@@ -268,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-                <span>Panic Sell All</span>
+                <span>{t('header.panicSell', 'PANIC SELL')}</span>
               </div>
               {!isAdmin && <Lock className="h-3 w-3 text-rose-400/60" />}
             </button>
@@ -277,25 +275,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Security & Access Box */}
         <div className="p-3 border-t border-slate-800/80 bg-[#060910] space-y-1.5">
-          {/* Kamus Istilah & FAQ Button */}
+          {/* Glossary Button */}
           {onOpenGlossary && (
             <button
               onClick={onOpenGlossary}
               className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-blue-500/30 bg-blue-950/30 hover:bg-blue-900/40 text-blue-300 hover:text-blue-100 text-xs font-semibold transition-all shadow-sm"
             >
               <BookOpen className="h-4 w-4 text-blue-400" />
-              <span>📖 Kamus Istilah &amp; FAQ</span>
+              <span>📖 {t('header.glossary', 'Glossary & FAQ')}</span>
             </button>
           )}
 
-          {/* Panduan Pemula Button */}
+          {/* Tutorial Button */}
           {onStartTutorial && (
             <button
               onClick={onStartTutorial}
               className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-indigo-500/30 bg-indigo-950/30 hover:bg-indigo-900/40 text-indigo-300 hover:text-indigo-100 text-xs font-semibold transition-all shadow-sm"
             >
               <Gamepad2 className="h-4 w-4 text-indigo-400" />
-              <span>🎮 Panduan Pemula (Tutorial)</span>
+              <span>🎮 {t('header.tutorial', 'Tutorial')}</span>
             </button>
           )}
 
@@ -304,19 +302,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Administrator</span>
+                  <span>{t('header.admin', 'Administrator')}</span>
                 </div>
-                <span className="text-[10px] text-emerald-300/80 font-mono">Akses Penuh</span>
+                <span className="text-[10px] text-emerald-300/80 font-mono">Full Access</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-snug">
-                Semua tindakan eksekusi & konfigurasi dapat dilakukan.
+                All execution actions & configuration controls are unlocked.
               </p>
               <button
                 onClick={onLogout}
                 className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-[11px] text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
               >
                 <LogOut className="h-3.5 w-3.5" />
-                <span>Kunci / Keluar Admin</span>
+                <span>Lock / Exit Admin</span>
               </button>
             </div>
           ) : (
@@ -324,19 +322,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-amber-400 font-bold">
                   <Eye className="h-4 w-4" />
-                  <span>Mode Pengamat</span>
+                  <span>{t('header.viewOnly', 'View-Only Mode')}</span>
                 </div>
                 <span className="text-[10px] text-amber-300/80 font-mono">View-Only</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-snug">
-                Anda dapat melihat seluruh data & telemetri tanpa hak mengubah trading.
+                Telemetry and analytics are visible in monitoring mode.
               </p>
               <button
                 onClick={onOpenAuthModal}
                 className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-[11px] font-semibold text-white transition-colors shadow-sm"
               >
                 <Unlock className="h-3.5 w-3.5" />
-                <span>Buka Akses Admin</span>
+                <span>{t('header.loginAdmin', 'Unlock Admin Access')}</span>
               </button>
             </div>
           )}
