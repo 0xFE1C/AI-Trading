@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Gamepad2,
   Sparkles,
@@ -41,8 +41,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       'Hello Trader! Welcome to the autonomous crypto trading platform powered by Multi-Agent AI. Think of this as a flight simulator where you are the Commander. From this cockpit, you can monitor the Indodax market, scan coin momentum, and let quantitative algorithms hunt for disciplined profits. A wise commander never flips switches without understanding their cockpit!',
     narrative_id:
       'Halo Trader! Selamat datang di platform trading crypto otomatis bertenaga Multi-Agent AI. Seperti bermain game simulator, kamu adalah Komandan armada ini. Di cockpit ini, kamu bisa memantau pasar Indodax, membaca radar koin, dan membiarkan algoritma kuantitatif memburu profit secara terukur. Tapi ingat, komandan bijak tidak asal menekan tombol sebelum memahami fungsi cockpit-nya!',
-    tip_en: 'If you are already familiar with the system, you can click "Skip Tour" anytime to jump straight into the cockpit.',
-    tip_id: 'Jika kamu sudah memahami dasar trading, kamu dapat menekan tombol "Lewati Tur" kapan saja untuk langsung masuk ke cockpit.',
+    tip_en: 'Complete this 8-step training orientation to master all controls and unlock your cockpit.',
+    tip_id: 'Selesaikan 8 langkah orientasi pelatihan ini untuk menguasai kendali dan membuka cockpit kamu.',
     buttonText_en: 'Ready! Start Training Mission ➜',
     buttonText_id: 'Siap! Mulai Misi Pelatihan ➜',
   },
@@ -211,6 +211,42 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     }
   }, [isOpen, currentStepIndex, step.tab, activeTab, onSwitchTab]);
 
+  // COMPLETE SCROLL & BACKGROUND LOCK: User cannot scroll or interact with background during tutorial
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // 1. Freeze body and document scroll
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    // 2. Prevent scroll wheel & touchmove
+    const preventScroll = (e: Event) => {
+      e.preventDefault();
+    };
+
+    // 3. Prevent scroll keys (arrow keys, page up/down, space, home, end)
+    const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
+    const preventKeyScroll = (e: KeyboardEvent) => {
+      if (scrollKeys.has(e.key)) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', preventScroll, { passive: false });
+    window.addEventListener('touchmove', preventScroll, { passive: false });
+    window.addEventListener('keydown', preventKeyScroll, { passive: false });
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      window.removeEventListener('wheel', preventScroll);
+      window.removeEventListener('touchmove', preventScroll);
+      window.removeEventListener('keydown', preventKeyScroll);
+    };
+  }, [isOpen]);
+
   // Measure and track target element bounding rect with retry
   const updateTargetRect = useCallback(() => {
     if (!step.targetSelector) {
@@ -229,7 +265,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     setTargetRect(null);
   }, [step.targetSelector]);
 
-  // Robust element detection, scrolling, and DOM highlight class attachment
+  // Robust element detection, scrolling into center, and DOM highlight class attachment
   useEffect(() => {
     if (!isOpen) return;
 
@@ -319,11 +355,6 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     }
   };
 
-  const handleSkip = () => {
-    localStorage.removeItem('ai_trading_tutorial_step');
-    onComplete();
-  };
-
   const isFinalStep = currentStepIndex === TUTORIAL_STEPS.length - 1;
 
   // Calculate intelligent position for the dialog box relative to target rect
@@ -385,7 +416,14 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
   const hasCutout = !step.centerModal && targetRect;
 
   return (
-    <div className="fixed inset-0 z-[9990] overflow-hidden select-none">
+    <div
+      className="fixed inset-0 z-[9990] overflow-hidden select-none pointer-events-auto"
+      onClick={(e) => {
+        // Prevent clicking anywhere in the background from triggering any underlying actions
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+    >
       {/* 1. Backdrop Overlay:
              If there is a target, use SVG Mask to punch a 100% CRYSTAL-CLEAR TRANSPARENT HOLE directly over the target element.
              If centerModal or no target, use a smooth dark backdrop. */}
@@ -415,7 +453,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
             y="0"
             width="100%"
             height="100%"
-            fill="rgba(3, 7, 18, 0.72)"
+            fill="rgba(3, 7, 18, 0.75)"
             mask="url(#tutorial-spotlight-hole)"
           />
         </svg>
@@ -461,14 +499,18 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
         </div>
       )}
 
-      {/* 3. Game HUD Quest Dialog Box */}
+      {/* 3. Game HUD Quest Dialog Box (Only clickable element) */}
       <div
         style={getDialogStyle()}
-        className={`w-full max-w-lg rounded-2xl border-2 border-blue-500/50 bg-[#090f1d] shadow-2xl shadow-blue-950/90 p-5 sm:p-6 text-slate-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 ${
+        onClick={(e) => {
+          // Allow clicks inside dialog box (prev and next buttons)
+          e.stopPropagation();
+        }}
+        className={`w-full max-w-lg rounded-2xl border-2 border-blue-500/50 bg-[#090f1d] shadow-2xl shadow-blue-950/90 p-5 sm:p-6 text-slate-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 pointer-events-auto ${
           step.centerModal ? 'mx-4' : ''
         }`}
       >
-        {/* HUD Top Bar: Mission Badge, Progress, & Skip button */}
+        {/* HUD Top Bar: Mission Badge & Progress Percentage (NO SKIP BUTTON) */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/30 text-blue-400 border border-blue-500/40">
@@ -486,15 +528,11 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1">
-            <button
-              type="button"
-              onClick={handleSkip}
-              className="text-[10px] font-mono font-semibold text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 px-2 py-0.5 rounded-full transition-colors"
-              title={l('Skip tutorial and proceed directly to cockpit', 'Lewati tutorial dan langsung ke terminal')}
-            >
-              {l('Skip Tour ✕', 'Lewati Tur ✕')}
-            </button>
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex items-center gap-1 text-[10px] font-mono font-semibold text-blue-400 bg-blue-950/60 border border-blue-500/30 px-2 py-0.5 rounded-full">
+              <Sparkles className="w-2.5 h-2.5 text-blue-300 animate-pulse" />
+              <span>{progressPercent}%</span>
+            </div>
             {/* Progress Bar */}
             <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
@@ -538,7 +576,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
           </div>
         </div>
 
-        {/* Bottom Actions: Prev & Next Button */}
+        {/* Bottom Actions: ONLY Prev & Next / Finish Button */}
         <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
           {currentStepIndex > 0 ? (
             <button
