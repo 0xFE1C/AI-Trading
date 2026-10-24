@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -28,8 +29,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const finalConfirmText = confirmText || confirmLabel || 'Konfirmasi';
-  const finalCancelText = cancelText || cancelLabel || 'Batal';
+  const { l } = useLanguage();
+  const finalConfirmText = confirmText || confirmLabel || l('Confirm', 'Konfirmasi');
+  const finalCancelText = cancelText || cancelLabel || l('Cancel', 'Batal');
   const effectiveIsDanger = isDanger || variant === 'danger';
   if (!isOpen) return null;
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, X, ShieldAlert, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface PanicModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface PanicModalProps {
 }
 
 export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfirm, openPositionsCount }) => {
+  const { l } = useLanguage();
   const [confirmedCheck, setConfirmedCheck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resultMsg, setResultMsg] = useState<{ success: boolean; text: string } | null>(null);
@@ -30,7 +32,7 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
         }, 2500);
       }
     } catch (err: any) {
-      setResultMsg({ success: false, text: err.message || 'Gagal mengeksekusi Panic Sell.' });
+      setResultMsg({ success: false, text: err.message || l('Failed to execute Panic Sell.', 'Gagal mengeksekusi Panic Sell.') });
     } finally {
       setLoading(false);
     }
@@ -47,10 +49,10 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
             </div>
             <div>
               <h3 className="text-base font-bold text-white tracking-tight">
-                Darurat: Panic Sell Portofolio
+                {l('Emergency: Portfolio Panic Sell', 'Darurat: Panic Sell Portofolio')}
               </h3>
               <p className="text-xs text-rose-300/80">
-                Likuidasi darurat seluruh koin ke Rupiah (IDR)
+                {l('Immediate market liquidation of all open coins to IDR', 'Likuidasi darurat seluruh koin ke Rupiah (IDR)')}
               </p>
             </div>
           </div>
@@ -58,7 +60,7 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
             onClick={onClose}
             disabled={loading}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
-            title="Tutup"
+            title={l('Close', 'Tutup')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -68,17 +70,20 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
         <div className="rounded-xl border border-rose-500/20 bg-rose-950/20 p-4 space-y-2.5 text-xs text-rose-200/90 leading-relaxed">
           <div className="font-semibold text-rose-300 flex items-center gap-1.5">
             <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-            Aksi ini akan menjalankan langkah berikut seketika:
+            {l('This action will immediately execute the following steps:', 'Aksi ini akan menjalankan langkah berikut seketika:')}
           </div>
           <ul className="space-y-1.5 pl-5 list-disc text-slate-300 text-[11px]">
             <li>
-              Menjual <strong>SEMUA</strong> {openPositionsCount !== undefined ? `(${openPositionsCount}) ` : ''}koin posisi terbuka langsung ke IDR pada harga terbaik saat ini.
+              {l(
+                `Market-sell ALL ${openPositionsCount !== undefined ? `(${openPositionsCount}) ` : ''}active positions directly to IDR at current best market prices.`,
+                `Menjual SEMUA ${openPositionsCount !== undefined ? `(${openPositionsCount}) ` : ''}koin posisi terbuka langsung ke IDR pada harga terbaik saat ini.`
+              )}
             </li>
             <li>
-              Membatalkan seluruh pending order yang belum terselesaikan di bursa.
+              {l('Cancel all unfilled pending orders on the exchange.', 'Membatalkan seluruh pending order yang belum terselesaikan di bursa.')}
             </li>
             <li>
-              Menjeda (<strong>PAUSE</strong>) mesin auto-trading agar tidak membuka posisi baru.
+              {l('Pause the auto-trading engine to prevent any new position openings.', 'Menjeda (PAUSE) mesin auto-trading agar tidak membuka posisi baru.')}
             </li>
           </ul>
         </div>
@@ -111,7 +116,10 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
             className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-950 text-rose-600 focus:ring-rose-500"
           />
           <span className="text-xs text-slate-300">
-            Saya memahami sepenuhnya dan ingin melikuidasi seluruh koin sekarang demi keamanan modal.
+            {l(
+              'I fully understand and want to liquidate all crypto positions now to preserve capital.',
+              'Saya memahami sepenuhnya dan ingin melikuidasi seluruh koin sekarang demi keamanan modal.'
+            )}
           </span>
         </label>
 
@@ -123,7 +131,7 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
             disabled={loading}
             className="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
           >
-            Batalkan
+            {l('Cancel', 'Batalkan')}
           </button>
           <button
             type="button"
@@ -138,11 +146,11 @@ export const PanicModal: React.FC<PanicModalProps> = ({ isOpen, onClose, onConfi
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Mengeksekusi...</span>
+                <span>{l('Executing...', 'Mengeksekusi...')}</span>
               </>
             ) : (
               <>
-                <span>EKSEKUSI PANIC SELL</span>
+                <span>{l('EXECUTE PANIC SELL', 'EKSEKUSI PANIC SELL')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}

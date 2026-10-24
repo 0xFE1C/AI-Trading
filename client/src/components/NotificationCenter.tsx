@@ -11,6 +11,7 @@ import {
   Clock,
   Trash2
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export interface AppNotification {
   id: string;
@@ -38,6 +39,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onClearAll,
   onNotificationClick,
 }) => {
+  const { l, language } = useLanguage();
   if (!isOpen) return null;
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -85,14 +87,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-100">Pusat Pemberitahuan</h3>
+                <h3 className="text-sm font-bold text-slate-100">{l('Notification Center', 'Pusat Pemberitahuan')}</h3>
                 {unreadCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-600 text-white">
-                    {unreadCount} baru
+                    {unreadCount} {l('new', 'baru')}
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400">Riwayat eksekusi &amp; peringatan risiko sistem</p>
+              <p className="text-[11px] text-slate-400">{l('Execution history & system risk telemetry', 'Riwayat eksekusi & peringatan risiko sistem')}</p>
             </div>
           </div>
 
@@ -114,7 +116,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               className="flex items-center gap-1.5 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <CheckCheck className="h-3.5 w-3.5 text-blue-400" />
-              <span>Tandai Semua Dibaca</span>
+              <span>{l('Mark All as Read', 'Tandai Semua Dibaca')}</span>
             </button>
             <button
               type="button"
@@ -122,7 +124,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               className="flex items-center gap-1.5 text-rose-400/80 hover:text-rose-300 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Hapus Riwayat</span>
+              <span>{l('Clear History', 'Hapus Riwayat')}</span>
             </button>
           </div>
         )}
@@ -146,7 +148,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   </div>
                   <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {new Date(item.timestamp).toLocaleTimeString('id-ID', {
+                    {new Date(item.timestamp).toLocaleTimeString(language === 'id' ? 'id-ID' : 'en-US', {
                       hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit',
@@ -161,9 +163,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
               <Bell className="h-10 w-10 text-slate-600 mb-2 stroke-1" />
-              <p className="text-xs font-medium text-slate-400">Belum ada notifikasi</p>
+              <p className="text-xs font-medium text-slate-400">{l('No notifications yet', 'Belum ada notifikasi')}</p>
               <p className="text-[11px] text-slate-500 mt-1 max-w-xs">
-                Transaksi beli, jual, pergerakan koin baru, atau peringatan rem darurat akan tercatat di sini.
+                {l(
+                  'Buy, sell, new coin surge, and emergency stop events will be recorded here.',
+                  'Transaksi beli, jual, pergerakan koin baru, atau peringatan rem darurat akan tercatat di sini.'
+                )}
               </p>
             </div>
           )}

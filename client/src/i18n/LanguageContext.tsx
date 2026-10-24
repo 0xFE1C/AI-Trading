@@ -1,15 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { Language, translations } from './translations';
 
-interface LanguageContextType {
+export interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string, fallback?: string) => string;
+  l: (enText: string, idText: string) => string;
   formatCurrency: (value: number) => string;
   formatNumber: (value: number) => string;
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+export const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'ai_trading_language';
 
@@ -55,6 +56,12 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
   }, [language]);
 
+  const l = useMemo(() => {
+    return (enText: string, idText: string): string => {
+      return language === 'id' ? idText : enText;
+    };
+  }, [language]);
+
   const formatCurrency = useMemo(() => {
     return (val: number): string => {
       if (language === 'id') {
@@ -72,7 +79,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [language]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, formatCurrency, formatNumber }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, l, formatCurrency, formatNumber }}>
       {children}
     </LanguageContext.Provider>
   );

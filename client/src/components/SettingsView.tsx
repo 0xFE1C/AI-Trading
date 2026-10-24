@@ -45,6 +45,7 @@ import {
 import { ConfirmModal } from './ConfirmModal';
 import { Toast } from './Toast';
 import { LanguageSelector } from './LanguageSelector';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export type SettingsSubTab = 'ai' | 'risk' | 'indodax' | 'security';
 
@@ -57,6 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   activeSubTab: externalSubTab,
   onSubTabChange,
 }) => {
+  const { l, formatCurrency, formatNumber, language } = useLanguage();
   const [deleteProviderId, setDeleteProviderId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [currentSubTab, setCurrentSubTab] = useState<SettingsSubTab>(() => {
@@ -166,10 +168,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         intervalUnit: rotationStatus.intervalUnit,
       });
       setRotationStatus(updated);
-      setRotationSuccessMessage('Pengaturan rotasi token berhasil disimpan!');
+      setRotationSuccessMessage(l('Token rotation settings saved successfully!', 'Pengaturan rotasi token berhasil disimpan!'));
       setTimeout(() => setRotationSuccessMessage(null), 4000);
     } catch (err: any) {
-      setToast({ message: err?.message || 'Gagal menyimpan pengaturan rotasi token', type: 'error' });
+      setToast({ message: err?.message || l('Failed to save token rotation settings', 'Gagal menyimpan pengaturan rotasi token'), type: 'error' });
     } finally {
       setRotationLoading(false);
     }
@@ -202,10 +204,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             : null
         );
       }
-      setRotationSuccessMessage('Token baru berhasil di-generate dan disinkronkan ke sesi ini!');
+      setRotationSuccessMessage(l('New token generated and synchronized to this session!', 'Token baru berhasil di-generate dan disinkronkan ke sesi ini!'));
       setTimeout(() => setRotationSuccessMessage(null), 5000);
     } catch (err: any) {
-      setToast({ message: err?.message || 'Gagal merotasi token', type: 'error' });
+      setToast({ message: err?.message || l('Failed to rotate token', 'Gagal merotasi token'), type: 'error' });
     } finally {
       setRotationLoading(false);
     }
@@ -235,7 +237,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         setAgyStep('manual');
       }
     } catch (err: any) {
-      setAgyError(err.message || 'Gagal memulai otorisasi Antigravity.');
+      setAgyError(err.message || l('Failed to initiate Antigravity authorization.', 'Gagal memulai otorisasi Antigravity.'));
       setAgyStep('error');
     }
   };
@@ -256,7 +258,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setAgyStep('success');
       await loadData();
     } catch (err: any) {
-      setAgyError(err.message || 'Gagal menukarkan token Antigravity.');
+      setAgyError(err.message || l('Failed to exchange Antigravity token.', 'Gagal menukarkan token Antigravity.'));
       setAgyStep('error');
     }
   };
@@ -317,7 +319,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         protocol: provProtocol,
       });
 
-      setStatusMessage(`Provider "${provName}" berhasil disimpan! Klik tombol "Import Models Otomatis" untuk mengambil daftar model.`);
+      setStatusMessage(`Provider "${provName}" berhasil disimpan! Klik tombol "{l('Auto-Import Models', 'Import Models Otomatis')}" untuk mengambil daftar model.`);
       setShowAddForm(false);
       setProvName('');
       setProvBaseUrl('');
@@ -343,7 +345,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setDeleteProviderId(null);
     try {
       await api.deleteProvider(id);
-      setToast({ message: 'Provider dan model terkait berhasil dihapus.', type: 'info' });
+      setToast({ message: l('Provider and associated models deleted successfully.', 'Provider dan model terkait berhasil dihapus.'), type: 'info' });
       await loadData();
     } catch (err: any) {
       setToast({ message: `Gagal menghapus provider: ${err.message}`, type: 'error' });
@@ -360,7 +362,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         setToast({ message: `Berhasil mengimpor ${res.count} model!`, type: 'success' });
         await loadData();
       } else {
-        setToast({ message: 'Gagal mengimpor model dari provider.', type: 'error' });
+        setToast({ message: l('Failed to import models from provider.', 'Gagal mengimpor model dari provider.'), type: 'error' });
       }
     } catch (err: any) {
       setToast({ message: `Error saat import models: ${err.message}`, type: 'error' });
@@ -377,7 +379,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (payload.max_allocation_per_trade_idr) {
         const alloc = parseFloat(payload.max_allocation_per_trade_idr);
         if (isNaN(alloc) || alloc < 10000) {
-          setToast({ message: 'Alokasi per trade minimal Rp 10.000 (batas minimum transaksi Indodax)', type: 'error' });
+          setToast({ message: l('Allocation per trade must be at least IDR 10,000 (Indodax minimum order size)', 'Alokasi per trade minimal Rp 10.000 (batas minimum transaksi Indodax)'), type: 'error' });
           return;
         }
       }
@@ -385,7 +387,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (payload.trailing_stop_percent) {
         const ts = parseFloat(payload.trailing_stop_percent);
         if (isNaN(ts) || ts <= 0 || ts > 50) {
-          setToast({ message: 'Trailing stop percent harus antara 0.1% s/d 50%', type: 'error' });
+          setToast({ message: l('Trailing stop percent must be between 0.1% and 50%', 'Trailing stop percent harus antara 0.1% s/d 50%'), type: 'error' });
           return;
         }
       }
@@ -393,7 +395,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (payload.take_profit_target_1_percent) {
         const tp = parseFloat(payload.take_profit_target_1_percent);
         if (isNaN(tp) || tp <= 0 || tp > 200) {
-          setToast({ message: 'Take profit target 1 harus lebih dari 0%', type: 'error' });
+          setToast({ message: l('Take profit target 1 must be greater than 0%', 'Take profit target 1 harus lebih dari 0%'), type: 'error' });
           return;
         }
       }
@@ -401,7 +403,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (payload.daily_loss_limit_percent) {
         const dll = parseFloat(payload.daily_loss_limit_percent);
         if (isNaN(dll) || dll <= 0 || dll > 100) {
-          setToast({ message: 'Batas kerugian harian harus antara 1% s/d 100%', type: 'error' });
+          setToast({ message: l('Daily loss limit must be between 1% and 100%', 'Batas kerugian harian harus antara 1% s/d 100%'), type: 'error' });
           return;
         }
       }
@@ -409,7 +411,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (payload.max_active_trades) {
         const mat = parseInt(payload.max_active_trades, 10);
         if (isNaN(mat) || mat < 1 || mat > 20) {
-          setToast({ message: 'Maksimal posisi aktif harus antara 1 s/d 20 koin', type: 'error' });
+          setToast({ message: l('Max active positions must be between 1 and 20 coins', 'Maksimal posisi aktif harus antara 1 s/d 20 koin'), type: 'error' });
           return;
         }
       }
@@ -422,7 +424,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         authStorage.setToken(payload.admin_access_token);
       }
       setSaveSuccess(true);
-      setToast({ message: 'Konfigurasi pengaturan berhasil disimpan!', type: 'success' });
+      setToast({ message: l('Configuration settings saved successfully!', 'Konfigurasi pengaturan berhasil disimpan!'), type: 'success' });
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
       setToast({ message: `Gagal menyimpan settings: ${err.message}`, type: 'error' });
@@ -522,7 +524,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (!token || !chatId) {
         setTelegramFeedback({
           type: 'error',
-          message: 'Mohon isi Telegram Bot Token dan Chat ID terlebih dahulu.',
+          message: l('Please enter Telegram Bot Token and Chat ID first.', 'Mohon isi Telegram Bot Token dan Chat ID terlebih dahulu.'),
         });
         return;
       }
@@ -530,18 +532,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (res.success) {
         setTelegramFeedback({
           type: 'success',
-          message: res.message || 'Pesan tes berhasil dikirim ke Telegram!',
+          message: res.message || l('Test message sent to Telegram successfully!', 'Pesan tes berhasil dikirim ke Telegram!'),
         });
       } else {
         setTelegramFeedback({
           type: 'error',
-          message: res.message || 'Gagal mengirim pesan tes ke Telegram. Periksa token dan Chat ID.',
+          message: res.message || l('Failed to send test message to Telegram. Check token and Chat ID.', 'Gagal mengirim pesan tes ke Telegram. Periksa token dan Chat ID.'),
         });
       }
     } catch (err: any) {
       setTelegramFeedback({
         type: 'error',
-        message: err.message || 'Terjadi kesalahan saat menghubungi Telegram API.',
+        message: err.message || l('Error occurred while contacting Telegram API.', 'Terjadi kesalahan saat menghubungi Telegram API.'),
       });
     } finally {
       setTelegramTesting(false);
@@ -620,7 +622,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setSettings(recommended);
       setSaveSuccess(true);
       setStatusMessage('Preset Pemula Berhasil Diterapkan! Profil: Konservatif, Saldo Simulasi: Rp 10 Juta, Filter: Bluechip Aman.');
-      setToast({ message: 'Preset Pemula Ramah Modal Berhasil Diterapkan!', type: 'success' });
+      setToast({ message: l('Beginner-Friendly Preset Applied Successfully!', 'Preset Pemula Ramah Modal Berhasil Diterapkan!'), type: 'success' });
       setTimeout(() => {
         setSaveSuccess(false);
         setStatusMessage(null);
@@ -645,13 +647,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>Pengaturan &amp; Konfigurasi Sistem</span>
+              <span>{l('System Settings & Configuration', 'Pengaturan & Konfigurasi Sistem')}</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-500/30">
                 v1.0
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Kelola koneksi AI, parameter risiko, akun Indodax, dan keamanan remote access secara rapi dan terarah.
+              {l('Manage AI connections, risk parameters, Indodax accounts, and remote access security with clarity.', 'Kelola koneksi AI, parameter risiko, akun Indodax, dan keamanan remote access secara rapi dan terarah.')}
             </p>
           </div>
         </div>
@@ -661,7 +663,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md shadow-blue-950/40 transition-all active:scale-95 shrink-0"
         >
           <Save className="h-4 w-4" />
-          <span>Simpan Perubahan</span>
+          <span>{l('Save Changes', 'Simpan Perubahan')}</span>
         </button>
       </div>
 
@@ -681,7 +683,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {saveSuccess && (
         <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/40 text-emerald-200 text-xs flex items-center gap-2.5 shadow-sm animate-in fade-in">
           <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">Seluruh pengaturan berhasil disimpan ke database lokal!</span>
+          <span className="font-medium">{l('All settings successfully saved to local database!', 'Seluruh pengaturan berhasil disimpan ke database lokal!')}</span>
         </div>
       )}
 
@@ -697,14 +699,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-100">
-                Setup Otomatis 1-Klik untuk Pemula
+                {l('1-Click Automatic Setup for Beginners', 'Setup Otomatis 1-Klik untuk Pemula')}
               </h3>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                Direkomendasikan
+                {l('Recommended', 'Direkomendasikan')}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              Bingung mengatur angka teknis? Klik tombol ini untuk otomatis menerapkan profil risiko <strong>Konservatif (Aman)</strong>, modal simulasi <strong>Rp 10.000.000</strong>, dan menyalakan filter proteksi koin bluechip.
+              {l('Confused by technical settings? Click this button to automatically apply Conservative (Safe) risk profile, IDR 10,000,000 simulation balance, and bluechip coin protection filters.', 'Bingung mengatur angka teknis? Klik tombol ini untuk otomatis menerapkan profil risiko Konservatif (Aman), modal simulasi Rp 10.000.000, dan menyalakan filter proteksi koin bluechip.')}
             </p>
           </div>
         </div>
@@ -714,7 +716,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all shrink-0 active:scale-95"
         >
           <CheckCircle2 className="w-4 h-4" />
-          <span>Terapkan Preset Pemula</span>
+          <span>{l('Apply Beginner Preset', 'Terapkan Preset Pemula')}</span>
         </button>
       </div>
 
@@ -731,9 +733,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <Cpu className={`w-4 h-4 shrink-0 ${currentSubTab === 'ai' ? 'text-white' : 'text-blue-400'}`} />
           <div className="min-w-0">
-            <div className="text-xs truncate">1. AI Provider &amp; Model</div>
+            <div className="text-xs truncate">{l('1. AI Provider & Model', '1. AI Provider & Model')}</div>
             <div className={`text-[10px] truncate ${currentSubTab === 'ai' ? 'text-blue-100' : 'text-slate-500'}`}>
-              Google OAuth / API Keys
+              {l('Google OAuth / API Keys', 'Google OAuth / API Keys')}
             </div>
           </div>
         </button>
@@ -749,9 +751,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <Shield className={`w-4 h-4 shrink-0 ${currentSubTab === 'risk' ? 'text-white' : 'text-amber-400'}`} />
           <div className="min-w-0">
-            <div className="text-xs truncate">2. Modal &amp; Manajemen Risiko</div>
+            <div className="text-xs truncate">{l('2. Capital & Risk Management', '2. Modal & Manajemen Risiko')}</div>
             <div className={`text-[10px] truncate ${currentSubTab === 'risk' ? 'text-blue-100' : 'text-slate-500'}`}>
-              Profil &amp; Batas Kerugian
+              {l('Profiles & Loss Limits', 'Profil & Batas Kerugian')}
             </div>
           </div>
         </button>
@@ -767,9 +769,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <Key className={`w-4 h-4 shrink-0 ${currentSubTab === 'indodax' ? 'text-white' : 'text-emerald-400'}`} />
           <div className="min-w-0">
-            <div className="text-xs truncate">3. Kunci Indodax (Mode Live)</div>
+            <div className="text-xs truncate">{l('3. Indodax Keys (Live Mode)', '3. Kunci Indodax (Mode Live)')}</div>
             <div className={`text-[10px] truncate ${currentSubTab === 'indodax' ? 'text-blue-100' : 'text-slate-500'}`}>
-              Khusus Uang Riil
+              {l('Real Money Trading Only', 'Khusus Uang Riil')}
             </div>
           </div>
         </button>
@@ -785,9 +787,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <Globe className={`w-4 h-4 shrink-0 ${currentSubTab === 'security' ? 'text-white' : 'text-sky-400'}`} />
           <div className="min-w-0">
-            <div className="text-xs truncate">4. Akses Remote &amp; Notifikasi</div>
+            <div className="text-xs truncate">{l('4. Remote Access & Notifications', '4. Akses Remote & Notifikasi')}</div>
             <div className={`text-[10px] truncate ${currentSubTab === 'security' ? 'text-blue-100' : 'text-slate-500'}`}>
-              Telegram, Tunnel &amp; Token
+              {l('Telegram, Tunnel & Token', 'Telegram, Tunnel & Token')}
             </div>
           </div>
         </button>
@@ -803,10 +805,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <HelpCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-semibold text-slate-100">
-                Cara Termudah untuk Pemula:
+                {l('Easiest Method for Beginners:', 'Cara Termudah untuk Pemula:')}
               </p>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Anda tidak perlu membeli API Key mahal. Cukup klik tombol <strong>"Hubungkan Antigravity (Google OAuth)"</strong> di bawah. Anda akan login menggunakan akun Google dan langsung mendapatkan akses ke model Google Gemini tanpa biaya tambahan.
+                {l('You do not need to purchase expensive API Keys. Simply click "Connect Antigravity (Google OAuth)" below. Log in with your Google account to get instant access to Gemini models at zero additional cost.', 'Anda tidak perlu membeli API Key mahal. Cukup klik tombol Hubungkan Antigravity (Google OAuth) di bawah. Anda akan login menggunakan akun Google dan langsung mendapatkan akses ke model Google Gemini tanpa biaya tambahan.')}
               </p>
             </div>
           </div>
@@ -817,10 +819,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
                   <Cpu className="h-4 w-4 text-blue-400" />
-                  <span>Daftar AI Providers &amp; Auto-Failover Keys</span>
+                  <span>{l('AI Providers List & Auto-Failover Keys', 'Daftar AI Providers & Auto-Failover Keys')}</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Mendukung Antigravity (Google OAuth), Token Harbor, OpenAI, Anthropic, dan custom endpoint dengan auto-failover.
+                  {l('Supports Antigravity (Google OAuth), Token Harbor, OpenAI, Anthropic, and custom endpoints with auto-failover.', 'Mendukung Antigravity (Google OAuth), Token Harbor, OpenAI, Anthropic, dan custom endpoint dengan auto-failover.')}
                 </p>
               </div>
 
@@ -831,7 +833,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-bold text-white shadow-md transition-all group"
                 >
                   <Sparkles className="h-4 w-4 text-blue-200 group-hover:scale-110 transition-transform" />
-                  <span>Hubungkan Antigravity (Google OAuth)</span>
+                  <span>{l('Connect Antigravity (Google OAuth)', 'Hubungkan Antigravity (Google OAuth)')}</span>
                 </button>
 
                 <button
@@ -840,7 +842,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-700 bg-slate-850 text-xs font-semibold text-slate-300 hover:bg-slate-750 hover:text-slate-100 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>+ Provider Manual</span>
+                  <span>{l('+ Manual Provider', '+ Provider Manual')}</span>
                 </button>
               </div>
             </div>
@@ -850,12 +852,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <form onSubmit={handleCreateProvider} className="p-5 rounded-xl border border-blue-500/30 bg-slate-900/90 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
                   <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Form Tambah Provider Manual (API Key)
+                    {l('Add Manual Provider Form (API Key)', 'Form Tambah Provider Manual (API Key)')}
                   </h4>
 
                   {/* Quick Template Presets */}
                   <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-[11px] text-slate-500">Preset Cepat:</span>
+                    <span className="text-[11px] text-slate-500">{l('Quick Presets:', 'Preset Cepat:')}</span>
                     <button
                       type="button"
                       onClick={() => applyPreset('antigravity')}
@@ -890,19 +892,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs text-slate-300 block mb-1">Nama Provider</label>
+                    <label className="text-xs text-slate-300 block mb-1">{l('Provider Name', 'Nama Provider')}</label>
                     <input
                       type="text"
                       required
                       value={provName}
                       onChange={(e) => setProvName(e.target.value)}
-                      placeholder="Contoh: Token Harbor atau Custom AI"
+                      placeholder={l('Example: Token Harbor or Custom AI', 'Contoh: Token Harbor atau Custom AI')}
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs text-slate-300 block mb-1">Alias Prefix</label>
+                    <label className="text-xs text-slate-300 block mb-1">{l('Alias Prefix', 'Alias Prefix')}</label>
                     <input
                       type="text"
                       required
@@ -914,7 +916,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-xs text-slate-300 block mb-1">Base URL / Endpoint</label>
+                    <label className="text-xs text-slate-300 block mb-1">{l('Base URL / Endpoint', 'Base URL / Endpoint')}</label>
                     <input
                       type="url"
                       required
@@ -927,7 +929,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
                   <div className="md:col-span-2">
                     <label className="text-xs text-slate-300 block mb-1">
-                      Multiple API Keys (1 Key per Baris - Auto-Failover)
+                      {l('Multiple API Keys (1 Key per Line - Auto-Failover)', 'Multiple API Keys (1 Key per Baris - Auto-Failover)')}
                     </label>
                     <textarea
                       rows={3}
@@ -938,12 +940,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-950 text-xs text-slate-100 font-mono placeholder-slate-600 focus:outline-none focus:border-blue-500 leading-relaxed"
                     />
                     <span className="text-[11px] text-slate-400 block mt-1">
-                      Jika Key 1 terkena rate limit, sistem otomatis berganti ke Key 2 demi kontinuitas analisis.
+                      {l('If Key 1 hits rate limits, the system seamlessly fails over to Key 2 for continuous analysis.', 'Jika Key 1 terkena rate limit, sistem otomatis berganti ke Key 2 demi kontinuitas analisis.')}
                     </span>
                   </div>
 
                   <div>
-                    <label className="text-xs text-slate-300 block mb-1">Format Protokol API</label>
+                    <label className="text-xs text-slate-300 block mb-1">{l('API Protocol Format', 'Format Protokol API')}</label>
                     <select
                       value={provProtocol}
                       onChange={(e) => setProvProtocol(e.target.value as any)}
@@ -967,7 +969,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     type="submit"
                     className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-sm"
                   >
-                    Simpan &amp; Import Model
+                    {l('Save & Import Models', 'Simpan & Import Model')}
                   </button>
                 </div>
               </form>
@@ -977,9 +979,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {providers.length === 0 ? (
               <div className="py-10 text-center text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl space-y-2 bg-slate-950/30">
                 <Cpu className="w-8 h-8 text-slate-600 mx-auto" />
-                <p className="font-semibold text-slate-300">Belum ada AI Provider yang terhubung.</p>
+                <p className="font-semibold text-slate-300">{l('No AI Providers connected yet.', 'Belum ada AI Provider yang terhubung.')}</p>
                 <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  Klik tombol <strong>"Hubungkan Antigravity"</strong> di atas untuk login cepat dengan Google OAuth gratis.
+                  {l('Click "Connect Antigravity" above for quick login via free Google OAuth.', 'Klik tombol Hubungkan Antigravity di atas untuk login cepat dengan Google OAuth gratis.')}
                 </p>
               </div>
             ) : (
@@ -1407,7 +1409,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Trailing Stop Loss (%)</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Trailing Stop Loss (%)', 'Trailing Stop Loss (%)')}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -1419,7 +1421,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Scale-Out Take-Profit Target Tahap 1 (%)</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Scale-Out Take-Profit Target Stage 1 (%)', 'Scale-Out Take-Profit Target Tahap 1 (%)')}</label>
                   <input
                     type="number"
                     step="0.5"
@@ -1431,7 +1433,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Macro Regime Guard: Drop BTC 24j (%)</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Macro Regime Guard: BTC 24h Drop (%)', 'Macro Regime Guard: Drop BTC 24j (%)')}</label>
                   <input
                     type="number"
                     step="0.5"
@@ -1443,7 +1445,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Minimal Volume 24 Jam (IDR)</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Minimum 24h Volume (IDR)', 'Minimal Volume 24 Jam (IDR)')}</label>
                   <input
                     type="number"
                     step="50000000"
@@ -1455,7 +1457,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Toleransi Slippage Orderbook (%)</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Orderbook Slippage Tolerance (%)', 'Toleransi Slippage Orderbook (%)')}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -1467,33 +1469,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Beli Koin Baru Listing?</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Allow New Listing Coins?', 'Beli Koin Baru Listing?')}</label>
                   <select
                     value={settings.allow_new_listings || '1'}
                     onChange={(e) => updateSettingField('allow_new_listings', e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 outline-none focus:border-blue-500"
                   >
-                    <option value="1">Aktif (Boleh Beli Koin Baru Listing)</option>
-                    <option value="0">Nonaktif (Hanya Koin yang Sudah Mapan)</option>
+                    <option value="1">{l('Active (Allow new listings)', 'Aktif (Boleh Beli Koin Baru Listing)')}</option>
+                    <option value="0">{l('Disabled (Established coins only)', 'Nonaktif (Hanya Koin yang Sudah Mapan)')}</option>
                   </select>
                   <span className="text-[11px] text-slate-500 block mt-1">Koin baru listing memiliki potensi keuntungan &amp; risiko tinggi</span>
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 block mb-1">Alokasi Dinamis ATR / Volatilitas</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('ATR Volatility Sizing', 'Alokasi Dinamis ATR / Volatilitas')}</label>
                   <select
                     value={settings.volatility_sizing_enabled ?? '1'}
                     onChange={(e) => updateSettingField('volatility_sizing_enabled', e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 outline-none focus:border-blue-500"
                   >
-                    <option value="1">Aktif (Kecilkan Lot jika Koin Sangat Volatil)</option>
-                    <option value="0">Nonaktif (Gunakan Lot Tetap Sama Rata)</option>
+                    <option value="1">{l('Enabled (Scale down lot on high volatility)', 'Aktif (Kecilkan Lot jika Koin Sangat Volatil)')}</option>
+                    <option value="0">{l('Disabled (Use equal flat lots)', 'Nonaktif (Gunakan Lot Tetap Sama Rata)')}</option>
                   </select>
                   <span className="text-[11px] text-slate-500 block mt-1">Mengurangi ukuran order hingga 40% pada koin liar (&gt;10% fluktuasi)</span>
                 </div>
 
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="text-xs text-slate-300 block mb-1">Whitelist Koin Khusus (Opsional)</label>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Custom Coin Whitelist (Optional)', 'Whitelist Koin Khusus (Opsional)')}</label>
                   <input
                     type="text"
                     value={settings.allowed_coins_only || ''}
@@ -1511,10 +1513,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-slate-800 bg-slate-900/60">
                 <div>
                   <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide">
-                    Saldo Simulasi Paper Trading
+                    {l('Paper Trading Simulation Balance', 'Saldo Simulasi Paper Trading')}
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Saldo virtual untuk testing strategi tanpa menyentuh Rupiah asli.
+                    {l('Virtual balance for strategy testing without touching real Rupiah.', 'Saldo virtual untuk testing strategi tanpa menyentuh Rupiah asli.')}
                   </p>
                 </div>
 
@@ -1547,10 +1549,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-semibold text-slate-100">
-                Perhatian untuk Pemula:
+                {l('Notice for Beginners:', 'Perhatian untuk Pemula:')}
               </p>
               <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                Kunci API Indodax <strong>HANYA</strong> dibutuhkan jika Anda ingin beralih dari Paper Trading (Simulasi) ke Live Trading dengan Rupiah asli di bursa Indodax. Jika saat ini Anda hanya ingin mencoba bot, <strong>kosongkan saja bagian ini</strong>.
+                {l('Indodax API keys are ONLY needed if you intend to switch from Paper Simulation to Live Trading with real funds. If you are currently testing the bot, leave these fields empty.', 'Kunci API Indodax HANYA dibutuhkan jika Anda ingin beralih dari Paper Trading (Simulasi) ke Live Trading dengan Rupiah asli di bursa Indodax. Jika saat ini Anda hanya ingin mencoba bot, kosongkan saja bagian ini.')}
               </p>
             </div>
           </div>
@@ -1559,10 +1561,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="pb-3 border-b border-slate-800/80">
               <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
                 <Key className="h-4 w-4 text-emerald-400" />
-                <span>Kredensial Resmi Indodax Trade API v2.0</span>
+                <span>{l('Official Indodax Trade API v2.0 Credentials', 'Kredensial Resmi Indodax Trade API v2.0')}</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Gunakan API Key dan Secret Key resmi dari menu Trade API akun Indodax Anda.
+                {l('Use official API Key and Secret Key generated from your Indodax Trade API account.', 'Gunakan API Key dan Secret Key resmi dari menu Trade API akun Indodax Anda.')}
               </p>
             </div>
 
@@ -1591,7 +1593,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   {settings.has_indodax_secret && (
                     <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 font-semibold">
                       <CheckCircle2 className="h-3 w-3" />
-                      Kunci Tersimpan Aman
+                      {l('Key Stored Securely', 'Kunci Tersimpan Aman')}
                     </span>
                   )}
                 </div>
@@ -1612,13 +1614,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2.5">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
                 <Shield className="w-4 h-4 text-emerald-400" />
-                <span>Panduan Keamanan Pembuatan Kunci Indodax:</span>
+                <span>{l('Security Guidelines for Indodax API Keys:', 'Panduan Keamanan Pembuatan Kunci Indodax:')}</span>
               </div>
               <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-5 leading-relaxed">
-                <li>Buka situs resmi <strong>indodax.com</strong> &gt; Menu <strong>Trade API</strong>.</li>
-                <li>Centang izin <strong>View Info</strong> dan <strong>Trade</strong>.</li>
-                <li><strong className="text-rose-400">JANGAN PERNAH</strong> mencentang izin <em>Withdraw</em>. Bot trading kami tidak memerlukan dan tidak pernah meminta akses penarikan dana.</li>
-                <li>Simpan API Key dan Secret Key ke form di atas, lalu klik <strong>"Simpan Perubahan"</strong>.</li>
+                <li>{l('Open official website indodax.com > Trade API menu.', 'Buka situs resmi indodax.com > Menu Trade API.')}</li>
+                <li>{l('Check View Info and Trade permissions only.', 'Centang izin View Info dan Trade.')}</li>
+                <li><strong className="text-rose-400">{l('NEVER', 'JANGAN PERNAH')}</strong> {l('grant Withdraw permissions. Our trading bot never requests or requires withdrawal access.', 'mencentang izin Withdraw. Bot trading kami tidak memerlukan dan tidak pernah meminta akses penarikan dana.')}</li>
+                <li>{l('Paste your API Key and Secret Key into the form above, then click "Save Changes".', 'Simpan API Key dan Secret Key ke form di atas, lalu klik "Simpan Perubahan".')}</li>
               </ul>
             </div>
           </div>
@@ -1646,10 +1648,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
                   <Shield className="h-4 w-4 text-sky-400" />
-                  <span>Keamanan Akses &amp; Manajemen Rotasi Token Admin</span>
+                  <span>{l('Access Security & Admin Token Auto-Rotation', 'Keamanan Akses & Manajemen Rotasi Token Admin')}</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Token rahasia untuk login ke dashboard web dan API. Sistem dapat merotasi token ini secara otomatis.
+                  {l('Secret token for web dashboard and API access. The system can rotate this token automatically.', 'Token rahasia untuk login ke dashboard web dan API. Sistem dapat merotasi token ini secara otomatis.')}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1663,21 +1665,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   {(rotationStatus?.mode || 'fixed') === 'fixed' && (
                     <>
                       <Lock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Mode: Token Statis (Tetap)</span>
+                      <span>{l('Mode: Static Token (Fixed)', 'Mode: Token Statis (Tetap)')}</span>
                     </>
                   )}
                   {(rotationStatus?.mode || 'fixed') === 'on_startup' && (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Mode: Rotasi Startup</span>
+                      <span>{l('Mode: Startup Rotation', 'Mode: Rotasi Startup')}</span>
                     </>
                   )}
                   {(rotationStatus?.mode || 'fixed') === 'interval' && (
                     <>
                       <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                       <span>
-                        Mode: Tiap {rotationStatus?.intervalValue || 1}{' '}
-                        {(rotationStatus?.intervalUnit || 'days') === 'minutes' ? 'Menit' : (rotationStatus?.intervalUnit || 'days') === 'hours' ? 'Jam' : 'Hari'}
+                        {l('Mode: Every', 'Mode: Tiap')} {rotationStatus?.intervalValue || 1}{' '}
+                        {(rotationStatus?.intervalUnit || 'days') === 'minutes' ? l('Minutes', 'Menit') : (rotationStatus?.intervalUnit || 'days') === 'hours' ? l('Hours', 'Jam') : l('Days', 'Hari')}
                       </span>
                     </>
                   )}
@@ -1705,7 +1707,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {/* Current Active Token Box */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-slate-300 block mb-1 font-medium">Admin Access Token Saat Ini</label>
+                <label className="text-xs text-slate-300 block mb-1 font-medium">{l('Current Admin Access Token', 'Admin Access Token Saat Ini')}</label>
                 <div className="flex gap-2">
                   <input
                     type={showTokenPlain ? 'text' : 'password'}
@@ -1717,7 +1719,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     type="button"
                     onClick={() => setShowTokenPlain(!showTokenPlain)}
                     className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-colors"
-                    title={showTokenPlain ? 'Sembunyikan Token' : 'Lihat Token'}
+                    title={showTokenPlain ? l('Hide Token', 'Sembunyikan Token') : l('Show Token', 'Lihat Token')}
                   >
                     {showTokenPlain ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
@@ -1729,22 +1731,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       setTimeout(() => setCopiedAdminToken(false), 2000);
                     }}
                     className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-mono flex items-center gap-1.5 transition-colors"
-                    title="Salin Token"
+                    title={l('Copy Token', 'Salin Token')}
                   >
                     <Copy className="w-3.5 h-3.5" />
-                    <span>{copiedAdminToken ? 'Tersalin' : 'Salin'}</span>
+                    <span>{copiedAdminToken ? l('Copied', 'Tersalin') : l('Copy', 'Salin')}</span>
                   </button>
                 </div>
                 <span className="text-[11px] text-slate-500 block mt-1">
-                  Token tercetak di terminal server dan dikirimkan otomatis ke WhatsApp &amp; Telegram saat berganti.
+                  {l('Token is printed to server terminal and transmitted to WhatsApp & Telegram upon rotation.', 'Token tercetak di terminal server dan dikirimkan otomatis ke WhatsApp & Telegram saat berganti.')}
                 </span>
               </div>
 
               <div className="p-3.5 rounded-lg border border-slate-800/80 bg-slate-900/40 text-xs text-slate-400 leading-relaxed flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold text-slate-200 block mb-0.5">Proteksi Akses Tunnel Publik:</span>
-                  Saat dashboard dibuka via internet (Cloudflare / Ngrok), token ini wajib dimasukkan agar pihak luar tidak bisa mengubah parameter risiko, melihat API key, atau menghentikan trading.
+                  <span className="font-semibold text-slate-200 block mb-0.5">{l('Public Tunnel Access Protection:', 'Proteksi Akses Tunnel Publik:')}</span>
+                  {l('When accessing the dashboard via the public internet (Cloudflare / Ngrok), this token is required to prevent unauthorized changes to risk parameters or API keys.', 'Saat dashboard dibuka via internet (Cloudflare / Ngrok), token ini wajib dimasukkan agar pihak luar tidak bisa mengubah parameter risiko, melihat API key, atau menghentikan trading.')}
                 </div>
               </div>
             </div>
@@ -1752,7 +1754,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {/* Rotation Mode Selector Grid */}
             <div>
               <label className="text-xs text-slate-300 block mb-2 font-medium">
-                Pilih Kebijakan Rotasi Token Otomatis:
+                {l('Select Automated Token Rotation Policy:', 'Pilih Kebijakan Rotasi Token Otomatis:')}
               </label>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* Mode 1: Fixed */}
@@ -1776,14 +1778,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5">
                       <Lock className="w-3.5 h-3.5 text-blue-400" />
-                      <span>1. Tetap / Statis (Default)</span>
+                      <span>{l('1. Fixed / Static (Default)', '1. Tetap / Statis (Default)')}</span>
                     </span>
                     {(rotationStatus?.mode || 'fixed') === 'fixed' && (
                       <span className="h-2 w-2 rounded-full bg-blue-400" />
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-400">
-                    Token tidak pernah berubah otomatis. Aman dan sangat cocok bagi pemula yang tidak ingin repot.
+                    {l('Token never changes automatically. Convenient and ideal for beginners.', 'Token tidak pernah berubah otomatis. Aman dan sangat cocok bagi pemula yang tidak ingin repot.')}
                   </p>
                 </div>
 
@@ -1808,14 +1810,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5">
                       <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
-                      <span>2. Setiap Startup Server</span>
+                      <span>{l('2. On Every Server Startup', '2. Setiap Startup Server')}</span>
                     </span>
                     {rotationStatus?.mode === 'on_startup' && (
                       <span className="h-2 w-2 rounded-full bg-sky-400" />
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-400">
-                    Token otomatis berubah baru setiap kali program server dijalankan ulang. Token lama hangus.
+                    {l('A new token is generated every time the server boots up. The old token is invalidated.', 'Token otomatis berubah baru setiap kali program server dijalankan ulang. Token lama hangus.')}
                   </p>
                 </div>
 
@@ -1840,14 +1842,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>3. Berkala / Terjadwal</span>
+                      <span>{l('3. Scheduled Periodic Interval', '3. Berkala / Terjadwal')}</span>
                     </span>
                     {rotationStatus?.mode === 'interval' && (
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-400">
-                    Token otomatis berganti setiap rentang waktu (misal setiap 1 hari). Dikirim ke WhatsApp.
+                    {l('Token automatically rotates at custom intervals (e.g. daily) and is dispatched to WhatsApp.', 'Token otomatis berganti setiap rentang waktu (misal setiap 1 hari). Dikirim ke WhatsApp.')}
                   </p>
                 </div>
               </div>
@@ -1858,12 +1860,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/15 space-y-3 animate-in fade-in">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
                   <Clock className="w-4 h-4" />
-                  <span>Pengaturan Durasi Rotasi Berkala</span>
+                  <span>{l('Periodic Rotation Duration Settings', 'Pengaturan Durasi Rotasi Berkala')}</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[11px] text-slate-300 block mb-1">Rotasi Setiap (Angka):</label>
+                    <label className="text-[11px] text-slate-300 block mb-1">{l('Rotate Every (Number):', 'Rotasi Setiap (Angka):')}</label>
                     <input
                       type="number"
                       min="1"
@@ -1878,7 +1880,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-[11px] text-slate-300 block mb-1">Satuan Waktu:</label>
+                    <label className="text-[11px] text-slate-300 block mb-1">{l('Time Unit:', 'Satuan Waktu:')}</label>
                     <select
                       value={rotationStatus.intervalUnit}
                       onChange={(e) => {
@@ -1887,9 +1889,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       }}
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="days">Hari (Rekomendasi, misal 1 hari)</option>
-                      <option value="hours">Jam (Misal setiap 6 atau 12 jam)</option>
-                      <option value="minutes">Menit (Untuk testing / kebutuhan cepat)</option>
+                      <option value="days">{l('Days (Recommended, e.g. 1 day)', 'Hari (Rekomendasi, misal 1 hari)')}</option>
+                      <option value="hours">{l('Hours (e.g. every 6 or 12 hours)', 'Jam (Misal setiap 6 atau 12 jam)')}</option>
+                      <option value="minutes">{l('Minutes (For testing / rapid rotation)', 'Menit (Untuk testing / kebutuhan cepat)')}</option>
                     </select>
                   </div>
 
@@ -1912,7 +1914,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow-sm transition-colors"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{rotationLoading ? 'Menyimpan...' : 'Simpan Kebijakan Rotasi'}</span>
+                <span>{rotationLoading ? l('Saving...', 'Menyimpan...') : l('Save Rotation Policy', 'Simpan Kebijakan Rotasi')}</span>
               </button>
 
               <button
@@ -1922,7 +1924,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 shadow-sm transition-colors"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${rotationLoading ? 'animate-spin' : ''}`} />
-                <span>Rotasi Token Sekarang (Manual)</span>
+                <span>{l('Rotate Token Now (Manual)', 'Rotasi Token Sekarang (Manual)')}</span>
               </button>
             </div>
           </div>
@@ -1933,10 +1935,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
                   <Globe className="h-4 w-4 text-emerald-400" />
-                  <span>Akses Web Publik / Tunneling (Cloudflared &amp; Ngrok)</span>
+                  <span>{l('Public Web Access / Tunneling (Cloudflared & Ngrok)', 'Akses Web Publik / Tunneling (Cloudflared & Ngrok)')}</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Buka dashboard ini secara publik melalui internet dari HP atau laptop lain tanpa port forwarding.
+                  {l('Access this dashboard securely over the internet from mobile or remote devices without port forwarding.', 'Buka dashboard ini secara publik melalui internet dari HP atau laptop lain tanpa port forwarding.')}
                 </p>
               </div>
 
@@ -1946,13 +1948,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   : 'bg-slate-900 border-slate-800 text-slate-400'
               }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${tunnelStatus.active ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                {tunnelStatus.active ? 'Tunnel Aktif' : 'Tunnel Non-Aktif'}
+                {tunnelStatus.active ? l('Tunnel Active', 'Tunnel Aktif') : l('Tunnel Inactive', 'Tunnel Non-Aktif')}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-slate-300 block mb-1.5 font-medium">Pilih Layanan Tunnel</label>
+                <label className="text-xs text-slate-300 block mb-1.5 font-medium">{l('Select Tunnel Service', 'Pilih Layanan Tunnel')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -1964,7 +1966,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     }`}
                   >
                     <div className="text-xs font-bold font-mono">Cloudflared</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Gratis, tanpa akun / setup</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{l('Free, zero account / setup required', 'Gratis, tanpa akun / setup')}</div>
                   </button>
 
                   <button
@@ -1977,7 +1979,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     }`}
                   >
                     <div className="text-xs font-bold font-mono">Ngrok</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Membutuhkan Authtoken</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{l('Requires Authtoken', 'Membutuhkan Authtoken')}</div>
                   </button>
                 </div>
               </div>
@@ -2020,14 +2022,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       onClick={copyTunnelUrl}
                       className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      title="Salin Link"
+                      title={l('Copy Link', 'Salin Link')}
                     >
                       <Copy className="h-3 w-3" />
                     </button>
-                    {copiedTunnelUrl && <span className="text-[10px] text-emerald-400 font-mono">Tersalin!</span>}
+                    {copiedTunnelUrl && <span className="text-[10px] text-emerald-400 font-mono">{l('Copied!', 'Tersalin!')}</span>}
                   </div>
                 ) : (
-                  <span className="text-xs text-slate-500 font-mono">Dashboard saat ini hanya dapat dibuka di localhost:3001.</span>
+                  <span className="text-xs text-slate-500 font-mono">{l('Dashboard is currently only accessible locally at localhost:3001.', 'Dashboard saat ini hanya dapat dibuka di localhost:3001.')}</span>
                 )}
               </div>
 
@@ -2043,10 +2045,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <Radio className={`h-3.5 w-3.5 ${tunnelLoading ? 'animate-spin' : ''}`} />
                 <span>
                   {tunnelLoading
-                    ? 'Memproses...'
+                    ? l('Processing...', 'Memproses...')
                     : tunnelStatus.active
-                    ? 'Hentikan Tunnel'
-                    : 'Mulai Tunnel Publik'}
+                    ? l('Stop Tunnel', 'Hentikan Tunnel')
+                    : l('Start Public Tunnel', 'Mulai Tunnel Publik')}
                 </span>
               </button>
             </div>
@@ -2061,7 +2063,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                    <span>Pengaturan Bot Notifikasi Terpadu (WhatsApp &amp; Telegram)</span>
+                    <span>{l('Unified Notification Bots Hub (WhatsApp & Telegram)', 'Pengaturan Bot Notifikasi Terpadu (WhatsApp & Telegram)')}</span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Pengaturan kanal notifikasi, pairing WhatsApp QR, dan token Telegram Bot kini disatukan di tab <strong>Bots</strong>.
@@ -2094,7 +2096,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 }}
                 className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors shrink-0"
               >
-                <span>Buka Tab Bots</span>
+                <span>{l('Open Bots Tab', 'Buka Tab Bots')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -2106,10 +2108,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
                   <Sliders className="h-4 w-4 text-indigo-400" />
-                  <span>Cadangan Konfigurasi: Ekspor &amp; Impor Pengaturan</span>
+                  <span>{l('Configuration Backup: Export & Import Settings', 'Cadangan Konfigurasi: Ekspor & Impor Pengaturan')}</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Simpan seluruh pengaturan bot ke file JSON untuk memudahkan migrasi ke komputer atau server lain.
+                  {l('Export complete bot configurations to a JSON file for effortless migration to other devices.', 'Simpan seluruh pengaturan bot ke file JSON untuk memudahkan migrasi ke komputer atau server lain.')}
                 </p>
               </div>
             </div>
@@ -2121,12 +2123,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all"
               >
                 <Download className="w-4 h-4" />
-                <span>Ekspor Pengaturan (JSON)</span>
+                <span>{l('Export Settings (JSON)', 'Ekspor Pengaturan (JSON)')}</span>
               </button>
 
               <label className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer transition-all">
                 <Upload className="w-4 h-4 text-slate-400" />
-                <span>Impor Pengaturan (JSON)</span>
+                <span>{l('Import Settings (JSON)', 'Impor Pengaturan (JSON)')}</span>
                 <input
                   type="file"
                   accept=".json,application/json"
@@ -2155,22 +2157,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-100">
-                  Konfirmasi Rotasi Token Admin
+                  {l('Confirm Admin Token Rotation', 'Konfirmasi Rotasi Token Admin')}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Tindakan ini akan menghasilkan Admin Access Token baru.
+                  {l('This action will generate a new Admin Access Token.', 'Tindakan ini akan menghasilkan Admin Access Token baru.')}
                 </p>
               </div>
             </div>
 
             <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 text-xs text-slate-300 space-y-2 leading-relaxed">
               <p>
-                ⚠️ <strong>Perhatian:</strong>
+                ⚠️ <strong>{l('Attention:', 'Perhatian:')}</strong>
               </p>
               <ul className="list-disc pl-4 space-y-1 text-slate-400 text-[11px]">
-                <li>Token akses lama akan <strong>langsung hangus</strong> dan tidak dapat digunakan lagi.</li>
-                <li>Token baru akan langsung ditampilkan di <strong>Terminal Server</strong> dan dikirimkan ke <strong>WhatsApp Admin</strong>.</li>
-                <li>Sesi browser Anda saat ini akan <strong>otomatis diperbarui</strong> dengan token baru sehingga Anda tidak akan ter-logout.</li>
+                <li>{l('The old access token will immediately expire and cannot be used again.', 'Token akses lama akan langsung hangus dan tidak dapat digunakan lagi.')}</li>
+                <li>{l('The new token is printed directly in the Server Terminal and sent to Admin WhatsApp.', 'Token baru akan langsung ditampilkan di Terminal Server dan dikirimkan ke WhatsApp Admin.')}</li>
+                <li>{l('Your current browser session will automatically synchronize with the new token so you stay logged in.', 'Sesi browser Anda saat ini akan otomatis diperbarui dengan token baru sehingga Anda tidak akan ter-logout.')}</li>
               </ul>
             </div>
 
@@ -2190,7 +2192,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold shadow-md shadow-amber-950/50 flex items-center gap-1.5 transition-all"
               >
                 {rotationLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                <span>{rotationLoading ? 'Memproses...' : 'Ya, Rotasi Token Sekarang'}</span>
+                <span>{rotationLoading ? l('Processing...', 'Memproses...') : l('Yes, Rotate Token Now', 'Ya, Rotasi Token Sekarang')}</span>
               </button>
             </div>
           </div>
@@ -2206,7 +2208,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                 <Calculator className="h-4 w-4" />
-                <span>Kalkulator Parameter Risiko Otomatis</span>
+                <span>{l('Automated Risk Parameter Wizard', 'Kalkulator Parameter Risiko Otomatis')}</span>
               </div>
               <button onClick={() => setShowRiskModal(false)} className="text-slate-400 hover:text-slate-200 text-xs">
                 ✕
@@ -2217,7 +2219,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-slate-300 font-semibold block">
-                    Berapa Total Modal Anda? (IDR)
+                    {l('What is your Total Capital? (IDR)', 'Berapa Total Modal Anda? (IDR)')}
                   </label>
                   <button
                     type="button"
@@ -2237,7 +2239,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     }}
                     className="text-[11px] text-amber-400 hover:text-amber-300 underline font-medium"
                   >
-                    Ambil Saldo Terkini
+                    {l('Fetch Current Balance', 'Ambil Saldo Terkini')}
                   </button>
                 </div>
                 <input
@@ -2268,7 +2270,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
               <div>
                 <label className="text-slate-300 font-semibold block mb-1.5">
-                  Pilih Profil Risiko:
+                  {l('Select Risk Profile:', 'Pilih Profil Risiko:')}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
@@ -2329,19 +2331,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 return (
                   <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950 space-y-1.5 font-mono text-[11px] text-slate-300">
                     <div className="text-slate-500 uppercase text-[10px] font-bold pb-1 border-b border-slate-900 flex justify-between items-center">
-                      <span>Hasil Kalkulasi Otomatis:</span>
-                      <span className="text-amber-400 font-sans font-semibold text-[10px]">100% Sesuai Aturan Indodax</span>
+                      <span>{l('Automatic Calculation Results:', 'Hasil Kalkulasi Otomatis:')}</span>
+                      <span className="text-amber-400 font-sans font-semibold text-[10px]">{l('100% Compliant with Indodax Rules', '100% Sesuai Aturan Indodax')}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-sans">Alokasi per Koin:</span>
+                      <span className="text-slate-400 font-sans">{l('Allocation per Coin:', 'Alokasi per Koin:')}</span>
                       <strong className="text-emerald-400">Rp {alloc.toLocaleString('id-ID')}</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-sans">Maksimal Koin Aktif:</span>
+                      <span className="text-slate-400 font-sans">{l('Max Active Coins:', 'Maksimal Koin Aktif:')}</span>
                       <strong className="text-slate-100">{finalTrades} Posisi</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-sans">Cadangan Kas Pengaman:</span>
+                      <span className="text-slate-400 font-sans">{l('Safety Cash Reserve:', 'Cadangan Kas Pengaman:')}</span>
                       <strong className="text-sky-400">Rp {buffer.toLocaleString('id-ID')} ({bufferPct}%)</strong>
                     </div>
                     <div className="flex justify-between">
@@ -2349,11 +2351,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <strong className="text-amber-400">{wizardProfile === 'conservative' ? '1.8%' : wizardProfile === 'balanced' ? '2.5%' : '3.5%'}</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-sans">Target Take Profit 1:</span>
+                      <span className="text-slate-400 font-sans">{l('Take Profit Target 1:', 'Target Take Profit 1:')}</span>
                       <strong className="text-indigo-400">{wizardProfile === 'conservative' ? '3.5%' : wizardProfile === 'balanced' ? '5.0%' : '7.5%'}</strong>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-sans">Batas Rugi Harian:</span>
+                      <span className="text-slate-400 font-sans">{l('Daily Loss Limit:', 'Batas Rugi Harian:')}</span>
                       <strong className="text-rose-400">{wizardProfile === 'conservative' ? '3.0%' : wizardProfile === 'balanced' ? '5.0%' : '8.0%'}</strong>
                     </div>
 
@@ -2380,7 +2382,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onClick={handleApplyRiskWizard}
                 className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white shadow-sm"
               >
-                Terapkan Parameter
+                {l('Apply Parameters', 'Terapkan Parameter')}
               </button>
             </div>
           </div>
@@ -2400,13 +2402,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                    <span>Hubungkan Antigravity</span>
+                    <span>{l('Connect Antigravity', 'Hubungkan Antigravity')}</span>
                     <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-500/30">
                       Google Cloud Code
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Otentikasi langsung Google OAuth untuk akses model Gemini &amp; Claude
+                    {l('Direct Google OAuth authentication for Gemini & Claude model access', 'Otentikasi langsung Google OAuth untuk akses model Gemini & Claude')}
                   </p>
                 </div>
               </div>
@@ -2430,20 +2432,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
                 <div>
                   <h4 className="text-sm font-bold text-slate-200">
-                    Menunggu Otorisasi di Jendela Google...
+                    {l('Waiting for Authorization in Google Window...', 'Menunggu Otorisasi di Jendela Google...')}
                   </h4>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
-                    Jendela otorisasi Google telah dibuka. Silakan pilih akun Google Anda dan klik <strong className="text-slate-200">Allow / Lanjutkan</strong>.
+                    {l('The Google authorization window has opened. Please select your Google account and click Allow / Continue.', 'Jendela otorisasi Google telah dibuka. Silakan pilih akun Google Anda dan klik Allow / Lanjutkan.')}
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs text-amber-300 text-left space-y-2">
                   <p className="font-semibold flex items-center gap-1.5">
                     <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
-                    <span>Jendela popup tidak muncul atau diblokir peramban?</span>
+                    <span>{l('Popup window blocked or did not appear?', 'Jendela popup tidak muncul atau diblokir peramban?')}</span>
                   </p>
                   <p className="text-[11px] text-amber-200/80 leading-relaxed">
-                    Jika peramban Anda memblokir popup otomatis, Anda dapat beralih ke mode manual untuk membuka tautan otorisasi dan menempelkan URL callback hasil redirect secara manual.
+                    {l('If your browser blocked the automatic popup, switch to manual mode to open the link and paste the redirect callback URL manually.', 'Jika peramban Anda memblokir popup otomatis, Anda dapat beralih ke mode manual untuk membuka tautan otorisasi dan menempelkan URL callback hasil redirect secara manual.')}
                   </p>
                   <button
                     type="button"
@@ -2451,7 +2453,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     className="w-full mt-1 px-3 py-1.5 rounded-lg bg-amber-600/30 hover:bg-amber-600/40 border border-amber-500/40 text-amber-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
-                    <span>Beralih ke Input URL Manual (Popup Terblokir)</span>
+                    <span>{l('Switch to Manual URL Input (Popup Blocked)', 'Beralih ke Input URL Manual (Popup Terblokir)')}</span>
                   </button>
                 </div>
               </div>
@@ -2463,9 +2465,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/10 text-xs text-blue-300 flex items-start gap-2.5">
                   <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-400" />
                   <div>
-                    <p className="font-semibold">Mode Verifikasi Manual (Popup Terblokir / Headless)</p>
+                    <p className="font-semibold">{l('Manual Verification Mode (Popup Blocked / Headless)', 'Mode Verifikasi Manual (Popup Terblokir / Headless)')}</p>
                     <p className="text-[11px] text-blue-200/80 mt-0.5">
-                      Ikuti 2 langkah mudah di bawah ini untuk menghubungkan akun Google Antigravity Anda secara manual.
+                      {l('Follow the 2 simple steps below to connect your Antigravity Google account manually.', 'Ikuti 2 langkah mudah di bawah ini untuk menghubungkan akun Google Antigravity Anda secara manual.')}
                     </p>
                   </div>
                 </div>
@@ -2474,7 +2476,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                     <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">1</span>
-                    <span>Buka Tautan Otentikasi Google</span>
+                    <span>{l('Open Google Authentication Link', 'Buka Tautan Otentikasi Google')}</span>
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -2502,7 +2504,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white flex items-center gap-1"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      <span>Buka</span>
+                      <span>{l('Open', 'Buka')}</span>
                     </a>
                   </div>
                 </div>
@@ -2511,10 +2513,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                     <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">2</span>
-                    <span>Tempelkan URL Callback Hasil Redirect atau Kode</span>
+                    <span>{l('Paste Redirected Callback URL or Code', 'Tempelkan URL Callback Hasil Redirect atau Kode')}</span>
                   </label>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Setelah menekan "Allow" di Google, salin seluruh isi bilah alamat peramban Anda (contoh: <code className="font-mono text-emerald-400">http://127.0.0.1:3001/callback?code=4/0A...</code>) lalu tempelkan di bawah:
+                    {l('After clicking "Allow" in Google, copy the entire contents of your browser address bar (e.g. http://127.0.0.1:3001/callback?code=4/0A...) and paste it below:', 'Setelah menekan "Allow" di Google, salin seluruh isi bilah alamat peramban Anda (contoh: http://127.0.0.1:3001/callback?code=4/0A...) lalu tempelkan di bawah:')}
                   </p>
                   <input
                     type="text"
@@ -2553,9 +2555,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <Sparkles className="h-5 w-5 text-blue-400 animate-pulse" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-200">Menghubungkan Akun Antigravity...</h4>
+                  <h4 className="text-sm font-bold text-slate-200">{l('Connecting Antigravity Account...', 'Menghubungkan Akun Antigravity...')}</h4>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
-                    Menukarkan kode otorisasi Google OAuth, mendeteksi GCP Cloud Code Project, dan mengimpor katalog model.
+                    {l('Exchanging Google OAuth code, detecting GCP Cloud Code Project, and importing model catalog.', 'Menukarkan kode otorisasi Google OAuth, mendeteksi GCP Cloud Code Project, dan mengimpor katalog model.')}
                   </p>
                 </div>
               </div>
@@ -2569,16 +2571,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-100">
-                    Berhasil Terhubung ke Antigravity!
+                    {l('Successfully Connected to Antigravity!', 'Berhasil Terhubung ke Antigravity!')}
                   </h4>
                   <p className="text-xs text-slate-400 mt-1">
-                    Koneksi OAuth dan auto-refresh token telah tersimpan aktif.
+                    {l('OAuth connection and auto-refresh tokens are stored securely.', 'Koneksi OAuth dan auto-refresh token telah tersimpan aktif.')}
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 text-xs font-mono text-left space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Email Akun:</span>
+                    <span className="text-slate-500">{l('Account Email:', 'Email Akun:')}</span>
                     <span className="text-emerald-400 font-bold">{agySuccessData?.email || 'Google User'}</span>
                   </div>
                   <div className="flex justify-between">
@@ -2586,8 +2588,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <span className="text-blue-400">{agySuccessData?.projectId || '-'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Model Diimpor:</span>
-                    <span className="text-slate-200 font-bold">{agySuccessData?.modelsCount || 6} Model Siap Pakai</span>
+                    <span className="text-slate-500">{l('Imported Models:', 'Model Diimpor:')}</span>
+                    <span className="text-slate-200 font-bold">{agySuccessData?.modelsCount || 6} {l('Models Ready', 'Model Siap Pakai')}</span>
                   </div>
                 </div>
 
@@ -2596,7 +2598,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   onClick={() => setShowAntigravityModal(false)}
                   className="w-full px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-md"
                 >
-                  Selesai &amp; Tutup
+                  {l('Done & Close', 'Selesai & Tutup')}
                 </button>
               </div>
             )}
@@ -2608,9 +2610,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <AlertCircle className="h-6 w-6" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-rose-300">Gagal Menghubungkan Antigravity</h4>
+                  <h4 className="text-sm font-bold text-rose-300">{l('Failed to Connect Antigravity', 'Gagal Menghubungkan Antigravity')}</h4>
                   <p className="text-xs text-rose-200/80 max-w-sm mx-auto mt-1 break-words font-mono">
-                    {agyError || 'Terjadi kesalahan saat otentikasi.'}
+                    {agyError || l('Authentication error occurred.', 'Terjadi kesalahan saat otentikasi.')}
                   </p>
                 </div>
 
@@ -2638,10 +2640,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       <ConfirmModal
         isOpen={Boolean(deleteProviderId)}
-        title="Hapus Provider AI?"
-        message="Yakin ingin menghapus provider ini beserta seluruh model yang terhubung? Tindakan ini tidak dapat dibatalkan."
-        confirmText="Hapus Provider"
-        cancelText="Batal"
+        title={l('Delete AI Provider?', 'Hapus Provider AI?')}
+        message={l('Are you sure you want to delete this provider and all connected models? This action cannot be undone.', 'Yakin ingin menghapus provider ini beserta seluruh model yang terhubung? Tindakan ini tidak dapat dibatalkan.')}
+        confirmText={l('Delete Provider', 'Hapus Provider')}
+        cancelText={l('Cancel', 'Batal')}
         variant="danger"
         onConfirm={handleConfirmDeleteProvider}
         onCancel={() => setDeleteProviderId(null)}

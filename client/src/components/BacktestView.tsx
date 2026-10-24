@@ -22,10 +22,12 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { BacktestParams, BacktestResult, BacktestTrade } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const POPULAR_PAIRS = ['BTCIDR', 'ETHIDR', 'SOLIDR', 'PEPEIDR', 'DOGEIDR', 'XRPIDR', 'BNBIDR'];
 
 export const BacktestView: React.FC = () => {
+  const { l, formatCurrency, formatNumber, language } = useLanguage();
   const [params, setParams] = useState<BacktestParams>({
     symbol: 'BTCIDR',
     timeframe: '1h',
@@ -51,16 +53,11 @@ export const BacktestView: React.FC = () => {
       const data = await api.runBacktest(params);
       setResult(data);
     } catch (err: any) {
-      setError(err.message || 'Gagal menjalankan backtest.');
+      setError(err.message || l('Failed to execute backtest.', 'Gagal menjalankan backtest.'));
       setResult(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper to format IDR
-  const formatIdr = (val: number) => {
-    return `Rp ${Math.round(val).toLocaleString('id-ID')}`;
   };
 
   return (
@@ -70,13 +67,16 @@ export const BacktestView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
             <Zap className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Laboratorium Kuantitatif &bull; Backtest Engine</span>
+            <span>{l('Quantitative Laboratory • Backtest Engine', 'Laboratorium Kuantitatif • Backtest Engine')}</span>
           </div>
           <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            Simulasi Kuantitatif Strategi Indodax
+            {l('Indodax Strategy Quantitative Simulation', 'Simulasi Kuantitatif Strategi Indodax')}
           </h2>
           <p className="text-xs text-slate-400 max-w-2xl mt-1">
-            Uji performa algoritma momentum, ratchet trailing stop, partial take-profit, dan pemodelan slippage pada candlestick historis Indodax nyata (TradingView API) sebelum menjalankan Live Trading.
+            {l(
+              'Test momentum algorithm performance, ratchet trailing stops, partial take-profits, and slippage modeling on real historical Indodax candlesticks (TradingView API) before running Live Trading.',
+              'Uji performa algoritma momentum, ratchet trailing stop, partial take-profit, dan pemodelan slippage pada candlestick historis Indodax nyata (TradingView API) sebelum menjalankan Live Trading.'
+            )}
           </p>
         </div>
 
@@ -88,12 +88,12 @@ export const BacktestView: React.FC = () => {
           {loading ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Memproses Simulasi...</span>
+              <span>{l('Processing Simulation...', 'Memproses Simulasi...')}</span>
             </>
           ) : (
             <>
               <Play className="w-4 h-4 fill-current" />
-              <span>Jalankan Backtest</span>
+              <span>{l('Run Backtest', 'Jalankan Backtest')}</span>
             </>
           )}
         </button>
@@ -103,16 +103,26 @@ export const BacktestView: React.FC = () => {
       <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-950/20 text-slate-300 text-xs space-y-1.5">
         <div className="flex items-center gap-2 font-bold text-blue-400 text-xs">
           <Info className="w-4 h-4 text-blue-400 shrink-0" />
-          <span>Transparansi Metodologi: Backtest Teknis vs Live Trading Bot</span>
+          <span>{l('Methodology Transparency: Technical Backtest vs Live Trading Bot', 'Transparansi Metodologi: Backtest Teknis vs Live Trading Bot')}</span>
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          Simulasi ini menguji <strong>aturan eksekusi kuantitatif</strong> (momentum pasar, trailing stop loss ratchet, scale-out partial TP ke breakeven, pemodelan slippage orderbook 0.2%, dan taker fee bursa 0.2%) pada riwayat candlestick bursa Indodax.
+          {l(
+            'This simulation stress-tests quantitative execution rules (market momentum, trailing stop ratchet, partial scale-out TP to breakeven, 0.2% orderbook slippage, and 0.2% exchange taker fee) on historical Indodax candles.',
+            'Simulasi ini menguji aturan eksekusi kuantitatif (momentum pasar, trailing stop loss ratchet, scale-out partial TP ke breakeven, pemodelan slippage orderbook 0.2%, dan taker fee bursa 0.2%) pada riwayat candlestick bursa Indodax.'
+          )}
         </p>
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          <strong>Perbedaan dengan Live Engine:</strong> Backtest historis tidak menyertakan konfirmasi AI LLM menit-ke-menit (karena tidak ada arsip berita live per menit di masa lampau) atau deteksi listing koin baru instan. Gunakan hasil simulasi ini untuk memvalidasi ketahanan manajemen risiko dan ekspektasi drawdown, bukan sebagai jaminan profit pasti di masa depan.
+          <strong>{l('Difference from Live Engine: ', 'Perbedaan dengan Live Engine: ')}</strong>
+          {l(
+            'Historical backtests omit minute-by-minute AI LLM confirmation and instant new coin listing detection. Use simulation results to validate risk management and drawdown resilience, not as guaranteed future profits.',
+            'Backtest historis tidak menyertakan konfirmasi AI LLM menit-ke-menit (karena tidak ada arsip berita live per menit di masa lampau) atau deteksi listing koin baru instan. Gunakan hasil simulasi ini untuk memvalidasi ketahanan manajemen risiko dan ekspektasi drawdown, bukan sebagai jaminan profit pasti di masa depan.'
+          )}
         </p>
         <p className="text-[11px] text-amber-300/90 font-medium pt-1 border-t border-blue-500/20">
-          ⚠️ Kepatuhan &amp; Edukasi: Kinerja masa lalu tidak menjamin hasil masa depan. Seluruh angka adalah simulasi kuantitatif berdasarkan riwayat pergerakan harga.
+          {l(
+            '⚠️ Compliance & Education: Past performance does not guarantee future results. All figures are quantitative simulations based on historical price action.',
+            '⚠️ Kepatuhan & Edukasi: Kinerja masa lalu tidak menjamin hasil masa depan. Seluruh angka adalah simulasi kuantitatif berdasarkan riwayat pergerakan harga.'
+          )}
         </p>
       </div>
 
@@ -121,11 +131,11 @@ export const BacktestView: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
             <BarChart2 className="w-4 h-4 text-indigo-400" />
-            <span>Parameter Replay Strategi</span>
+            <span>{l('Strategy Replay Parameters', 'Parameter Replay Strategi')}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Sliders className="w-3.5 h-3.5 text-slate-500" />
-            <span>Paginasi otomatis hingga 180 hari riwayat bursa</span>
+            <span>{l('Auto-paginates up to 180 days of exchange history', 'Paginasi otomatis hingga 180 hari riwayat bursa')}</span>
           </div>
         </div>
 
@@ -133,7 +143,7 @@ export const BacktestView: React.FC = () => {
         <div className="p-3 rounded-xl border border-indigo-500/20 bg-indigo-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span className="font-semibold text-slate-200">Preset Skenario Otomatis:</span>
+            <span className="font-semibold text-slate-200">{l('Auto Scenario Presets:', 'Preset Skenario Otomatis:')}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -147,7 +157,7 @@ export const BacktestView: React.FC = () => {
               })}
               className="px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 font-medium transition-colors"
             >
-              🛡️ Uji Profil Konservatif
+              {l('🛡️ Test Conservative Profile', '🛡️ Uji Profil Konservatif')}
             </button>
             <button
               type="button"
@@ -160,7 +170,7 @@ export const BacktestView: React.FC = () => {
               })}
               className="px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-950/40 hover:bg-blue-900/40 text-blue-300 font-medium transition-colors"
             >
-              ⚖️ Uji Profil Seimbang
+              {l('⚖️ Test Balanced Profile', '⚖️ Uji Profil Seimbang')}
             </button>
             <button
               type="button"
@@ -173,7 +183,7 @@ export const BacktestView: React.FC = () => {
               })}
               className="px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-950/40 hover:bg-amber-900/40 text-amber-300 font-medium transition-colors"
             >
-              🚀 Uji Profil Agresif
+              {l('🚀 Test Aggressive Profile', '🚀 Uji Profil Agresif')}
             </button>
           </div>
         </div>
@@ -182,7 +192,7 @@ export const BacktestView: React.FC = () => {
           {/* Strategy Mode Selector */}
           <div>
             <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-              Pilih Mesin / Aturan Strategi:
+              {l('Choose Strategy Rules / Engine:', 'Pilih Mesin / Aturan Strategi:')}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
@@ -195,13 +205,20 @@ export const BacktestView: React.FC = () => {
                 }`}
               >
                 <div className="flex items-center justify-between pb-1">
-                  <span className="font-bold text-xs text-slate-200">24h Rolling Momentum (Replay Logika Live)</span>
+                  <span className="font-bold text-xs text-slate-200">
+                    {l('24h Rolling Momentum (Live Engine Replay)', '24h Rolling Momentum (Replay Logika Live)')}
+                  </span>
                   {(params.strategyType === 'live_momentum' || !params.strategyType) && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-600 text-white">Rekomendasi</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-600 text-white">
+                      {l('Recommended', 'Rekomendasi')}
+                    </span>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Mereplikasi scanner bot live: mencari koin dengan kenaikan rolling 24 jam &ge; threshold (1.5% - 25%) dengan volume konfirmasi. Menghasilkan frekuensi trade realistis pada pair mayor (BTC/ETH).
+                  {l(
+                    'Replicates live bot scanner: searches for coins with 24h rolling gains >= threshold (1.5% - 25%) with volume confirmation. Produces realistic trade frequency on major pairs (BTC/ETH).',
+                    'Mereplikasi scanner bot live: mencari koin dengan kenaikan rolling 24 jam >= threshold (1.5% - 25%) dengan volume konfirmasi. Menghasilkan frekuensi trade realistis pada pair mayor (BTC/ETH).'
+                  )}
                 </p>
               </button>
 
@@ -215,13 +232,20 @@ export const BacktestView: React.FC = () => {
                 }`}
               >
                 <div className="flex items-center justify-between pb-1">
-                  <span className="font-bold text-xs text-slate-200">Single Candlestick Breakout</span>
+                  <span className="font-bold text-xs text-slate-200">
+                    {l('Single Candlestick Breakout', 'Single Candlestick Breakout')}
+                  </span>
                   {params.strategyType === 'candle_breakout' && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-600 text-white">Aktif</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-600 text-white">
+                      {l('Active', 'Aktif')}
+                    </span>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Breakout teknikal berbasis satu candle bullish dengan lonjakan persentase cepat per bar (sensitivitas adaptif otomatis per timeframe).
+                  {l(
+                    'Technical breakout based on a single bullish candle with rapid percentage surge per bar.',
+                    'Breakout teknikal berbasis satu candle bullish dengan lonjakan persentase cepat per bar (sensitivitas adaptif otomatis per timeframe).'
+                  )}
                 </p>
               </button>
             </div>
@@ -231,14 +255,14 @@ export const BacktestView: React.FC = () => {
             {/* Symbol Selection */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Pair / Aset Kripto
+                {l('Pair / Crypto Asset', 'Pair / Aset Kripto')}
               </label>
               <div className="space-y-2">
                 <input
                   type="text"
                   value={params.symbol}
                   onChange={(e) => setParams({ ...params, symbol: e.target.value.toUpperCase() })}
-                  placeholder="Contoh: BTCIDR"
+                  placeholder={l('Example: BTCIDR', 'Contoh: BTCIDR')}
                   className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-100 font-mono outline-none"
                   required
                 />
@@ -264,7 +288,7 @@ export const BacktestView: React.FC = () => {
             {/* Timeframe */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Timeframe Candlestick
+                {l('Candlestick Timeframe', 'Timeframe Candlestick')}
               </label>
               <div className="grid grid-cols-4 gap-1.5">
                 {(['15m', '1h', '4h', '1d'] as const).map((tf) => (
@@ -283,39 +307,39 @@ export const BacktestView: React.FC = () => {
                 ))}
               </div>
               <span className="text-[10px] text-slate-500 block mt-1.5">
-                {params.timeframe === '15m' && 'Scalping cepat (high-frequency)'}
-                {params.timeframe === '1h' && 'Intraday momentum (Rekomendasi)'}
-                {params.timeframe === '4h' && 'Swing trading beberapa hari'}
-                {params.timeframe === '1d' && 'Trend makro jangka panjang'}
+                {params.timeframe === '15m' && l('Rapid scalping (high-frequency)', 'Scalping cepat (high-frequency)')}
+                {params.timeframe === '1h' && l('Intraday momentum (Recommended)', 'Intraday momentum (Rekomendasi)')}
+                {params.timeframe === '4h' && l('Multi-day swing trading', 'Swing trading beberapa hari')}
+                {params.timeframe === '1d' && l('Long-term macro trend', 'Trend makro jangka panjang')}
               </span>
             </div>
 
             {/* Days Duration */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Rentang Waktu (Hari Terakhir)
+                {l('Duration (Past Days)', 'Rentang Waktu (Hari Terakhir)')}
               </label>
               <select
                 value={params.days}
                 onChange={(e) => setParams({ ...params, days: parseInt(e.target.value, 10) })}
                 className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-100 outline-none"
               >
-                <option value={7}>7 Hari Terakhir</option>
-                <option value={14}>14 Hari Terakhir</option>
-                <option value={30}>30 Hari Terakhir (1 Bulan)</option>
-                <option value={60}>60 Hari Terakhir (2 Bulan)</option>
-                <option value={90}>90 Hari Terakhir (3 Bulan)</option>
-                <option value={180}>180 Hari Terakhir (6 Bulan)</option>
+                <option value={7}>{l('Last 7 Days', '7 Hari Terakhir')}</option>
+                <option value={14}>{l('Last 14 Days', '14 Hari Terakhir')}</option>
+                <option value={30}>{l('Last 30 Days (1 Month)', '30 Hari Terakhir (1 Bulan)')}</option>
+                <option value={60}>{l('Last 60 Days (2 Months)', '60 Hari Terakhir (2 Bulan)')}</option>
+                <option value={90}>{l('Last 90 Days (3 Months)', '90 Hari Terakhir (3 Bulan)')}</option>
+                <option value={180}>{l('Last 180 Days (6 Months)', '180 Hari Terakhir (6 Bulan)')}</option>
               </select>
               <span className="text-[10px] text-slate-500 block mt-1.5">
-                Otomatis mengambil data multi-chunk dari bursa
+                {l('Automatically fetches multi-chunk data from exchange', 'Otomatis mengambil data multi-chunk dari bursa')}
               </span>
             </div>
 
             {/* Initial Balance */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Modal Awal Simulasi (IDR)
+                {l('Initial Simulation Capital (IDR)', 'Modal Awal Simulasi (IDR)')}
               </label>
               <input
                 type="number"
@@ -326,7 +350,7 @@ export const BacktestView: React.FC = () => {
                 required
               />
               <span className="text-[10px] text-slate-500 block mt-1.5">
-                {formatIdr(params.initialBalanceIdr || 0)}
+                {formatCurrency(params.initialBalanceIdr || 0)}
               </span>
             </div>
           </div>
@@ -335,7 +359,7 @@ export const BacktestView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800/80">
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Alokasi per Trade (IDR)
+                {l('Allocation per Trade (IDR)', 'Alokasi per Trade (IDR)')}
               </label>
               <input
                 type="number"
@@ -345,13 +369,13 @@ export const BacktestView: React.FC = () => {
                 className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono outline-none"
               />
               <span className="text-[10px] text-slate-500 block mt-1">
-                {formatIdr(params.allocationPerTradeIdr || 0)} per posisi
+                {formatCurrency(params.allocationPerTradeIdr || 0)} {l('per position', 'per posisi')}
               </span>
             </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Trailing Stop Loss (%)
+                {l('Trailing Stop Loss (%)', 'Trailing Stop Loss (%)')}
               </label>
               <input
                 type="number"
@@ -361,13 +385,13 @@ export const BacktestView: React.FC = () => {
                 className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono outline-none"
               />
               <span className="text-[10px] text-slate-500 block mt-1">
-                Jarak ratchet pengunci profit
+                {l('Profit ratchet buffer distance', 'Jarak ratchet pengunci profit')}
               </span>
             </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Scale-Out Take-Profit (%)
+                {l('Scale-Out Take-Profit (%)', 'Scale-Out Take-Profit (%)')}
               </label>
               <input
                 type="number"
@@ -377,13 +401,13 @@ export const BacktestView: React.FC = () => {
                 className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono outline-none"
               />
               <span className="text-[10px] text-slate-500 block mt-1">
-                Jual 50% &amp; geser SL ke Breakeven
+                {l('Sell 50% & lock breakeven SL', 'Jual 50% & geser SL ke Breakeven')}
               </span>
             </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Trigger Momentum (%)
+                {l('Momentum Trigger (%)', 'Trigger Momentum (%)')}
               </label>
               <input
                 type="number"
@@ -393,13 +417,13 @@ export const BacktestView: React.FC = () => {
                 className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono outline-none"
               />
               <span className="text-[10px] text-slate-500 block mt-1">
-                {params.strategyType === 'candle_breakout' ? 'Kenaikan single-bar' : 'Kenaikan 24h rolling'}
+                {params.strategyType === 'candle_breakout' ? l('Single-bar surge', 'Kenaikan single-bar') : l('24h rolling surge', 'Kenaikan 24h rolling')}
               </span>
             </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Estimasi Slippage (%)
+                {l('Estimated Slippage (%)', 'Estimasi Slippage (%)')}
               </label>
               <input
                 type="number"
@@ -409,7 +433,7 @@ export const BacktestView: React.FC = () => {
                 className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono outline-none"
               />
               <span className="text-[10px] text-slate-500 block mt-1">
-                Potongan realistis orderbook (def 0.2%)
+                {l('Realistic orderbook cut (def 0.2%)', 'Potongan realistis orderbook (def 0.2%)')}
               </span>
             </div>
           </div>
@@ -421,7 +445,7 @@ export const BacktestView: React.FC = () => {
         <div className="flex items-center gap-3 p-4 rounded-xl border border-rose-500/30 bg-rose-950/20 text-rose-300 text-xs">
           <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
           <div>
-            <div className="font-semibold">Simulasi Gagal</div>
+            <div className="font-semibold">{l('Simulation Failed', 'Simulasi Gagal')}</div>
             <div className="text-rose-400/80">{error}</div>
           </div>
         </div>
@@ -435,9 +459,12 @@ export const BacktestView: React.FC = () => {
             <div className="flex items-center gap-3 p-3.5 rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-300 text-xs">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
               <div>
-                <span className="font-bold">Histori Terbatas Bursa: </span>
+                <span className="font-bold">{l('Limited Exchange History: ', 'Histori Terbatas Bursa: ')}</span>
                 <span>
-                  Bursa Indodax menyediakan {result.totalCandles} candle (~{result.effectiveDays} hari) dari {result.days} hari yang diminta. Metrik di bawah dihitung berdasarkan seluruh rentang riwayat yang tersedia.
+                  {l(
+                    `Indodax exchange provided ${result.totalCandles} candles (~${result.effectiveDays} days) out of ${result.days} days requested. Metrics below reflect the full available data range.`,
+                    `Bursa Indodax menyediakan ${result.totalCandles} candle (~${result.effectiveDays} hari) dari ${result.days} hari yang diminta. Metrik di bawah dihitung berdasarkan seluruh rentang riwayat yang tersedia.`
+                  )}
                 </span>
               </div>
             </div>
@@ -447,15 +474,15 @@ export const BacktestView: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-400 font-mono">
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-500/30">
-                Strategi: {result.strategyUsed}
+                {l('Strategy: ', 'Strategi: ')}{result.strategyUsed}
               </span>
               <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                Data: {result.totalCandles} candle (~{result.effectiveDays} hari)
+                Data: {result.totalCandles} {l('candles', 'candle')} (~{result.effectiveDays} {l('days', 'hari')})
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                Biaya: Slippage {result.slippagePercent}% + Fee Indodax {result.feePercent}%
+                {l('Costs: Slippage', 'Biaya: Slippage')} {result.slippagePercent}% + {l('Fee', 'Fee Indodax')} {result.feePercent}%
               </span>
             </div>
           </div>
@@ -464,17 +491,17 @@ export const BacktestView: React.FC = () => {
           <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 text-xs text-slate-300 space-y-1.5">
             <div className="flex items-center gap-2 font-bold text-slate-200">
               <Info className="w-4 h-4 text-blue-400" />
-              <span>Cara Membaca Hasil Backtest untuk Pemula:</span>
+              <span>{l('How to Interpret Backtest Results for Beginners:', 'Cara Membaca Hasil Backtest untuk Pemula:')}</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-[11px] text-slate-400">
               <p>
-                • <strong className="text-slate-300">Win Rate: </strong> Persentase trade yang berhasil mencetak laba. Di atas 50% menunjukkan sinyal terarah baik.
+                • <strong className="text-slate-300">Win Rate: </strong> {l('Percentage of trades with positive net returns. Above 50% indicates healthy directional signals.', 'Persentase trade yang berhasil mencetak laba. Di atas 50% menunjukkan sinyal terarah baik.')}
               </p>
               <p>
-                • <strong className="text-slate-300">Profit Factor: </strong> Rasio perbandingan total laba dibagi total rugi. Angka di atas 1.5x tergolong sehat.
+                • <strong className="text-slate-300">Profit Factor: </strong> {l('Ratio of total gross gains over total losses. A score above 1.5x is considered strong.', 'Rasio perbandingan total laba dibagi total rugi. Angka di atas 1.5x tergolong sehat.')}
               </p>
               <p>
-                • <strong className="text-slate-300">Max Drawdown: </strong> Penurunan modal terdalam dari titik puncak. Semakin kecil angkanya, semakin aman bagi psikologi trader.
+                • <strong className="text-slate-300">Max Drawdown: </strong> {l('Deepest peak-to-trough capital dip. Lower drawdown protects trader capital and psychology.', 'Penurunan modal terdalam dari titik puncak. Semakin kecil angkanya, semakin aman bagi psikologi trader.')}
               </p>
             </div>
           </div>
@@ -485,7 +512,7 @@ export const BacktestView: React.FC = () => {
             <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
               <span className="text-[11px] font-semibold text-slate-400">Net PnL (IDR)</span>
               <div className={`text-base font-bold font-mono ${result.netPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {result.netPnlIdr >= 0 ? '+' : ''}{formatIdr(result.netPnlIdr)}
+                {result.netPnlIdr >= 0 ? '+' : ''}{formatCurrency(result.netPnlIdr)}
               </div>
               <span className={`text-[10px] font-semibold font-mono ${result.netPnlPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {result.netPnlPercent >= 0 ? '+' : ''}{result.netPnlPercent}% return
@@ -499,7 +526,7 @@ export const BacktestView: React.FC = () => {
                 {result.winRatePercent}%
               </div>
               <span className="text-[10px] text-slate-400">
-                {result.winningTrades} Menang / {result.losingTrades} Kalah
+                {result.winningTrades} {l('Wins', 'Menang')} / {result.losingTrades} {l('Losses', 'Kalah')}
               </span>
             </div>
 
@@ -507,10 +534,10 @@ export const BacktestView: React.FC = () => {
             <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
               <span className="text-[11px] font-semibold text-slate-400">Profit Factor</span>
               <div className={`text-base font-bold font-mono ${result.profitFactor === null ? 'text-emerald-400' : result.profitFactor >= 1.5 ? 'text-emerald-400' : result.profitFactor >= 1.0 ? 'text-blue-400' : 'text-rose-400'}`}>
-                {result.profitFactor !== null ? `${result.profitFactor}x` : (result.winningTrades > 0 ? '∞ (Tanpa Loss)' : '0.00x')}
+                {result.profitFactor !== null ? `${result.profitFactor}x` : (result.winningTrades > 0 ? `∞ (${l('Zero Loss', 'Tanpa Loss')})` : '0.00x')}
               </div>
               <span className="text-[10px] text-slate-400">
-                {result.profitFactor === null ? '100% Win Rate' : result.profitFactor >= 1.5 ? 'Sangat Sehat' : result.profitFactor >= 1.0 ? 'Moderat' : 'Perlu Evaluasi'}
+                {result.profitFactor === null ? '100% Win Rate' : result.profitFactor >= 1.5 ? l('Very Strong', 'Sangat Sehat') : result.profitFactor >= 1.0 ? l('Moderate', 'Moderat') : l('Needs Review', 'Perlu Evaluasi')}
               </span>
             </div>
 
@@ -527,23 +554,23 @@ export const BacktestView: React.FC = () => {
 
             {/* Total Trades */}
             <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400">Total Transaksi</span>
+              <span className="text-[11px] font-semibold text-slate-400">{l('Total Trades', 'Total Transaksi')}</span>
               <div className="text-base font-bold font-mono text-slate-100">
                 {result.totalTrades}
               </div>
               <span className="text-[10px] text-slate-400">
-                Dari {result.totalCandles} candle
+                {l('From', 'Dari')} {result.totalCandles} {l('candles', 'candle')}
               </span>
             </div>
 
             {/* Final Balance */}
             <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400">Saldo Akhir</span>
+              <span className="text-[11px] font-semibold text-slate-400">{l('Final Balance', 'Saldo Akhir')}</span>
               <div className="text-base font-bold font-mono text-slate-100">
-                {formatIdr(result.finalBalance)}
+                {formatCurrency(result.finalBalance)}
               </div>
               <span className="text-[10px] text-slate-500">
-                Modal {formatIdr(result.initialBalance)}
+                {l('Initial Capital', 'Modal')} {formatCurrency(result.initialBalance)}
               </span>
             </div>
           </div>
@@ -554,10 +581,10 @@ export const BacktestView: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  <span>Kurva Pertumbuhan Ekuitas (Equity Curve)</span>
+                  <span>{l('Equity Growth Curve', 'Kurva Pertumbuhan Ekuitas (Equity Curve)')}</span>
                 </div>
                 <div className="text-xs font-mono text-slate-400">
-                  {result.symbol} &bull; {result.timeframe} &bull; ~{result.effectiveDays} Hari ({result.totalCandles} candle)
+                  {result.symbol} &bull; {result.timeframe} &bull; ~{result.effectiveDays} {l('Days', 'Hari')} ({result.totalCandles} {l('candles', 'candle')})
                 </div>
               </div>
 
@@ -609,8 +636,8 @@ export const BacktestView: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
-                <span>Mulai: {result.equityCurve[0]?.time}</span>
-                <span>Terakhir: {result.equityCurve[result.equityCurve.length - 1]?.time}</span>
+                <span>{l('Start: ', 'Mulai: ')}{result.equityCurve[0]?.time}</span>
+                <span>{l('Latest: ', 'Terakhir: ')}{result.equityCurve[result.equityCurve.length - 1]?.time}</span>
               </div>
             </div>
           )}
@@ -620,16 +647,19 @@ export const BacktestView: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
                 <Clock className="w-4 h-4 text-indigo-400" />
-                <span>Catatan Transaksi Backtest ({result.trades.length} Trade)</span>
+                <span>{l('Backtest Trade Execution Log', 'Catatan Transaksi Backtest')} ({result.trades.length} {l('Trades', 'Trade')})</span>
               </div>
               <div className="text-xs text-slate-400 font-mono">
-                Rata-rata Return: {result.averageTradePnlPercent >= 0 ? '+' : ''}{result.averageTradePnlPercent}% / trade
+                {l('Average Return: ', 'Rata-rata Return: ')}{result.averageTradePnlPercent >= 0 ? '+' : ''}{result.averageTradePnlPercent}% / trade
               </div>
             </div>
 
             {result.trades.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-500">
-                Tidak ada sinyal entry yang memenuhi kriteria momentum pada rentang data ini. Coba gunakan strategi "24h Rolling Momentum" atau gunakan timeframe lebih rendah.
+                {l(
+                  'No entry signals met momentum criteria in this dataset. Try using "24h Rolling Momentum" or lower timeframe.',
+                  'Tidak ada sinyal entry yang memenuhi kriteria momentum pada rentang data ini. Coba gunakan strategi "24h Rolling Momentum" atau gunakan timeframe lebih rendah.'
+                )}
               </div>
             ) : (
               <>
@@ -638,12 +668,12 @@ export const BacktestView: React.FC = () => {
                   <table className="w-full text-left text-xs font-mono">
                     <thead>
                       <tr className="border-b border-slate-800 text-[11px] text-slate-400 uppercase">
-                        <th className="py-2.5 px-3">Waktu Masuk</th>
-                        <th className="py-2.5 px-3">Waktu Keluar</th>
-                        <th className="py-2.5 px-3">Durasi</th>
-                        <th className="py-2.5 px-3">Harga Masuk</th>
-                        <th className="py-2.5 px-3">Harga Keluar</th>
-                        <th className="py-2.5 px-3">Alasan Keluar</th>
+                        <th className="py-2.5 px-3">{l('Entry Time', 'Waktu Masuk')}</th>
+                        <th className="py-2.5 px-3">{l('Exit Time', 'Waktu Keluar')}</th>
+                        <th className="py-2.5 px-3">{l('Duration', 'Durasi')}</th>
+                        <th className="py-2.5 px-3">{l('Entry Price', 'Harga Masuk')}</th>
+                        <th className="py-2.5 px-3">{l('Exit Price', 'Harga Keluar')}</th>
+                        <th className="py-2.5 px-3">{l('Exit Reason', 'Alasan Keluar')}</th>
                         <th className="py-2.5 px-3 text-right">PnL (IDR)</th>
                         <th className="py-2.5 px-3 text-right">Return</th>
                       </tr>
@@ -655,9 +685,9 @@ export const BacktestView: React.FC = () => {
                           <tr key={trade.id} className="hover:bg-slate-900/40 transition-colors">
                             <td className="py-2 px-3 text-slate-300">{trade.entryDate}</td>
                             <td className="py-2 px-3 text-slate-300">{trade.exitDate}</td>
-                            <td className="py-2 px-3 text-slate-400">{trade.holdDurationHours} jam</td>
-                            <td className="py-2 px-3 text-slate-200">{formatIdr(trade.entryPrice)}</td>
-                            <td className="py-2 px-3 text-slate-200">{formatIdr(trade.exitPrice)}</td>
+                            <td className="py-2 px-3 text-slate-400">{trade.holdDurationHours} {l('h', 'jam')}</td>
+                            <td className="py-2 px-3 text-slate-200">{formatCurrency(trade.entryPrice)}</td>
+                            <td className="py-2 px-3 text-slate-200">{formatCurrency(trade.exitPrice)}</td>
                             <td className="py-2 px-3 text-slate-400">
                               <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
                                 isWin ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-300'
@@ -666,7 +696,7 @@ export const BacktestView: React.FC = () => {
                               </span>
                             </td>
                             <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {isWin ? '+' : ''}{formatIdr(trade.pnlIdr)}
+                              {isWin ? '+' : ''}{formatCurrency(trade.pnlIdr)}
                             </td>
                             <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {isWin ? '+' : ''}{trade.pnlPercent}%
@@ -691,7 +721,7 @@ export const BacktestView: React.FC = () => {
                             {trade.exitReason}
                           </span>
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-slate-500">{trade.holdDurationHours} jam</span>
+                            <span className="text-[11px] text-slate-500">{trade.holdDurationHours} {l('h', 'jam')}</span>
                             <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                               isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30' : 'bg-rose-950/60 text-rose-400 border border-rose-500/30'
                             }`}>
@@ -702,19 +732,19 @@ export const BacktestView: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60">
                           <div>
-                            <span className="text-[10px] text-slate-500 block">MASUK ({trade.entryDate})</span>
-                            <span className="text-slate-200 font-semibold">{formatIdr(trade.entryPrice)}</span>
+                            <span className="text-[10px] text-slate-500 block">{l('ENTRY', 'MASUK')} ({trade.entryDate})</span>
+                            <span className="text-slate-200 font-semibold">{formatCurrency(trade.entryPrice)}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-500 block">KELUAR ({trade.exitDate})</span>
-                            <span className="text-slate-200 font-semibold">{formatIdr(trade.exitPrice)}</span>
+                            <span className="text-[10px] text-slate-500 block">{l('EXIT', 'KELUAR')} ({trade.exitDate})</span>
+                            <span className="text-slate-200 font-semibold">{formatCurrency(trade.exitPrice)}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between text-xs pt-0.5">
                           <span className="text-slate-400 text-[11px]">Net PnL (IDR):</span>
                           <span className={`font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {isWin ? '+' : ''}{formatIdr(trade.pnlIdr)}
+                            {isWin ? '+' : ''}{formatCurrency(trade.pnlIdr)}
                           </span>
                         </div>
                       </div>

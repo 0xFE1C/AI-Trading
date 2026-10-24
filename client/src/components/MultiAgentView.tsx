@@ -19,8 +19,10 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { SubagentDef, SubagentLog } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const MultiAgentView: React.FC = () => {
+  const { l, language } = useLanguage();
   const [agents, setAgents] = useState<SubagentDef[]>([]);
   const [logs, setLogs] = useState<SubagentLog[]>([]);
   const [sentiment, setSentiment] = useState<any>(null);
@@ -70,13 +72,16 @@ export const MultiAgentView: React.FC = () => {
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>Tim Riset AI (10 Analis Bekerja 24 Jam)</span>
+              <span>{l('AI Research Team (10 Analysts 24/7)', 'Tim Riset AI (10 Analis Bekerja 24 Jam)')}</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full border border-indigo-500/30 bg-indigo-950/40 text-indigo-300 font-mono">
-                100+ Sumber Real-Time
+                {l('100+ Real-Time Sources', '100+ Sumber Real-Time')}
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              10 Analis AI mandiri memantau berita global, ekosistem teknologi, whale on-chain, media sosial, dan sinyal bursa secara terus-menerus.
+              {l(
+                '10 autonomous AI analysts continuously monitor global news, crypto tech stacks, on-chain whales, social sentiment, and exchange order books.',
+                '10 Analis AI mandiri memantau berita global, ekosistem teknologi, whale on-chain, media sosial, dan sinyal bursa secara terus-menerus.'
+              )}
             </p>
           </div>
         </div>
@@ -88,7 +93,7 @@ export const MultiAgentView: React.FC = () => {
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/20 text-xs font-semibold text-indigo-300 hover:bg-indigo-600/30 transition-colors disabled:opacity-50 shadow-sm"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${runningCycle ? 'animate-spin' : ''}`} />
-            <span>{runningCycle ? 'Menjalankan Riset AI...' : 'Jalankan Riset Sekarang'}</span>
+            <span>{runningCycle ? l('Running AI Research...', 'Menjalankan Riset AI...') : l('Run Research Now', 'Jalankan Riset Sekarang')}</span>
           </button>
         </div>
       </div>
@@ -97,10 +102,12 @@ export const MultiAgentView: React.FC = () => {
       <div className="p-3.5 rounded-xl border border-indigo-500/20 bg-indigo-950/20 text-xs text-indigo-200 flex items-start gap-2.5">
         <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong className="text-indigo-300 font-semibold">Cara Membaca Skor Sentimen: </strong>
+          <strong className="text-indigo-300 font-semibold">{l('How to Read Sentiment Scores: ', 'Cara Membaca Skor Sentimen: ')}</strong>
           <span>
-            Skor berkisar dari <strong>-1.0 (Sangat Waspada / Potensi Risiko)</strong> sampai <strong>+1.0 (Sangat Bullish / Peluang)</strong>.
-            Bot hanya menyetujui transaksi jika sentimen berita mendukung dan Analis Keamanan memastikan nol indikasi exploit/hack.
+            {l(
+              'Scores range from -1.0 (High Caution / Risk Potential) to +1.0 (Highly Bullish / Opportunity). The bot only approves trades if sentiment is favorable and security checks report zero exploits or hacks.',
+              'Skor berkisar dari -1.0 (Sangat Waspada / Potensi Risiko) sampai +1.0 (Sangat Bullish / Peluang). Bot hanya menyetujui transaksi jika sentimen berita mendukung dan Analis Keamanan memastikan nol indikasi exploit/hack.'
+            )}
           </span>
         </div>
       </div>
@@ -109,7 +116,7 @@ export const MultiAgentView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4">
           <div className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">
-            Skor Sentimen Gabungan
+            {l('Aggregated Sentiment Score', 'Skor Sentimen Gabungan')}
           </div>
           <div className="text-2xl font-bold font-mono text-slate-100 flex items-center gap-2">
             <span>{sentiment?.averageSentiment > 0 ? `+${sentiment?.averageSentiment}` : sentiment?.averageSentiment || '0.00'}</span>
@@ -123,30 +130,34 @@ export const MultiAgentView: React.FC = () => {
               {(sentiment?.averageSentiment ?? 0) >= 0.2 ? 'BULLISH' : (sentiment?.averageSentiment ?? 0) <= -0.2 ? 'BEARISH' : 'NEUTRAL'}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Dihitung dari 30 laporan analis AI terbaru (-1.0 s/d +1.0)</p>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {l('Calculated from 30 latest AI analyst reports (-1.0 to +1.0)', 'Dihitung dari 30 laporan analis AI terbaru (-1.0 s/d +1.0)')}
+          </p>
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4">
           <div className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">
-            Status Keamanan &amp; Threat Radar
+            {l('Security Status & Threat Radar', 'Status Keamanan & Threat Radar')}
           </div>
           <div className="text-2xl font-bold font-mono text-slate-100 flex items-center gap-2">
             {(sentiment?.threatCount ?? 0) === 0 ? (
               <span className="text-emerald-400 flex items-center gap-1.5 text-base font-semibold">
-                <ShieldCheck className="h-5 w-5" /> Aman (0 Ancaman)
+                <ShieldCheck className="h-5 w-5" /> {l('Safe (0 Threats)', 'Aman (0 Ancaman)')}
               </span>
             ) : (
               <span className="text-rose-400 flex items-center gap-1.5 text-base font-semibold">
-                <ShieldAlert className="h-5 w-5" /> {sentiment?.threatCount} Peringatan Hack/FUD
+                <ShieldAlert className="h-5 w-5" /> {sentiment?.threatCount} {l('Hack/FUD Warnings', 'Peringatan Hack/FUD')}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Analis Keamanan memfilter hack, exploit, dan isu delisting</p>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {l('Security analysts screen hacks, exploits, and delisting risks', 'Analis Keamanan memfilter hack, exploit, dan isu delisting')}
+          </p>
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4">
           <div className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">
-            Sentimen Koin Teratas
+            {l('Top Coin Sentiment', 'Sentimen Koin Teratas')}
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {sentiment?.coinSentiments && Object.keys(sentiment.coinSentiments).length > 0 ? (
@@ -165,7 +176,7 @@ export const MultiAgentView: React.FC = () => {
                 </span>
               ))
             ) : (
-              <span className="text-xs text-slate-500">Belum ada data koin spesifik.</span>
+              <span className="text-xs text-slate-500">{l('No specific coin data yet.', 'Belum ada data koin spesifik.')}</span>
             )}
           </div>
         </div>
@@ -176,7 +187,7 @@ export const MultiAgentView: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
             <Cpu className="h-4 w-4 text-indigo-400" />
-            <span>10 Analis Riset AI Independen</span>
+            <span>{l('10 Autonomous AI Research Analysts', '10 Analis Riset AI Independen')}</span>
           </h3>
 
           {/* Category Filter Pills */}
@@ -187,7 +198,7 @@ export const MultiAgentView: React.FC = () => {
                 categoryFilter === 'all' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Semua ({agents.length})
+              {l('All', 'Semua')} ({agents.length})
             </button>
             <button
               onClick={() => setCategoryFilter('news')}
@@ -195,7 +206,7 @@ export const MultiAgentView: React.FC = () => {
                 categoryFilter === 'news' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Berita &amp; Komunitas
+              {l('News & Community', 'Berita & Komunitas')}
             </button>
             <button
               onClick={() => setCategoryFilter('market')}
@@ -203,7 +214,7 @@ export const MultiAgentView: React.FC = () => {
                 categoryFilter === 'market' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Pasar &amp; Momentum
+              {l('Market & Momentum', 'Pasar & Momentum')}
             </button>
             <button
               onClick={() => setCategoryFilter('security')}
@@ -211,7 +222,7 @@ export const MultiAgentView: React.FC = () => {
                 categoryFilter === 'security' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Keamanan &amp; Makro
+              {l('Security & Macro', 'Keamanan & Makro')}
             </button>
           </div>
         </div>
@@ -231,11 +242,13 @@ export const MultiAgentView: React.FC = () => {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-200 truncate">{agent.name}</span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" title="Aktif memantau" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" title={l('Actively monitoring', 'Aktif memantau')} />
                 </div>
                 <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{agent.role}</p>
                 <div className="pt-2 border-t border-slate-800/60">
-                  <span className="text-[10px] font-mono uppercase text-slate-500 block mb-1">Sumber Pantauan:</span>
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block mb-1">
+                    {l('Monitored Sources:', 'Sumber Pantauan:')}
+                  </span>
                   <div className="flex flex-wrap gap-1">
                     {agent.sources.slice(0, 2).map((s, idx) => (
                       <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 truncate max-w-[120px]">
@@ -260,17 +273,20 @@ export const MultiAgentView: React.FC = () => {
           <div className="flex items-center gap-2">
             <Radio className="h-4 w-4 text-indigo-400" />
             <h3 className="text-sm font-semibold text-slate-200">
-              Siaran Langsung Riset AI (Output Real-Time Stream)
+              {l('Live AI Intelligence Stream (Real-Time Output)', 'Siaran Langsung Riset AI (Output Real-Time Stream)')}
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            {logs.length} Laporan Tersedia
+            {logs.length} {l('Reports Available', 'Laporan Tersedia')}
           </span>
         </div>
 
         {logs.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-xs">
-            Belum ada log analis. Klik &quot;Jalankan Riset Sekarang&quot; untuk menjalankan analisa pertama.
+            {l(
+              'No analyst logs yet. Click "Run Research Now" to execute the first analysis.',
+              'Belum ada log analis. Klik "Jalankan Riset Sekarang" untuk menjalankan analisa pertama.'
+            )}
           </div>
         ) : (
           <div className="divide-y divide-slate-800/50 max-h-[500px] overflow-y-auto">
@@ -302,7 +318,7 @@ export const MultiAgentView: React.FC = () => {
                         Score: {log.sentiment_score > 0 ? `+${log.sentiment_score}` : log.sentiment_score}
                       </span>
                       <span className="text-[10px] text-slate-500">
-                        {new Date(log.timestamp).toLocaleTimeString('id-ID')}
+                        {new Date(log.timestamp).toLocaleTimeString(language === 'id' ? 'id-ID' : 'en-US')}
                       </span>
                     </div>
                   </div>
@@ -311,7 +327,7 @@ export const MultiAgentView: React.FC = () => {
                     {log.is_threat === 1 && (
                       <span className="text-rose-400 flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-rose-950 border border-rose-500/30 uppercase">
                         <AlertTriangle className="h-3 w-3" />
-                        Threat
+                        {l('Threat', 'Threat')}
                       </span>
                     )}
                     {log.title}
@@ -321,7 +337,7 @@ export const MultiAgentView: React.FC = () => {
 
                   {log.coins_mentioned && log.coins_mentioned.length > 0 && (
                     <div className="flex items-center gap-1 pt-1">
-                      <span className="text-[10px] text-slate-500 font-mono">Koin Terkait:</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{l('Related Coins:', 'Koin Terkait:')}</span>
                       {log.coins_mentioned.map((c, i) => (
                         <span key={i} className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
                           {c}

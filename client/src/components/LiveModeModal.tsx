@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ShieldCheck, X, CheckSquare, Square, DollarSign } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface LiveModeModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface LiveModeModalProps {
 }
 
 export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, onConfirm }) => {
+  const { l } = useLanguage();
   const [agreeRisk, setAgreeRisk] = useState(false);
   const [agreeRealMoney, setAgreeRealMoney] = useState(false);
   const [agreeTested, setAgreeTested] = useState(false);
@@ -33,10 +35,10 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <span>Konfirmasi Masuk Mode LIVE TRADING</span>
+                <span>{l('Confirm LIVE TRADING Activation', 'Konfirmasi Masuk Mode LIVE TRADING')}</span>
               </h2>
               <p className="text-xs text-rose-400 font-medium">
-                Peringatan Risiko &amp; Persetujuan Eksekusi Dana Riil
+                {l('Risk Warning & Real Capital Execution Consent', 'Peringatan Risiko & Persetujuan Eksekusi Dana Riil')}
               </p>
             </div>
           </div>
@@ -52,10 +54,16 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
         {/* Narrative / Context */}
         <div className="p-4 rounded-xl border border-rose-950/40 bg-rose-950/20 text-xs text-slate-300 space-y-2 leading-relaxed">
           <p>
-            Anda akan mengalihkan sistem dari <strong>Mode Simulasi (Paper)</strong> ke <strong>Mode Riil (Live)</strong>.
+            {l(
+              'You are about to switch the system from Simulation (Paper) to REAL (Live) Trading Mode.',
+              'Anda akan mengalihkan sistem dari Mode Simulasi (Paper) ke Mode Riil (Live).'
+            )}
           </p>
           <p className="text-rose-200">
-            Di Mode Live, seluruh order beli dan jual akan langsung diproses di bursa Indodax menggunakan <strong>saldo Rupiah nyata</strong> di akun Anda.
+            {l(
+              'In Live Mode, all buy and sell orders will be directly executed on Indodax using real IDR wallet funds.',
+              'Di Mode Live, seluruh order beli dan jual akan langsung diproses di bursa Indodax menggunakan saldo Rupiah nyata di akun Anda.'
+            )}
           </p>
         </div>
 
@@ -69,7 +77,10 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
               className="mt-0.5 rounded border-slate-700 text-blue-600 focus:ring-0"
             />
             <span className="text-xs text-slate-200 leading-snug">
-              Saya memahami bahwa order yang dipasang akan memotong <strong>saldo Rupiah resmi</strong> di akun Indodax saya.
+              {l(
+                'I understand that placed orders will debit real IDR funds from my Indodax account.',
+                'Saya memahami bahwa order yang dipasang akan memotong saldo Rupiah resmi di akun Indodax saya.'
+              )}
             </span>
           </label>
 
@@ -81,7 +92,10 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
               className="mt-0.5 rounded border-slate-700 text-blue-600 focus:ring-0"
             />
             <span className="text-xs text-slate-200 leading-snug">
-              Saya memahami volatilitas pasar kripto dan menyetujui bahwa AI-Trading adalah alat otomasi, bukan penasihat keuangan berlisensi.
+              {l(
+                'I acknowledge crypto market volatility and accept that AI-Trading is an automated execution tool, not a licensed financial advisor.',
+                'Saya memahami volatilitas pasar kripto dan menyetujui bahwa AI-Trading adalah alat otomasi, bukan penasihat keuangan berlisensi.'
+              )}
             </span>
           </label>
 
@@ -93,7 +107,10 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
               className="mt-0.5 rounded border-slate-700 text-blue-600 focus:ring-0"
             />
             <span className="text-xs text-slate-200 leading-snug">
-              Saya telah menguji performa bot di <strong>Mode Paper</strong> dan menyetujui batas profil risiko yang aktif.
+              {l(
+                'I have tested bot behavior in Paper Mode and agree with the currently configured risk parameters.',
+                'Saya telah menguji performa bot di Mode Paper dan menyetujui batas profil risiko yang aktif.'
+              )}
             </span>
           </label>
         </div>
@@ -105,7 +122,7 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
             onClick={onClose}
             className="px-4 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 font-medium transition-colors"
           >
-            Batal (Tetap di Paper)
+            {l('Cancel (Stay in Paper)', 'Batal (Tetap di Paper)')}
           </button>
 
           <button
@@ -115,7 +132,7 @@ export const LiveModeModal: React.FC<LiveModeModalProps> = ({ isOpen, onClose, o
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition-all"
           >
             <ShieldCheck className="h-4 w-4" />
-            <span>Aktifkan Mode Live Riil</span>
+            <span>{l('Activate Real Live Mode', 'Aktifkan Mode Live Riil')}</span>
           </button>
         </div>
       </div>

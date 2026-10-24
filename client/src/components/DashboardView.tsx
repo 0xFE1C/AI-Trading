@@ -39,6 +39,7 @@ import { EntryDiagnosticsSection } from './EntryDiagnosticsSection';
 import { HelpTooltip } from './HelpTooltip';
 import { Toast } from './Toast';
 import { api } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface DashboardViewProps {
   status: SystemStatus | null;
@@ -59,6 +60,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenAuthModal,
   onToggleTrading,
 }) => {
+  const { l, formatCurrency, formatNumber, language } = useLanguage();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [hasProvider, setHasProvider] = useState<boolean>(false);
   const [hasModels, setHasModels] = useState<boolean>(false);
@@ -118,13 +120,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         const currentModel = sett.master_model || sett.subagent_model || '';
         const foundModel = models.find((m) => m.alias_model_id === currentModel);
-        setActiveModelName(foundModel ? foundModel.display_name : currentModel || 'Belum dipilih');
+        setActiveModelName(foundModel ? foundModel.display_name : currentModel || l('Not selected', 'Belum dipilih'));
       } catch (e) {
         // Silent catch
       }
     };
     loadDashboardContext();
-  }, []);
+  }, [language]);
 
   const toggleGuide = () => {
     setIsGuideOpen((prev) => {
@@ -144,10 +146,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       await api.setRiskProfile(profile);
       const freshSettings = await api.getSettings();
       setSettings(freshSettings);
-      setToast({ message: `Profil risiko berhasil diubah menjadi: ${profile.toUpperCase()}`, type: 'success' });
+      setToast({
+        message: `${l('Risk profile successfully changed to: ', 'Profil risiko berhasil diubah menjadi: ')}${profile.toUpperCase()}`,
+        type: 'success',
+      });
       onRefresh();
     } catch (err: any) {
-      setToast({ message: `Gagal memilih profil risiko: ${err.message}`, type: 'error' });
+      setToast({
+        message: `${l('Failed to select risk profile: ', 'Gagal memilih profil risiko: ')}${err.message}`,
+        type: 'error',
+      });
     } finally {
       setUpdatingProfile(false);
     }
@@ -159,7 +167,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. Quick-Start Onboarding Wizard & Stepper (Ramah Pemula) */}
+      {/* 1. Quick-Start Onboarding Wizard & Stepper */}
       <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#090e1a] p-5 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/70">
           <div className="flex items-center gap-3">
@@ -169,14 +177,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-100 tracking-tight">
-                  Panduan Memulai Cepat (Quick Start Wizard)
+                  {l('Quick Start Wizard', 'Panduan Memulai Cepat (Quick Start Wizard)')}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-950/40 text-blue-300 font-semibold font-mono">
-                  Langkah 1 - 2 - 3
+                  {l('Steps 1 - 2 - 3', 'Langkah 1 - 2 - 3')}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Ikuti langkah mudah ini untuk mengonfigurasi dan menjalankan bot trading otomatis Anda.
+                {l(
+                  'Follow these simple steps to configure and run your automated trading bot.',
+                  'Ikuti langkah mudah ini untuk mengonfigurasi dan menjalankan bot trading otomatis Anda.'
+                )}
               </p>
             </div>
           </div>
@@ -186,7 +197,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={toggleGuide}
             className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-300 transition-colors"
           >
-            <span>{isGuideOpen ? 'Sembunyikan Panduan' : 'Buka Panduan Langkah'}</span>
+            <span>{isGuideOpen ? l('Hide Guide', 'Sembunyikan Panduan') : l('Show Guide Steps', 'Buka Panduan Langkah')}</span>
             {isGuideOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
@@ -203,21 +214,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   : 'border-blue-500/30 bg-blue-950/20 text-slate-200'
               }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 1</span>
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
+                    {l('Step 1', 'Langkah 1')}
+                  </span>
                   {hasProvider ? (
                     <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Terhubung
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {l('Connected', 'Terhubung')}
                     </span>
                   ) : (
-                    <span className="text-[11px] text-amber-400 font-medium">Perlu Dihubungkan</span>
+                    <span className="text-[11px] text-amber-400 font-medium">
+                      {l('Connection Required', 'Perlu Dihubungkan')}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <Cpu className="w-4 h-4 text-blue-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-100">Koneksi Akun AI</span>
+                  <span className="text-xs font-bold text-slate-100">
+                    {l('AI Account Connection', 'Koneksi Akun AI')}
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-snug mb-3">
-                  {hasProvider ? 'Provider AI (Google Antigravity / Token Harbor) telah aktif.' : 'Hubungkan akun Google atau masukkan API Key AI.'}
+                  {hasProvider
+                    ? l('AI Provider (Google Antigravity / Token Harbor) is active.', 'Provider AI (Google Antigravity / Token Harbor) telah aktif.')
+                    : l('Connect Google account or enter AI API Key.', 'Hubungkan akun Google atau masukkan API Key AI.')}
                 </p>
                 <button
                   type="button"
@@ -228,7 +247,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm'
                   }`}
                 >
-                  <span>{hasProvider ? 'Lihat Provider' : 'Hubungkan AI'}</span>
+                  <span>{hasProvider ? l('View Providers', 'Lihat Provider') : l('Connect AI', 'Hubungkan AI')}</span>
                   <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
@@ -240,21 +259,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   : 'border-indigo-500/30 bg-indigo-950/20 text-slate-200'
               }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 2</span>
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
+                    {l('Step 2', 'Langkah 2')}
+                  </span>
                   {isAiConfigured ? (
                     <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Siap
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {l('Ready', 'Siap')}
                     </span>
                   ) : (
-                    <span className="text-[11px] text-amber-400 font-medium">Pilih Model</span>
+                    <span className="text-[11px] text-amber-400 font-medium">
+                      {l('Select Model', 'Pilih Model')}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <Zap className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-100">Model AI Terpilih</span>
+                  <span className="text-xs font-bold text-slate-100">
+                    {l('Selected AI Model', 'Model AI Terpilih')}
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-snug mb-3 truncate" title={activeModelName}>
-                  {activeModelName ? `Model: ${activeModelName}` : 'Pilih model rekomendasi (Gemini / Claude)'}
+                  {activeModelName
+                    ? `${l('Model: ', 'Model: ')}${activeModelName}`
+                    : l('Select recommended model (Gemini / Claude)', 'Pilih model rekomendasi (Gemini / Claude)')}
                 </p>
                 <button
                   type="button"
@@ -265,7 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
                   }`}
                 >
-                  <span>{isAiConfigured ? 'Ubah Model' : 'Pilih Model AI'}</span>
+                  <span>{isAiConfigured ? l('Change Model', 'Ubah Model') : l('Select AI Model', 'Pilih Model AI')}</span>
                   <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
@@ -277,21 +304,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   : 'border-slate-800 bg-slate-900/40 text-slate-200'
               }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 3 (Opsional)</span>
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
+                    {l('Step 3 (Optional)', 'Langkah 3 (Opsional)')}
+                  </span>
                   {isWaConnected ? (
                     <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Online
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {l('Online', 'Online')}
                     </span>
                   ) : (
-                    <span className="text-[11px] text-slate-400">Belum Terhubung</span>
+                    <span className="text-[11px] text-slate-400">
+                      {l('Not Connected', 'Belum Terhubung')}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <MessageSquare className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-100">Bot Notifikasi (WA &amp; Telegram)</span>
+                  <span className="text-xs font-bold text-slate-100">
+                    {l('Notification Bots (WA & Telegram)', 'Bot Notifikasi (WA & Telegram)')}
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-snug mb-3">
-                  {isWaConnected ? 'Notifikasi transaksi aktif ke HP Anda (WhatsApp / Telegram).' : 'Hubungkan WhatsApp atau Telegram untuk menerima notifikasi profit di HP.'}
+                  {isWaConnected
+                    ? l('Real-time transaction alerts to your phone (WhatsApp / Telegram).', 'Notifikasi transaksi aktif ke HP Anda (WhatsApp / Telegram).')
+                    : l('Connect WhatsApp or Telegram to receive profit alerts on your phone.', 'Hubungkan WhatsApp atau Telegram untuk menerima notifikasi profit di HP.')}
                 </p>
                 <button
                   type="button"
@@ -302,7 +337,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       : 'border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
                   }`}
                 >
-                  <span>{isWaConnected ? 'Kelola Bots' : 'Atur Bot Notifikasi'}</span>
+                  <span>{isWaConnected ? l('Manage Bots', 'Kelola Bots') : l('Configure Bots', 'Atur Bot Notifikasi')}</span>
                   <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
@@ -311,17 +346,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-950/15 text-slate-200 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 4</span>
+                    <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
+                      {l('Step 4', 'Langkah 4')}
+                    </span>
                     <span className="text-[11px] text-amber-400 font-medium">
-                      {currentProfileKey === 'conservative' ? 'Konservatif' : currentProfileKey === 'aggressive' ? 'Agresif' : 'Seimbang'}
+                      {currentProfileKey === 'conservative'
+                        ? l('Conservative', 'Konservatif')
+                        : currentProfileKey === 'aggressive'
+                        ? l('Aggressive', 'Agresif')
+                        : l('Balanced', 'Seimbang')}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mb-1.5">
                     <Shield className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="text-xs font-bold text-slate-100">Profil Risiko Modal</span>
+                    <span className="text-xs font-bold text-slate-100">
+                      {l('Capital Risk Profile', 'Profil Risiko Modal')}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-snug mb-2.5">
-                    Pilih gaya trading Anda dengan 1-klik:
+                    {l('Select your trading style in 1 click:', 'Pilih gaya trading Anda dengan 1-klik:')}
                   </p>
                 </div>
 
@@ -330,40 +373,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     type="button"
                     disabled={updatingProfile}
                     onClick={() => handleQuickSelectRisk('conservative')}
-                    title="Hanya koin likuid teratas (BTC, ETH, SOL), Stop Loss 1.5%"
+                    title={l('Top liquid coins only (BTC, ETH, SOL), Stop Loss 1.5%', 'Hanya koin likuid teratas (BTC, ETH, SOL), Stop Loss 1.5%')}
                     className={`py-1 px-1.5 rounded text-[10px] font-semibold text-center transition-all ${
                       currentProfileKey === 'conservative'
                         ? 'bg-emerald-600 text-white font-bold shadow-sm'
                         : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
                     }`}
                   >
-                    Aman
+                    {l('Safe', 'Aman')}
                   </button>
                   <button
                     type="button"
                     disabled={updatingProfile}
                     onClick={() => handleQuickSelectRisk('balanced')}
-                    title="Momentum koin teratas + Take Profit 5%"
+                    title={l('Top coin momentum + Take Profit 5%', 'Momentum koin teratas + Take Profit 5%')}
                     className={`py-1 px-1.5 rounded text-[10px] font-semibold text-center transition-all ${
                       currentProfileKey === 'balanced'
                         ? 'bg-blue-600 text-white font-bold shadow-sm'
                         : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
                     }`}
                   >
-                    Seimbang
+                    {l('Balanced', 'Seimbang')}
                   </button>
                   <button
                     type="button"
                     disabled={updatingProfile}
                     onClick={() => handleQuickSelectRisk('aggressive')}
-                    title="Mengincar listing baru & koin memecoin"
+                    title={l('Targets new listings & high volatility memecoins', 'Mengincar listing baru & koin memecoin')}
                     className={`py-1 px-1.5 rounded text-[10px] font-semibold text-center transition-all ${
                       currentProfileKey === 'aggressive'
                         ? 'bg-amber-600 text-white font-bold shadow-sm'
                         : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
                     }`}
                   >
-                    Agresif
+                    {l('Aggressive', 'Agresif')}
                   </button>
                 </div>
 
@@ -373,7 +416,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className="w-full mt-2.5 py-1 px-2 rounded-lg border border-amber-500/30 bg-amber-950/30 hover:bg-amber-900/40 text-[10px] text-amber-300 font-medium flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Calculator className="w-3 h-3 text-amber-400" />
-                  <span>Hitung Alokasi Modal Otomatis</span>
+                  <span>{l('Calculate Auto Capital Allocation', 'Hitung Alokasi Modal Otomatis')}</span>
                 </button>
               </div>
             </div>
@@ -384,10 +427,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className={`h-3 w-3 rounded-full shrink-0 ${isAuto ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
                 <div>
                   <div className="text-xs font-bold text-slate-200">
-                    {isAuto ? 'Auto-Trading Sedang AKTIF Memantau Pasar' : 'Auto-Trading Saat Ini Sedang PAUSED (Siaga)'}
+                    {isAuto
+                      ? l('Auto-Trading is ACTIVE & Monitoring Market', 'Auto-Trading Sedang AKTIF Memantau Pasar')
+                      : l('Auto-Trading is currently PAUSED (Standby)', 'Auto-Trading Saat Ini Sedang PAUSED (Siaga)')}
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    Mode saat ini: <strong className="text-slate-300 font-mono">{status?.mode?.toUpperCase()} TRADING</strong> (Simulasi modal virtual Rp {balance.toLocaleString('id-ID')}).
+                    {l('Current mode: ', 'Mode saat ini: ')}
+                    <strong className="text-slate-300 font-mono">{status?.mode?.toUpperCase()} TRADING</strong>{' '}
+                    ({l('Virtual simulation: ', 'Simulasi modal virtual ')}{formatCurrency(balance)}).
                   </div>
                 </div>
               </div>
@@ -404,12 +451,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {isAuto ? (
                   <>
                     <Pause className="w-4 h-4 text-amber-400" />
-                    <span>Jeda Auto-Trading (Pause)</span>
+                    <span>{l('Pause Auto-Trading', 'Jeda Auto-Trading (Pause)')}</span>
                   </>
                 ) : (
                   <>
                     <Play className="w-4 h-4 fill-current" />
-                    <span>Mulai Auto-Trading Sekarang (Aman)</span>
+                    <span>{l('Start Auto-Trading Now (Safe)', 'Mulai Auto-Trading Sekarang (Aman)')}</span>
                   </>
                 )}
               </button>
@@ -418,7 +465,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
-      {/* Real-time Status Narrative (Plain Indonesian) */}
+      {/* Real-time Status Narrative */}
       <div className="p-3.5 rounded-xl border border-slate-800 bg-[#090e1a] text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -426,31 +473,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isAuto ? 'bg-emerald-500' : 'bg-slate-600'}`} />
           </span>
           <span>
-            <strong>Kondisi Mesin: </strong>
+            <strong>{l('Engine Status: ', 'Kondisi Mesin: ')}</strong>
             {isAuto
-              ? `Bot sedang memantau koin Indodax secara real-time, menahan risiko dengan profil ${currentProfileKey.toUpperCase()}, dan mengelola ${openPositions.length} posisi terbuka.`
-              : `Bot sedang dalam posisi jeda (PAUSED). Sinyal pasar tetap dipantau, namun order baru ditahan sampai Anda menyalakan auto-trading.`}
+              ? l(
+                  `Bot is actively monitoring Indodax pairs in real-time, managing risk via ${currentProfileKey.toUpperCase()} profile, and managing ${openPositions.length} open positions.`,
+                  `Bot sedang memantau koin Indodax secara real-time, menahan risiko dengan profil ${currentProfileKey.toUpperCase()}, dan mengelola ${openPositions.length} posisi terbuka.`
+                )
+              : l(
+                  'Bot is currently paused. Market signals are monitored, but new orders are held until you activate auto-trading.',
+                  'Bot sedang dalam posisi jeda (PAUSED). Sinyal pasar tetap dipantau, namun order baru ditahan sampai Anda menyalakan auto-trading.'
+                )}
           </span>
         </div>
         <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 shrink-0">
-          <span>Posisi Aktif: <strong className="text-slate-200">{openPositions.length}</strong></span>
+          <span>{l('Active Positions: ', 'Posisi Aktif: ')}<strong className="text-slate-200">{openPositions.length}</strong></span>
           <span>•</span>
-          <span>Selesai: <strong className="text-slate-200">{recentTrades.length}</strong></span>
+          <span>{l('Completed: ', 'Selesai: ')}<strong className="text-slate-200">{recentTrades.length}</strong></span>
         </div>
       </div>
 
-      {/* Mode Pemula Explainer Card (Plain Indonesian) */}
+      {/* Mode Pemula Explainer Card */}
       {displayMode === 'simple' && (
         <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-200">
           <div className="flex items-start gap-2.5">
             <HelpCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-slate-100 block mb-0.5">Bagaimana Bot Bekerja untuk Anda?</span>
-              Bot secara otomatis memindai seluruh koin di Indodax setiap 15 detik. Jika ada koin yang memiliki momentum kenaikan yang aman dan disetujui oleh evaluator AI, bot akan membelinya serta langsung memasang pengaman otomatis (*stop-loss dinamis*) agar keuntungan Anda terkunci dan modal Anda terlindungi dari kerugian.
+              <span className="font-bold text-slate-100 block mb-0.5">
+                {l('How Does the Bot Work for You?', 'Bagaimana Bot Bekerja untuk Anda?')}
+              </span>
+              {l(
+                'The bot automatically scans all pairs on Indodax every 15 seconds. When safe upward momentum is confirmed by the AI evaluator, the bot executes the buy and immediately sets dynamic trailing stop-loss protection to lock profits and safeguard your capital.',
+                'Bot secara otomatis memindai seluruh koin di Indodax setiap 15 detik. Jika ada koin yang memiliki momentum kenaikan yang aman dan disetujui oleh evaluator AI, bot akan membelinya serta langsung memasang pengaman otomatis (stop-loss dinamis) agar keuntungan Anda terkunci dan modal Anda terlindungi dari kerugian.'
+              )}
             </div>
           </div>
           <span className="text-[10px] px-2 py-1 rounded bg-blue-900/50 text-blue-300 font-mono shrink-0 self-end sm:self-auto border border-blue-500/30">
-            Mode Pemula Aktif
+            {l('Beginner Mode Active', 'Mode Pemula Aktif')}
           </span>
         </div>
       )}
@@ -460,19 +518,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-slate-200 flex items-center gap-2">
             <CheckSquare className="w-4 h-4 text-emerald-400" />
-            <span>Checklist 4 Langkah Keselamatan Trader Pemula:</span>
+            <span>{l('4-Step Beginner Trader Safety Checklist:', 'Checklist 4 Langkah Keselamatan Trader Pemula:')}</span>
           </span>
           <span className="text-[11px] font-mono text-slate-400">
-            {Object.values(checklist).filter(Boolean).length} / 4 Selesai
+            {Object.values(checklist).filter(Boolean).length} / 4 {l('Completed', 'Selesai')}
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
           {[
-            { id: 'step1', label: '1. Hubungkan Model AI (Google/Claude)' },
-            { id: 'step2', label: '2. Pasang Profil Risiko Aman (Konservatif)' },
-            { id: 'step3', label: '3. Uji minimal 7 hari di Mode Paper' },
-            { id: 'step4', label: '4. Buat cadangan database berkala' },
+            { id: 'step1', label: l('1. Connect AI Model (Google/Claude)', '1. Hubungkan Model AI (Google/Claude)') },
+            { id: 'step2', label: l('2. Set Safe Risk Profile (Conservative)', '2. Pasang Profil Risiko Aman (Konservatif)') },
+            { id: 'step3', label: l('3. Test for 7+ days in Paper Mode', '3. Uji minimal 7 hari di Mode Paper') },
+            { id: 'step4', label: l('4. Create periodic database backups', '4. Buat cadangan database berkala') },
           ].map((item) => (
             <button
               key={item.id}
@@ -497,35 +555,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* KPI Cards Row (Clean, Human-Readable) */}
+      {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Balance */}
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">
-                {status?.mode === 'paper' ? 'Saldo Virtual (Paper)' : 'Saldo Riil Indodax'}
+                {status?.mode === 'paper'
+                  ? l('Virtual Balance (Paper)', 'Saldo Virtual (Paper)')
+                  : l('Real Indodax Balance', 'Saldo Riil Indodax')}
               </span>
               <DollarSign className="h-4 w-4 text-blue-400" />
             </div>
             <div className="text-2xl font-bold font-mono text-slate-100">
-              Rp {balance.toLocaleString('id-ID')}
+              {formatCurrency(balance)}
             </div>
             <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
               <span className={`h-1.5 w-1.5 rounded-full ${status?.mode === 'live' ? 'bg-emerald-400' : 'bg-blue-400'}`} />
-              Mode: <span className="font-semibold text-slate-300 uppercase">{status?.mode} Trading</span>
+              {l('Mode: ', 'Mode: ')}<span className="font-semibold text-slate-300 uppercase">{status?.mode} Trading</span>
             </div>
           </div>
           <div className="mt-2.5">
             {status?.mode === 'paper' ? (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-300 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                <span>Mode Simulasi: Saldo Virtual (100% Bebas Risiko Rugi)</span>
+                <span>{l('Simulation Mode: Virtual Capital (Risk-Free)', 'Mode Simulasi: Saldo Virtual (100% Bebas Risiko Rugi)')}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-950/40 border border-amber-500/30 text-[10px] text-amber-300 font-medium">
                 <Shield className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                <span>Live Riil: Pengaman Stop Loss Aktif</span>
+                <span>{l('Live Mode: Active Stop Loss Protection', 'Live Riil: Pengaman Stop Loss Aktif')}</span>
               </div>
             )}
           </div>
@@ -534,7 +594,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Card 2: Floating PnL */}
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium uppercase tracking-wider">Keuntungan / Rugi Berjalan</span>
+            <span className="text-xs font-medium uppercase tracking-wider">
+              {l('Floating Profit / Loss', 'Keuntungan / Rugi Berjalan')}
+            </span>
             {totalFloatingPnl >= 0 ? (
               <TrendingUp className="h-4 w-4 text-emerald-400" />
             ) : (
@@ -542,18 +604,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
           <div className={`text-2xl font-bold font-mono ${totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {totalFloatingPnl >= 0 ? '+' : ''}Rp {Math.round(totalFloatingPnl).toLocaleString('id-ID')}
+            {totalFloatingPnl >= 0 ? '+' : ''}{formatCurrency(Math.round(totalFloatingPnl))}
           </div>
           <div className={`mt-2 text-xs font-mono font-medium flex items-center gap-1 ${totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {totalFloatingPnl >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            {totalFloatingPnlPercent >= 0 ? '+' : ''}{totalFloatingPnlPercent.toFixed(2)}% dari {openPositions.length} koin aktif
+            {totalFloatingPnlPercent >= 0 ? '+' : ''}{totalFloatingPnlPercent.toFixed(2)}% {l('across', 'dari')} {openPositions.length} {l('active coins', 'koin aktif')}
           </div>
         </div>
 
         {/* Card 3: Multi-Agent Sentiment Index */}
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium uppercase tracking-wider">Kondisi Pasar Menurut AI</span>
+            <span className="text-xs font-medium uppercase tracking-wider">
+              {l('AI Market Condition Index', 'Kondisi Pasar Menurut AI')}
+            </span>
             <Layers className="h-4 w-4 text-indigo-400" />
           </div>
           <div className="text-2xl font-bold font-mono text-slate-100 flex items-center gap-2">
@@ -565,28 +629,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 ? 'border-rose-500/30 bg-rose-950/40 text-rose-400'
                 : 'border-slate-700 bg-slate-800 text-slate-300'
             }`}>
-              {sentiment >= 0.2 ? 'BULLISH (NAIK)' : sentiment <= -0.2 ? 'BEARISH (TURUN)' : 'NETRAL'}
+              {sentiment >= 0.2
+                ? l('BULLISH (UP)', 'BULLISH (NAIK)')
+                : sentiment <= -0.2
+                ? l('BEARISH (DOWN)', 'BEARISH (TURUN)')
+                : l('NEUTRAL', 'NETRAL')}
             </span>
           </div>
           <div className="mt-2 text-xs text-slate-400">
-            Dipantau 10 Subagent (Berita &amp; Bursa)
+            {l('Monitored by 10 Subagents (News & Exchange)', 'Dipantau 10 Subagent (Berita & Bursa)')}
           </div>
         </div>
 
         {/* Card 4: WhatsApp Bot Link */}
         <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium uppercase tracking-wider">WhatsApp Bot Alert</span>
+            <span className="text-xs font-medium uppercase tracking-wider">
+              {l('WhatsApp Bot Alert', 'WhatsApp Bot Alert')}
+            </span>
             <Shield className="h-4 w-4 text-emerald-400" />
           </div>
           <div className="flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${status?.whatsapp?.connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
             <span className="text-base font-bold text-slate-100">
-              {status?.whatsapp?.connected ? 'Terhubung (Online)' : 'Menunggu Pairing QR'}
+              {status?.whatsapp?.connected
+                ? l('Connected (Online)', 'Terhubung (Online)')
+                : l('Awaiting Pairing QR', 'Menunggu Pairing QR')}
             </span>
           </div>
           <div className="mt-2 text-xs text-slate-400 truncate">
-            Admin: {status?.whatsapp?.adminNumber || 'Belum diisi di Settings'}
+            Admin: {status?.whatsapp?.adminNumber || l('Not set in Settings', 'Belum diisi di Settings')}
           </div>
         </div>
       </div>
@@ -597,20 +669,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center gap-2.5">
             <TrendingUp className="h-4 w-4 text-blue-400" />
             <h2 className="text-sm font-semibold tracking-wide text-slate-200">
-              Posisi Koin yang Sedang Berjalan ({openPositions.length})
+              {l('Active Open Positions', 'Posisi Koin yang Sedang Berjalan')} ({openPositions.length})
             </h2>
           </div>
           <span className="text-xs text-slate-400 font-mono">
-            Pengaman Dinamis: Trailing Stop Loss &amp; Scale-Out TP
+            {l('Dynamic Protection: Trailing Stop Loss & Scale-Out TP', 'Pengaman Dinamis: Trailing Stop Loss & Scale-Out TP')}
           </span>
         </div>
 
         {openPositions.length === 0 ? (
           <div className="py-12 text-center text-slate-400">
             <AlertCircle className="h-8 w-8 text-slate-500 mx-auto mb-2 opacity-60" />
-            <p className="text-sm font-medium text-slate-300">Belum ada koin yang sedang di-hold.</p>
+            <p className="text-sm font-medium text-slate-300">
+              {l('No positions currently held.', 'Belum ada koin yang sedang di-hold.')}
+            </p>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              Sistem autonomous sedang memindai peluang koin di Indodax. Saat momentum terdeteksi dan aman, koin akan otomatis muncul di sini.
+              {l(
+                'Autonomous system is scanning Indodax for opportunities. When safe momentum is confirmed, positions will appear here automatically.',
+                'Sistem autonomous sedang memindai peluang koin di Indodax. Saat momentum terdeteksi dan aman, koin akan otomatis muncul di sini.'
+              )}
             </p>
           </div>
         ) : (
@@ -620,29 +697,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-800/60 bg-slate-900/50 text-slate-400 font-mono text-[11px] uppercase">
-                    <th className="py-3 px-4">Koin / Pair</th>
-                    <th className="py-3 px-4">Harga Beli</th>
-                    <th className="py-3 px-4">Harga Sekarang</th>
+                    <th className="py-3 px-4">{l('Coin / Pair', 'Koin / Pair')}</th>
+                    <th className="py-3 px-4">{l('Entry Price', 'Harga Beli')}</th>
+                    <th className="py-3 px-4">{l('Current Price', 'Harga Sekarang')}</th>
                     <th className="py-3 px-4">
                       <div className="flex items-center gap-1">
-                        <span>Level Pengaman (Stop Loss)</span>
-                        <HelpTooltip content="Trailing Stop Loss: Level harga proteksi yang otomatis naik mengikuti kenaikan harga koin. Bila harga berbalik turun menembus angka ini, bot otomatis menjual untuk mengamankan profit atau membatasi rugi." />
+                        <span>{l('Stop Loss Level', 'Level Pengaman (Stop Loss)')}</span>
+                        <HelpTooltip content={l(
+                          'Trailing Stop Loss: Protection price level that automatically ratchets up as coin price rises. If price reverses below this, bot automatically sells to lock profits or limit losses.',
+                          'Trailing Stop Loss: Level harga proteksi yang otomatis naik mengikuti kenaikan harga koin. Bila harga berbalik turun menembus angka ini, bot otomatis menjual untuk mengamankan profit atau membatasi rugi.'
+                        )} />
                       </div>
                     </th>
-                    <th className="py-3 px-4">Modal Terpakai</th>
+                    <th className="py-3 px-4">{l('Capital Used', 'Modal Terpakai')}</th>
                     <th className="py-3 px-4">
                       <div className="flex items-center gap-1">
-                        <span>Keuntungan (PnL)</span>
-                        <HelpTooltip content="Floating Profit & Loss: Estimasi keuntungan atau kerugian berjalan saat ini sebelum koin dieksekusi jual." />
+                        <span>{l('Floating PnL', 'Keuntungan (PnL)')}</span>
+                        <HelpTooltip content={l(
+                          'Floating Profit & Loss: Estimated unrealized profit or loss before sell execution.',
+                          'Floating Profit & Loss: Estimasi keuntungan atau kerugian berjalan saat ini sebelum koin dieksekusi jual.'
+                        )} />
                       </div>
                     </th>
                     <th className="py-3 px-4">
                       <div className="flex items-center gap-1">
-                        <span>Status Pengamanan</span>
-                        <HelpTooltip content="Scale-Out TP: Saat profit capai target awal, bot menjual 50% untuk kunci profit dan memindahkan stop loss ke titik impas (breakeven)." />
+                        <span>{l('Protection Status', 'Status Pengamanan')}</span>
+                        <HelpTooltip content={l(
+                          'Scale-Out TP: When profit hits the initial target, bot secures 50% profits and moves the stop loss to breakeven.',
+                          'Scale-Out TP: Saat profit capai target awal, bot menjual 50% untuk kunci profit dan memindahkan stop loss ke titik impas (breakeven).'
+                        )} />
                       </div>
                     </th>
-                    <th className="py-3 px-4">Lama Hold</th>
+                    <th className="py-3 px-4">{l('Hold Duration', 'Lama Hold')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40 font-mono">
@@ -656,24 +742,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           {pos.symbol.toUpperCase()}
                         </td>
                         <td className="py-3.5 px-4 text-slate-300">
-                          Rp {pos.entry_price.toLocaleString('id-ID')}
+                          {formatCurrency(pos.entry_price)}
                         </td>
                         <td className="py-3.5 px-4 text-slate-100 font-semibold">
-                          Rp {pos.current_price.toLocaleString('id-ID')}
+                          {formatCurrency(pos.current_price)}
                         </td>
                         <td className="py-3.5 px-4 text-amber-400 font-bold">
-                          Rp {Math.round(pos.trailing_stop_price).toLocaleString('id-ID')}
+                          {formatCurrency(Math.round(pos.trailing_stop_price))}
                           <span className="block text-[10px] text-slate-500 font-sans font-normal">
-                            (Otomatis jual bila tembus)
+                            {l('(Auto-sells if breached)', '(Otomatis jual bila tembus)')}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-300">
-                          Rp {Math.round(pos.initial_cost_idr).toLocaleString('id-ID')}
+                          {formatCurrency(Math.round(pos.initial_cost_idr))}
                         </td>
                         <td className={`py-3.5 px-4 font-semibold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {isProfit ? '+' : ''}{pos.pnl_percent?.toFixed(2)}%
                           <span className="block text-[11px] opacity-80">
-                            ({isProfit ? '+' : ''}Rp {Math.round(pos.pnl_idr || 0).toLocaleString('id-ID')})
+                            ({isProfit ? '+' : ''}{formatCurrency(Math.round(pos.pnl_idr || 0))})
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
@@ -683,12 +769,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               : 'bg-blue-950/40 text-blue-300 border-blue-500/30'
                           }`}>
                             <Shield className="h-3 w-3" />
-                            {pos.take_profit_step === 1 ? '50% Profit Aman (Breakeven Locked)' : 'Tracking Momentum'}
+                            {pos.take_profit_step === 1
+                              ? l('50% Profit Locked (Breakeven)', '50% Profit Aman (Breakeven Locked)')
+                              : l('Tracking Momentum', 'Tracking Momentum')}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-400 flex items-center gap-1.5 pt-4 font-sans">
                           <Clock className="h-3.5 w-3.5 text-slate-500" />
-                          {holdMin} menit
+                          {holdMin} {l('min', 'menit')}
                         </td>
                       </tr>
                     );
@@ -697,7 +785,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </table>
             </div>
 
-            {/* Mobile Card Layout (< md screens) */}
+            {/* Mobile Card Layout */}
             <div className="md:hidden divide-y divide-slate-800/80 p-3 space-y-3">
               {openPositions.map((pos) => {
                 const isProfit = (pos.pnl_percent || 0) >= 0;
@@ -716,7 +804,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             : 'bg-blue-950/60 text-blue-300 border-blue-500/30'
                         }`}>
                           <Shield className="w-2.5 h-2.5" />
-                          {pos.take_profit_step === 1 ? 'Profit Aman' : 'Tracking'}
+                          {pos.take_profit_step === 1 ? l('Profit Locked', 'Profit Aman') : l('Tracking', 'Tracking')}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -727,28 +815,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                       <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">
-                        <span className="text-[10px] text-slate-500 block uppercase">Harga Sekarang</span>
-                        <span className="font-semibold text-slate-200">Rp {pos.current_price.toLocaleString('id-ID')}</span>
-                        <span className="text-[10px] text-slate-500 block">Beli: Rp {pos.entry_price.toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block uppercase">{l('Current Price', 'Harga Sekarang')}</span>
+                        <span className="font-semibold text-slate-200">{formatCurrency(pos.current_price)}</span>
+                        <span className="text-[10px] text-slate-500 block">{l('Buy: ', 'Beli: ')}{formatCurrency(pos.entry_price)}</span>
                       </div>
                       <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">
-                        <span className="text-[10px] text-slate-500 block uppercase">Pengaman (Stop Loss)</span>
-                        <span className="font-bold text-amber-400">Rp {Math.round(pos.trailing_stop_price).toLocaleString('id-ID')}</span>
-                        <span className="text-[10px] text-slate-500 block">Otomatis Cut/TP</span>
+                        <span className="text-[10px] text-slate-500 block uppercase">{l('Stop Loss Level', 'Pengaman (Stop Loss)')}</span>
+                        <span className="font-bold text-amber-400">{formatCurrency(Math.round(pos.trailing_stop_price))}</span>
+                        <span className="text-[10px] text-slate-500 block">{l('Auto Cut/TP', 'Otomatis Cut/TP')}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
                       <div className="text-xs">
-                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Modal Terpakai</span>
-                        <span className="font-mono text-slate-300">Rp {Math.round(pos.initial_cost_idr).toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">{l('Capital Used', 'Modal Terpakai')}</span>
+                        <span className="font-mono text-slate-300">{formatCurrency(Math.round(pos.initial_cost_idr))}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] text-slate-500 block uppercase font-mono">PnL Berjalan</span>
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">{l('Floating PnL', 'PnL Berjalan')}</span>
                         <span className={`text-sm font-bold font-mono ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {isProfit ? '+' : ''}{pos.pnl_percent?.toFixed(2)}%
                           <span className="text-xs font-normal ml-1">
-                            ({isProfit ? '+' : ''}Rp {Math.round(pos.pnl_idr || 0).toLocaleString('id-ID')})
+                            ({isProfit ? '+' : ''}{formatCurrency(Math.round(pos.pnl_idr || 0))})
                           </span>
                         </span>
                       </div>
@@ -775,15 +863,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div>
                 <span className="text-sm font-bold text-slate-200 block">
-                  Grafik Lilin Pasar Real-Time (TradingView Candlestick)
+                  {l('Real-Time Market Candlestick Chart (TradingView)', 'Grafik Lilin Pasar Real-Time (TradingView Candlestick)')}
                 </span>
                 <span className="text-xs text-slate-400">
-                  {showChartInSimple ? 'Klik untuk menutup chart' : 'Klik untuk melihat grafik teknikal harga langsung dari Indodax'}
+                  {showChartInSimple
+                    ? l('Click to close chart', 'Klik untuk menutup chart')
+                    : l('Click to view live technical chart directly from Indodax', 'Klik untuk melihat grafik teknikal harga langsung dari Indodax')}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs font-semibold text-blue-400">
-              <span>{showChartInSimple ? 'Tutup Grafik' : 'Tampilkan Grafik'}</span>
+              <span>{showChartInSimple ? l('Close Chart', 'Tutup Grafik') : l('Show Chart', 'Tampilkan Grafik')}</span>
               {showChartInSimple ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           </button>
@@ -823,15 +913,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div>
                 <span className="text-sm font-bold text-slate-200 block">
-                  Laboratorium Kuantitatif &amp; Pembuktian Nilai Tambah AI (A/B Alpha Tracker)
+                  {l('Quantitative Lab & AI Added Value Proof (A/B Alpha Tracker)', 'Laboratorium Kuantitatif & Pembuktian Nilai Tambah AI (A/B Alpha Tracker)')}
                 </span>
                 <span className="text-xs text-slate-400">
-                  {showAbInSimple ? 'Klik untuk menutup analisis kuantitatif' : 'Pelacak koin yang ditolak AI untuk membuktikan efektivitas keputusan AI secara nyata'}
+                  {showAbInSimple
+                    ? l('Click to close quantitative analysis', 'Klik untuk menutup analisis kuantitatif')
+                    : l('Tracks AI-rejected coins to prove real-world alpha and decision accuracy', 'Pelacak koin yang ditolak AI untuk membuktikan efektivitas keputusan AI secara nyata')}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400">
-              <span>{showAbInSimple ? 'Tutup Analisis' : 'Buka Analisis Kuantitatif'}</span>
+              <span>{showAbInSimple ? l('Close Analysis', 'Tutup Analisis') : l('Open Quantitative Analysis', 'Buka Analisis Kuantitatif')}</span>
               {showAbInSimple ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           </button>
@@ -860,15 +952,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div>
                   <span className="text-sm font-bold text-slate-200 block">
-                    Status 9 Gerbang Masuk Pasar &amp; Radar Peluang Koin
+                    {l('9 Market Entry Gates Status & Coin Radar', 'Status 9 Gerbang Masuk Pasar & Radar Peluang Koin')}
                   </span>
                   <span className="text-xs text-slate-400">
-                    {showDiagnosticsInSimple ? 'Klik untuk menutup diagnostik gerbang' : 'Pelajari alasan transparan mengapa bot belum atau sedang melakukan transaksi'}
+                    {showDiagnosticsInSimple
+                      ? l('Click to close gate diagnostics', 'Klik untuk menutup diagnostik gerbang')
+                      : l('Transparent insights explaining why the bot is or is not executing trades', 'Pelajari alasan transparan mengapa bot belum atau sedang melakukan transaksi')}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-blue-400">
-                <span>{showDiagnosticsInSimple ? 'Tutup Diagnostik' : 'Buka Diagnostik Gerbang'}</span>
+                <span>{showDiagnosticsInSimple ? l('Close Diagnostics', 'Tutup Diagnostik') : l('Open Gate Diagnostics', 'Buka Diagnostik Gerbang')}</span>
                 {showDiagnosticsInSimple ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
             </button>
@@ -890,13 +984,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
             <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
               <Clock className="h-4 w-4 text-blue-400" />
-              <span>Aktivitas Transaksi Terakhir</span>
+              <span>{l('Recent Trade Executions', 'Aktivitas Transaksi Terakhir')}</span>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">Buku Transaksi</span>
+            <span className="text-[11px] text-slate-400 font-mono">{l('Order Book', 'Buku Transaksi')}</span>
           </div>
 
           {recentTrades.length === 0 ? (
-            <p className="text-xs text-slate-400 py-6 text-center">Belum ada riwayat transaksi.</p>
+            <p className="text-xs text-slate-400 py-6 text-center">{l('No trade history yet.', 'Belum ada riwayat transaksi.')}</p>
           ) : (
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
               {recentTrades.map((t) => {
@@ -910,17 +1004,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                         isBuy ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' : 'bg-rose-950 text-rose-400 border border-rose-500/30'
                       }`}>
-                        {isBuy ? 'BELI' : 'JUAL'}
+                        {isBuy ? l('BUY', 'BELI') : l('SELL', 'JUAL')}
                       </span>
                       <div>
                         <span className="font-bold text-slate-200">{t.symbol.toUpperCase()}</span>
-                        <p className="text-[11px] text-slate-400">{t.reason || 'Otomatis oleh Trading Engine'}</p>
+                        <p className="text-[11px] text-slate-400">{t.reason || l('Automated by Trading Engine', 'Otomatis oleh Trading Engine')}</p>
                       </div>
                     </div>
                     <div className="text-right font-mono">
-                      <div className="text-slate-200 font-medium">Rp {t.total_idr.toLocaleString('id-ID')}</div>
+                      <div className="text-slate-200 font-medium">{formatCurrency(t.total_idr)}</div>
                       <div className="text-[10px] text-slate-400">
-                        {new Date(t.timestamp).toLocaleTimeString('id-ID')}
+                        {new Date(t.timestamp).toLocaleTimeString(language === 'id' ? 'id-ID' : 'en-US')}
                       </div>
                     </div>
                   </div>
@@ -935,25 +1029,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
             <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
               <Lightbulb className="h-4 w-4 text-amber-400" />
-              <span>Memori Belajar Mandiri AI (Self-Learning)</span>
+              <span>{l('AI Self-Learning Memory', 'Memori Belajar Mandiri AI (Self-Learning)')}</span>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">Closed-Loop Memory</span>
+            <span className="text-[11px] text-slate-400 font-mono">{l('Closed-Loop Memory', 'Closed-Loop Memory')}</span>
           </div>
 
           {lessons.length === 0 ? (
             <div className="text-center py-6 text-slate-400 text-xs">
-              <p>Belum ada rekaman evaluasi post-mortem.</p>
+              <p>{l('No post-mortem evaluation logs recorded yet.', 'Belum ada rekaman evaluasi post-mortem.')}</p>
               <p className="text-[11px] text-slate-500 mt-1">
-                Setiap posisi koin ditutup, AI Reviewer menganalisa faktor keberhasilan/kegagalan dan mengingatnya untuk trade berikutnya.
+                {l(
+                  'Whenever a coin position is closed, the AI Reviewer analyzes success/failure factors and retains it for future trades.',
+                  'Setiap posisi koin ditutup, AI Reviewer menganalisa faktor keberhasilan/kegagalan dan mengingatnya untuk trade berikutnya.'
+                )}
               </p>
             </div>
           ) : (
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-              {lessons.map((l) => {
-                const isWin = l.result === 'WIN';
+              {lessons.map((lessonItem) => {
+                const isWin = lessonItem.result === 'WIN';
                 return (
                   <div
-                    key={l.id}
+                    key={lessonItem.id}
                     className="p-3 rounded-lg border border-slate-800/60 bg-slate-900/30 text-xs space-y-1.5"
                   >
                     <div className="flex items-center justify-between font-mono">
@@ -963,17 +1060,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         ) : (
                           <XCircle className="h-3.5 w-3.5 text-rose-400" />
                         )}
-                        <span className="font-bold text-slate-200">{l.symbol.toUpperCase()}</span>
+                        <span className="font-bold text-slate-200">{lessonItem.symbol.toUpperCase()}</span>
                         <span className={isWin ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
-                          ({l.pnl_percent >= 0 ? '+' : ''}{l.pnl_percent.toFixed(2)}%)
+                          ({lessonItem.pnl_percent >= 0 ? '+' : ''}{lessonItem.pnl_percent.toFixed(2)}%)
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400">
-                        {new Date(l.timestamp).toLocaleDateString('id-ID')}
+                        {new Date(lessonItem.timestamp).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US')}
                       </span>
                     </div>
                     <p className="text-slate-300 leading-relaxed font-sans text-[11px]">
-                      "{l.lesson}"
+                      "{lessonItem.lesson}"
                     </p>
                   </div>
                 );
@@ -987,8 +1084,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="p-4 rounded-xl border border-slate-800 bg-[#080d17] text-xs text-slate-400 flex items-start gap-3 shadow-sm">
         <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
         <p className="leading-relaxed">
-          <strong className="text-slate-300">Pernyataan Risiko &amp; Kepatuhan: </strong>
-          Perdagangan aset kripto memiliki tingkat risiko tinggi terhadap modal Anda. AI Trading adalah piranti lunak otomasi kuantitatif mandiri, bukan penasihat keuangan atau pialang berizin. Segala keputusan strategi dan pengoperasian sepenuhnya berada di bawah kendali pengguna. Selalu utamakan simulasi di Mode Paper.
+          <strong className="text-slate-300">{l('Risk & Compliance Disclaimer: ', 'Pernyataan Risiko & Kepatuhan: ')}</strong>
+          {l(
+            'Crypto asset trading carries a high level of risk to your capital. AI Trading is an independent quantitative automation software, not a licensed financial advisor or broker. All strategy decisions and operations are solely controlled by the user. Always prioritize simulation in Paper Mode.',
+            'Perdagangan aset kripto memiliki tingkat risiko tinggi terhadap modal Anda. AI Trading adalah piranti lunak otomasi kuantitatif mandiri, bukan penasihat keuangan atau pialang berizin. Segala keputusan strategi dan pengoperasian sepenuhnya berada di bawah kendali pengguna. Selalu utamakan simulasi di Mode Paper.'
+          )}
         </p>
       </div>
 

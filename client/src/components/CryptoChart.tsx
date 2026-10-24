@@ -36,6 +36,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
 
 // Perhitungan Exponential Moving Average (EMA) matematis presisi
 function calculateEMA(prices: number[], period: number): number[] {
@@ -70,6 +71,7 @@ const POPULAR_INDODAX_PAIRS = [
 ];
 
 export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSymbol = 'BTC/IDR' }) => {
+  const { l, formatCurrency, language } = useLanguage();
   // --- 1. Symbol & Timeframe State ---
   const [activePair, setActivePair] = useState(selectedSymbol);
   const [timeframe, setTimeframe] = useState<'15m' | '1h' | '4h' | '1d'>('15m');
@@ -632,7 +634,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
             {isSearchOpen && (
               <div className="absolute top-full left-0 mt-2 w-80 rounded-xl border border-slate-700 bg-slate-950/95 backdrop-blur-xl shadow-2xl z-50 p-3">
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                  <span className="text-xs font-semibold text-slate-300">Pilih Pasangan Koin Indodax</span>
+                  <span className="text-xs font-semibold text-slate-300">{l('Select Indodax Coin Pair', 'Pilih Pasangan Koin Indodax')}</span>
                   <button onClick={() => setIsSearchOpen(false)} className="text-slate-400 hover:text-slate-200">
                     <X className="h-4 w-4" />
                   </button>
@@ -642,7 +644,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
                   <input
                     type="text"
-                    placeholder="Cari BTC, SOL, PEPE, SUI, XRP..."
+                    placeholder={l('Search BTC, SOL, PEPE, SUI, XRP...', 'Cari BTC, SOL, PEPE, SUI, XRP...')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 pl-8 pr-3 py-1.5 rounded-lg text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
@@ -675,7 +677,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
                 <form onSubmit={handleCustomSubmit} className="pt-2 mt-2 border-t border-slate-800 flex gap-1.5">
                   <input
                     type="text"
-                    placeholder="Koin lain (e.g. ADA)"
+                    placeholder={l('Other coin (e.g. ADA)', 'Koin lain (e.g. ADA)')}
                     value={customInput}
                     onChange={(e) => setCustomInput(e.target.value)}
                     className="flex-1 bg-slate-900 border border-slate-800 px-2 py-1 rounded text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
@@ -702,7 +704,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
                   : 'text-slate-100'
               }`}
             >
-              Rp {liveMetrics.latestPrice.toLocaleString('id-ID')}
+              {formatCurrency(liveMetrics.latestPrice)}
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded flex items-center gap-0.5 font-mono ${
@@ -720,7 +722,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
           {/* Bar Countdown Timer */}
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs">
             <Clock className="h-3.5 w-3.5 text-blue-400" />
-            <span className="text-[10px] text-slate-500 uppercase">Bar Close:</span>
+            <span className="text-[10px] text-slate-500 uppercase">{l('Bar Close:', 'Tutup Bar:')}</span>
             <span className="font-bold text-amber-400">{barCountdown}</span>
           </div>
         </div>
@@ -790,7 +792,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
           <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-800 text-xs">
             <button
               onClick={() => setChartType('candles')}
-              title="Grafik Candlestick TradingView"
+              title={l('TradingView Candlestick Chart', 'Grafik Candlestick TradingView')}
               className={`p-1.5 rounded transition-colors ${
                 chartType === 'candles' ? 'bg-slate-800 text-blue-400' : 'text-slate-400 hover:text-slate-200'
               }`}
@@ -799,7 +801,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
             </button>
             <button
               onClick={() => setChartType('line')}
-              title="Grafik Garis Area (Line)"
+              title={l('Area Line Chart', 'Grafik Garis Area (Line)')}
               className={`p-1.5 rounded transition-colors ${
                 chartType === 'line' ? 'bg-slate-800 text-blue-400' : 'text-slate-400 hover:text-slate-200'
               }`}
@@ -857,14 +859,14 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
           <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-800">
             <button
               onClick={handleZoomIn}
-              title="Perbesar Tampilan Candle (Zoom In)"
+              title={l('Zoom In Candles', 'Perbesar Tampilan Candle (Zoom In)')}
               className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
             >
               <ZoomIn className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleZoomOut}
-              title="Perkecil Tampilan Candle (Zoom Out)"
+              title={l('Zoom Out Candles', 'Perkecil Tampilan Candle (Zoom Out)')}
               className="p-1.5 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
             >
               <ZoomOut className="h-3.5 w-3.5" />
@@ -891,13 +893,13 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
                   : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
               }`}
             >
-              {chartHeightPreset === 'normal' ? 'Expand' : 'Compact'}
+              {chartHeightPreset === 'normal' ? l('Expand', 'Perluas') : l('Compact', 'Rapatkan')}
             </button>
           )}
 
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? 'Keluar Fullscreen' : 'Mode Layar Penuh'}
+            title={isFullscreen ? l('Exit Fullscreen', 'Keluar Fullscreen') : l('Fullscreen Mode', 'Mode Layar Penuh')}
             className="p-2 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5 text-blue-400" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -912,16 +914,16 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Time: {hoveredOHLC ? hoveredOHLC.time : 'LIVE'}</span>
+            <span>{l('Time', 'Waktu')}: {hoveredOHLC ? hoveredOHLC.time : 'LIVE'}</span>
           </div>
           <div>
-            O: <strong className="text-slate-100 font-mono">Rp {(hoveredOHLC ? hoveredOHLC.open : liveMetrics.latestPrice).toLocaleString('id-ID')}</strong>
+            O: <strong className="text-slate-100 font-mono">{formatCurrency(hoveredOHLC ? hoveredOHLC.open : liveMetrics.latestPrice)}</strong>
           </div>
           <div>
-            H: <strong className="text-emerald-400 font-mono">Rp {(hoveredOHLC ? hoveredOHLC.high : liveMetrics.high24h).toLocaleString('id-ID')}</strong>
+            H: <strong className="text-emerald-400 font-mono">{formatCurrency(hoveredOHLC ? hoveredOHLC.high : liveMetrics.high24h)}</strong>
           </div>
           <div>
-            L: <strong className="text-rose-400 font-mono">Rp {(hoveredOHLC ? hoveredOHLC.low : liveMetrics.low24h).toLocaleString('id-ID')}</strong>
+            L: <strong className="text-rose-400 font-mono">{formatCurrency(hoveredOHLC ? hoveredOHLC.low : liveMetrics.low24h)}</strong>
           </div>
           <div>
             C:{' '}
@@ -930,7 +932,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
             </strong>
           </div>
           <div>
-            Change:{' '}
+            {l('Change', 'Perubahan')}:{' '}
             <strong className={isUp ? 'text-emerald-400' : 'text-rose-400'}>
               {isUp ? '+' : ''}
               {(hoveredOHLC ? hoveredOHLC.change : percentChange).toFixed(2)}%
@@ -941,7 +943,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
         {recentTrades.length > 0 && (
           <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono">
             <span className="text-slate-500 uppercase flex items-center gap-1">
-              <Zap className="h-3 w-3 text-amber-400" /> Indodax Trades:
+              <Zap className="h-3 w-3 text-amber-400" /> {l('Indodax Trades:', 'Transaksi Indodax:')}
             </span>
             {recentTrades.map((t, idx) => (
               <span
@@ -952,7 +954,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
                     : 'border-rose-500/30 bg-rose-950/40 text-rose-300'
                 }`}
               >
-                {t.type.toUpperCase()} Rp {t.price.toLocaleString('id-ID')} ({t.time})
+                {t.type.toUpperCase()} {formatCurrency(t.price)} ({t.time})
               </span>
             ))}
           </div>
@@ -966,7 +968,7 @@ export const CryptoChart: React.FC<{ selectedSymbol?: string }> = ({ selectedSym
         {isLoading && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#070b14]/80 backdrop-blur-sm">
             <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-2" />
-            <span className="text-xs font-mono text-slate-300">Memuat Candlestick Resmi {activePair}...</span>
+            <span className="text-xs font-mono text-slate-300">{l(`Loading Official ${activePair} Candlestick...`, `Memuat Candlestick Resmi ${activePair}...`)}</span>
           </div>
         )}
 

@@ -13,6 +13,7 @@ import { api, authStorage, isStaticHost, apiConnectionState } from './services/a
 import { SystemStatus } from './types';
 import { SettingsSubTab } from './components/SettingsView';
 import { brandConfig } from './brand.config';
+import { useLanguage } from './i18n/LanguageContext';
 import {
   Lock,
   Key,
@@ -54,14 +55,18 @@ const SettingsView = lazy(() =>
   import('./components/SettingsView').then((m) => ({ default: m.SettingsView }))
 );
 
-const ViewLoadingFallback = () => (
-  <div className="min-h-[400px] flex flex-col items-center justify-center p-8 space-y-3">
-    <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-    <span className="text-xs text-slate-400 font-mono">Memuat tampilan...</span>
-  </div>
-);
+const ViewLoadingFallback = () => {
+  const { l } = useLanguage();
+  return (
+    <div className="min-h-[400px] flex flex-col items-center justify-center p-8 space-y-3">
+      <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      <span className="text-xs text-slate-400 font-mono">{l('Loading view...', 'Memuat tampilan...')}</span>
+    </div>
+  );
+};
 
 export function App() {
+  const { l, t, formatCurrency } = useLanguage();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reports' | 'scanner' | 'agents' | 'backtest' | 'bots' | 'whatsapp' | 'quota' | 'settings'>('dashboard');
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -319,7 +324,9 @@ export function App() {
         setStatus({ ...status, isAutoTradingActive: res.isActive });
       }
       setToast({
-        message: res.isActive ? 'Auto-Trading BERHASIL DIAKTIFKAN' : 'Auto-Trading DIJEDA (PAUSED)',
+        message: res.isActive
+          ? l('Auto-Trading SUCCESSFULLY ACTIVATED', 'Auto-Trading BERHASIL DIAKTIFKAN')
+          : l('Auto-Trading PAUSED', 'Auto-Trading DIJEDA (PAUSED)'),
         type: 'info',
       });
     } catch (err: any) {
@@ -348,11 +355,17 @@ export function App() {
         setStatus({ ...status, mode: res.mode });
       }
       setToast({
-        message: `Mode berhasil diubah ke: ${res.mode.toUpperCase()} TRADING`,
+        message: l(
+          `Trading mode changed to: ${res.mode.toUpperCase()} TRADING`,
+          `Mode berhasil diubah ke: ${res.mode.toUpperCase()} TRADING`
+        ),
         type: res.mode === 'live' ? 'error' : 'success',
       });
     } catch (err: any) {
-      setToast({ message: `Gagal mengubah mode trading: ${err.message}`, type: 'error' });
+      setToast({
+        message: l(`Failed to switch trading mode: ${err.message}`, `Gagal mengubah mode trading: ${err.message}`),
+        type: 'error',
+      });
     }
   };
 
@@ -369,8 +382,8 @@ export function App() {
     await fetchStatus();
     addNotification({
       type: 'warning',
-      title: '🚨 Panic Sell Dilaksanakan',
-      message: res.message || 'Seluruh posisi terbuka dilikuidasi ke IDR.',
+      title: l('🚨 Panic Sell Executed', '🚨 Panic Sell Dilaksanakan'),
+      message: res.message || l('All open positions liquidated to IDR.', 'Seluruh posisi terbuka dilikuidasi ke IDR.'),
     });
     return { success: true, message: res.message };
   };
@@ -380,7 +393,10 @@ export function App() {
     setInputToken('');
     setIsAdmin(false);
     fetchStatus();
-    setToast({ message: 'Akses Admin telah dikunci.', type: 'info' });
+    setToast({
+      message: l('Admin access locked.', 'Akses Admin telah dikunci.'),
+      type: 'info',
+    });
   };
 
   const handleSaveToken = async (e: React.FormEvent) => {
@@ -392,7 +408,10 @@ export function App() {
       setIsAdmin(true);
       setShowAuthModal(false);
       await fetchStatus();
-      setToast({ message: 'Autentikasi Administrator Berhasil!', type: 'success' });
+      setToast({
+        message: l('Administrator Authenticated Successfully!', 'Autentikasi Administrator Berhasil!'),
+        type: 'success',
+      });
 
       // Launch beginner tutorial if not yet completed
       const tutorialDone = localStorage.getItem('ai_trading_tutorial_completed');
@@ -400,7 +419,12 @@ export function App() {
         setShowTutorial(true);
       }
     } else {
-      setAuthError('Token akses tidak valid. Periksa baris ADMIN ACCESS TOKEN di terminal server Anda.');
+      setAuthError(
+        l(
+          'Invalid access token. Please check the ADMIN ACCESS TOKEN row in your server terminal.',
+          'Token akses tidak valid. Periksa baris ADMIN ACCESS TOKEN di terminal server Anda.'
+        )
+      );
     }
   };
 
@@ -454,15 +478,18 @@ export function App() {
             <div className="flex items-center gap-2">
               <WifiOff className="h-4 w-4 text-rose-400 shrink-0 animate-pulse" />
               <span>
-                <strong>Terputus dari Server Backend: </strong>
-                Sistem tidak dapat memperbarui data real-time. Data yang tampil di layar mungkin merupakan data cache terakhir. Memeriksa kembali koneksi...
+                <strong>{l('Disconnected from Backend Server: ', 'Terputus dari Server Backend: ')}</strong>
+                {l(
+                  'The system cannot fetch real-time data. On-screen metrics may reflect cached data. Retrying connection...',
+                  'Sistem tidak dapat memperbarui data real-time. Data yang tampil di layar mungkin merupakan data cache terakhir. Memeriksa kembali koneksi...'
+                )}
               </span>
             </div>
             <button
               onClick={() => fetchStatus()}
               className="px-3 py-1 rounded bg-rose-800 hover:bg-rose-700 text-white font-semibold text-[11px] shrink-0"
             >
-              Coba Sambung Ulang
+              {l('Reconnect Now', 'Coba Sambung Ulang')}
             </button>
           </div>
         )}
@@ -473,7 +500,11 @@ export function App() {
             <div className="flex items-center gap-2 text-blue-300 font-mono">
               <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
               <span>
-                <strong>SIMULATOR DEMO LIVE:</strong> Menjalankan simulasi bursa Indodax real-time. Anda bebas menguji seluruh fitur trading terminal di bawah ini tanpa risiko.
+                <strong>{l('LIVE DEMO SIMULATOR:', 'SIMULATOR DEMO LIVE:')}</strong>{' '}
+                {l(
+                  'Running real-time Indodax market simulation. Feel free to explore and test all trading features below without any financial risk.',
+                  'Menjalankan simulasi bursa Indodax real-time. Anda bebas menguji seluruh fitur trading terminal di bawah ini tanpa risiko.'
+                )}
               </span>
             </div>
           </div>
@@ -485,21 +516,25 @@ export function App() {
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-amber-400 shrink-0" />
               <span>
-                <strong>Mode Pengamat (View-Only):</strong> Anda dapat melihat seluruh telemetri, scanner, chart, subagents, dan metrik performa secara bebas. Masukkan token admin untuk mengubah kontrol eksekusi trading.
+                <strong>{l('Observer Mode (View-Only):', 'Mode Pengamat (View-Only):')}</strong>{' '}
+                {l(
+                  'You can freely view all telemetry, scanner, charts, subagents, and performance metrics. Enter your admin token to unlock trading execution controls.',
+                  'Anda dapat melihat seluruh telemetri, scanner, chart, subagents, dan metrik performa secara bebas. Masukkan token admin untuk mengubah kontrol eksekusi trading.'
+                )}
               </span>
             </div>
             <button
               onClick={() => setShowAuthModal(true)}
               className="text-xs px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-semibold self-start sm:self-auto transition-colors shrink-0"
             >
-              Buka Kunci Admin
+              {l('Unlock Admin Access', 'Buka Kunci Admin')}
             </button>
           </div>
         )}
 
         {/* Dynamic Page Views with ErrorBoundary & Suspense */}
         <main className="flex-1 w-full max-w-[1920px] mx-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
-          <ErrorBoundary fallbackTitle="Terjadi Kesalahan pada Halaman Ini">
+          <ErrorBoundary fallbackTitle={l('An error occurred on this page', 'Terjadi Kesalahan pada Halaman Ini')}>
             <Suspense fallback={<ViewLoadingFallback />}>
               {activeTab === 'dashboard' && (
                 <DashboardView
@@ -541,7 +576,7 @@ export function App() {
           <div>
             {brandConfig.developerCredit?.show ? (
               <span>
-                Made by{' '}
+                {l('Made by ', 'Dibuat oleh ')}
                 <a
                   href={brandConfig.developerCredit.url}
                   target="_blank"
@@ -575,8 +610,8 @@ export function App() {
                   <Lock className="w-5 h-5" />
                 </div>
                 <div>
-                  <div>Otentikasi Administrator</div>
-                  <div className="text-xs text-slate-400 font-normal">Akses Penuh Kontrol Trading</div>
+                  <div>{l('Administrator Authentication', 'Otentikasi Administrator')}</div>
+                  <div className="text-xs text-slate-400 font-normal">{l('Full Trading Control Access', 'Akses Penuh Kontrol Trading')}</div>
                 </div>
               </div>
               <button
@@ -589,7 +624,10 @@ export function App() {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Anda tetap dapat melihat dan memantau seluruh dashboard dalam Mode Pengamat (View-Only). Masukkan <strong>Admin Access Token</strong> untuk melakukan tindakan eksekusi atau mengubah pengaturan bot.
+              {l(
+                'You can always monitor the entire dashboard in View-Only mode. Enter your Admin Access Token to perform trade executions or modify bot settings.',
+                'Anda tetap dapat melihat dan memantau seluruh dashboard dalam Mode Pengamat (View-Only). Masukkan Admin Access Token untuk melakukan tindakan eksekusi atau mengubah pengaturan bot.'
+              )}
             </p>
 
             <form onSubmit={handleSaveToken} className="space-y-4 pt-1">
@@ -602,21 +640,32 @@ export function App() {
                   type="password"
                   value={inputToken}
                   onChange={(e) => setInputToken(e.target.value)}
-                  placeholder="Tempelkan token dari terminal server..."
+                  placeholder={l('Paste token from server terminal...', 'Tempelkan token dari terminal server...')}
                   className="w-full bg-[#050811] border border-slate-700 focus:border-sky-500 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 placeholder:text-slate-600 font-mono outline-none transition-colors"
                   autoFocus
                 />
                 <div className="text-[10px] text-slate-400 mt-2 space-y-1">
                   <p>
-                    • Token unik tercetak di log terminal server saat startup pada baris <code className="text-amber-400 font-mono">ADMIN ACCESS TOKEN</code>.
+                    {l(
+                      '• Unique token is printed in the server terminal log upon startup at line ',
+                      '• Token unik tercetak di log terminal server saat startup pada baris '
+                    )}
+                    <code className="text-amber-400 font-mono">ADMIN ACCESS TOKEN</code>.
                   </p>
                   {isLocalhost && (
                     <p className="text-blue-300">
-                      💡 Anda membuka dari komputer lokal (localhost). Token ada di jendela terminal Node.js server.
+                      {l(
+                        '💡 Running on local machine (localhost). The token is displayed in your server terminal window.',
+                        '💡 Anda membuka dari komputer lokal (localhost). Token ada di jendela terminal Node.js server.'
+                      )}
                     </p>
                   )}
                   <p>
-                    • Jika WhatsApp Bot aktif, Anda juga bisa otentikasi dengan mengirim: <code className="text-emerald-400 font-mono">/admin &lt;token&gt;</code>.
+                    {l(
+                      '• If WhatsApp Bot is active, you can also authenticate by messaging: ',
+                      '• Jika WhatsApp Bot aktif, Anda juga bisa otentikasi dengan mengirim: '
+                    )}
+                    <code className="text-emerald-400 font-mono">/admin &lt;token&gt;</code>.
                   </p>
                 </div>
               </div>
@@ -633,14 +682,14 @@ export function App() {
                   onClick={() => setShowAuthModal(false)}
                   className="px-3.5 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 transition-colors"
                 >
-                  Tetap di Mode Pengamat
+                  {l('Stay in View-Only', 'Tetap di Mode Pengamat')}
                 </button>
                 <button
                   type="submit"
                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white transition-colors shadow-md"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  Buka Akses Admin
+                  {l('Unlock Admin Access', 'Buka Akses Admin')}
                 </button>
               </div>
             </form>
@@ -658,17 +707,20 @@ export function App() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-100">
-                  Langkah Persiapan Sebelum Memulai Bot
+                  {l('Setup Steps Before Starting Bot', 'Langkah Persiapan Sebelum Memulai Bot')}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Bot memerlukan model AI untuk menganalisis pasar sebelum trading otomatis dapat diaktifkan.
+                  {l(
+                    'The bot requires an active AI model to analyze market sentiment before automated trading can be started.',
+                    'Bot memerlukan model AI untuk menganalisis pasar sebelum trading otomatis dapat diaktifkan.'
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
               <div className="text-xs font-semibold text-slate-300">
-                Yang perlu dilengkapi:
+                {l('Required Configuration:', 'Yang perlu dilengkapi:')}
               </div>
               <div className="space-y-2 text-xs text-slate-400">
                 <div className="flex items-start gap-2">
@@ -684,7 +736,7 @@ export function App() {
                 onClick={() => setSetupError(null)}
                 className="px-3.5 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs text-slate-300 transition-colors"
               >
-                Tutup Sementara
+                {l('Dismiss', 'Tutup Sementara')}
               </button>
               <button
                 type="button"
@@ -694,7 +746,7 @@ export function App() {
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition-colors shadow-md"
               >
-                <span>Buka Pengaturan AI Sekarang</span>
+                <span>{l('Open AI Settings Now', 'Buka Pengaturan AI Sekarang')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

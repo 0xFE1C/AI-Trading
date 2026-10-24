@@ -25,12 +25,14 @@ import { api } from '../services/api';
 import { PerformanceReport, BackupItem, SystemHealth } from '../types';
 import { generatePdfReport } from '../utils/pdfGenerator';
 import { Toast } from './Toast';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface ReportViewProps {
   isAdmin?: boolean;
 }
 
 export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
+  const { l, formatCurrency, formatNumber, language } = useLanguage();
   const [timeframe, setTimeframe] = useState<number | 'all'>('all');
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
@@ -69,9 +71,15 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
     if (!report) return;
     try {
       await generatePdfReport(report);
-      setToast({ message: 'Laporan PDF resmi berhasil dibuat dan diunduh!', type: 'success' });
+      setToast({
+        message: l('Official PDF report generated and downloaded successfully!', 'Laporan PDF resmi berhasil dibuat dan diunduh!'),
+        type: 'success',
+      });
     } catch (err: any) {
-      setToast({ message: `Gagal membuat dokumen PDF: ${err.message}`, type: 'error' });
+      setToast({
+        message: `${l('Failed to generate PDF document: ', 'Gagal membuat dokumen PDF: ')}${err.message}`,
+        type: 'error',
+      });
     }
   };
 
@@ -84,11 +92,17 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
     setBackingUp(true);
     try {
       const res = await api.createBackup();
-      setToast({ message: `Cadangan database berhasil dibuat: ${res.data.filename} (${res.data.sizeFormatted})`, type: 'success' });
+      setToast({
+        message: `${l('Database backup created successfully: ', 'Cadangan database berhasil dibuat: ')}${res.data.filename} (${res.data.sizeFormatted})`,
+        type: 'success',
+      });
       const updated = await api.getBackupList();
       setBackups(updated);
     } catch (err: any) {
-      setToast({ message: `Gagal membuat backup database: ${err.message}`, type: 'error' });
+      setToast({
+        message: `${l('Failed to create database backup: ', 'Gagal membuat backup database: ')}${err.message}`,
+        type: 'error',
+      });
     } finally {
       setBackingUp(false);
     }
@@ -113,13 +127,16 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>Laporan Hasil Trading &amp; Analitika Performa</span>
+              <span>{l('Trading Performance & Analytics Report', 'Laporan Hasil Trading & Analitika Performa')}</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
                 Audit Trail
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Pantau metrik keuntungan bersih, unduh laporan PDF resmi, export data ke Excel/CSV, dan kelola cadangan database.
+              {l(
+                'Monitor net profit metrics, download official PDF reports, export data to Excel/CSV, and manage database backups.',
+                'Pantau metrik keuntungan bersih, unduh laporan PDF resmi, export data ke Excel/CSV, dan kelola cadangan database.'
+              )}
             </p>
           </div>
         </div>
@@ -133,7 +150,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Download Laporan PDF</span>
+            <span>{l('Download PDF Report', 'Download Laporan PDF')}</span>
           </button>
 
           <button
@@ -143,17 +160,17 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors"
           >
             <ArrowDownToLine className="w-3.5 h-3.5" />
-            <span>Export CSV (Excel)</span>
+            <span>{l('Export CSV (Excel)', 'Export CSV (Excel)')}</span>
           </button>
 
           <button
             type="button"
             onClick={handleCreateBackup}
             disabled={backingUp}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 hover:bg-emerald-900/40 text-xs font-semibold text-emerald-300 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 hover:bg-emerald-900/40 text-xs font-semibold text-emerald-300 transition-colors"
           >
             <Database className={`w-3.5 h-3.5 ${backingUp ? 'animate-spin' : ''}`} />
-            <span>{backingUp ? 'Membackup...' : 'Backup DB'}</span>
+            <span>{backingUp ? l('Backing up...', 'Membackup...') : l('Backup DB', 'Backup DB')}</span>
           </button>
 
           <button
@@ -161,7 +178,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             onClick={loadData}
             disabled={loading}
             className="p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:text-white"
-            title="Refresh Laporan"
+            title={l('Refresh Report', 'Refresh Laporan')}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -173,17 +190,17 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-400 font-mono pl-3 pr-2 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-blue-400" />
-            <span>Filter Periode:</span>
+            <span>{l('Timeframe Filter:', 'Filter Periode:')}</span>
           </span>
 
           {[
-            { label: '7 Hari', val: 7 },
-            { label: '30 Hari', val: 30 },
-            { label: '90 Hari', val: 90 },
-            { label: 'Semua Waktu', val: 'all' as const },
+            { label: l('7 Days', '7 Hari'), val: 7 },
+            { label: l('30 Days', '30 Hari'), val: 30 },
+            { label: l('90 Days', '90 Hari'), val: 90 },
+            { label: l('All Time', 'Semua Waktu'), val: 'all' as const },
           ].map((tf) => (
             <button
-              key={tf.label}
+              key={String(tf.val)}
               type="button"
               onClick={() => setTimeframe(tf.val)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-mono transition-all ${
@@ -199,7 +216,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
 
         {report && (
           <div className="text-xs text-slate-400 font-mono pr-3">
-            <span>Mode: </span>
+            <span>{l('Mode: ', 'Mode: ')}</span>
             <strong className={report.currentMode === 'LIVE' ? 'text-rose-400' : 'text-emerald-400'}>
               {report.currentMode} TRADING
             </strong>
@@ -207,18 +224,21 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
         )}
       </div>
 
-      {/* Human-Friendly Narrative Summary Banner */}
+      {/* Narrative Summary Banner */}
       {report && (
         <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-950/20 text-xs text-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
             <span>
-              <strong>Ringkasan Kinerja: </strong>
-              Periode ini mencatat <strong>{report.totalTrades} transaksi</strong> ({report.winningTrades} profit, {report.losingTrades} rugi) dengan Win Rate <strong>{report.winRatePercent.toFixed(1)}%</strong> dan laba bersih <strong>Rp {report.netPnlIdr.toLocaleString('id-ID')}</strong>.
+              <strong>{l('Performance Summary: ', 'Ringkasan Kinerja: ')}</strong>
+              {l(
+                `This period recorded ${report.totalTrades} trades (${report.winningTrades} wins, ${report.losingTrades} losses) with Win Rate ${report.winRatePercent.toFixed(1)}% and net profit ${formatCurrency(report.netPnlIdr)}.`,
+                `Periode ini mencatat ${report.totalTrades} transaksi (${report.winningTrades} profit, ${report.losingTrades} rugi) dengan Win Rate ${report.winRatePercent.toFixed(1)}% dan laba bersih ${formatCurrency(report.netPnlIdr)}.`
+              )}
             </span>
           </div>
           <span className="text-[11px] font-mono text-blue-300 shrink-0">
-            Rentang: {report.periodLabel}
+            {l('Range: ', 'Rentang: ')}{report.periodLabel}
           </span>
         </div>
       )}
@@ -232,14 +252,14 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               Net Realized PnL
             </span>
             <div className={`text-xl font-bold font-mono ${report.netPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {report.netPnlIdr >= 0 ? '+' : ''}Rp {report.netPnlIdr.toLocaleString('id-ID')}
+              {report.netPnlIdr >= 0 ? '+' : ''}{formatCurrency(report.netPnlIdr)}
             </div>
             <div className="flex items-center justify-between text-xs pt-1">
               <span className={`font-semibold ${report.netPnlPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {report.netPnlPercent >= 0 ? '+' : ''}{report.netPnlPercent.toFixed(2)}% Return
               </span>
               <span className="text-[11px] text-slate-500 font-mono">
-                Gross: Rp {(report.grossProfitIdr / 1000).toFixed(0)}k
+                Gross: {formatCurrency(report.grossProfitIdr)}
               </span>
             </div>
           </div>
@@ -253,8 +273,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               {report.winRatePercent.toFixed(1)}%
             </div>
             <div className="flex items-center justify-between text-xs pt-1 text-slate-400 font-mono">
-              <span className="text-emerald-400">{report.winningTrades} Menang</span>
-              <span className="text-rose-400">{report.losingTrades} Kalah</span>
+              <span className="text-emerald-400">{report.winningTrades} {l('Wins', 'Menang')}</span>
+              <span className="text-rose-400">{report.losingTrades} {l('Losses', 'Kalah')}</span>
               <span>{report.totalTrades} Total</span>
             </div>
           </div>
@@ -268,8 +288,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               {report.profitFactor !== null ? report.profitFactor : 'N/A'}
             </div>
             <div className="flex items-center justify-between text-xs pt-1 text-slate-400 font-mono">
-              <span>Loss: Rp {(report.grossLossIdr / 1000).toFixed(0)}k</span>
-              <span className="text-[11px] text-slate-500">Rasio Untung/Rugi</span>
+              <span>Loss: {formatCurrency(report.grossLossIdr)}</span>
+              <span className="text-[11px] text-slate-500">{l('Gain/Loss Ratio', 'Rasio Untung/Rugi')}</span>
             </div>
           </div>
 
@@ -282,8 +302,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               {report.maxDrawdownPercent.toFixed(2)}%
             </div>
             <div className="flex items-center justify-between text-xs pt-1 text-slate-400 font-mono">
-              <span>Rp {report.maxDrawdownIdr.toLocaleString('id-ID')}</span>
-              <span className="text-[11px] text-slate-500">Penurunan Terbesar</span>
+              <span>{formatCurrency(report.maxDrawdownIdr)}</span>
+              <span className="text-[11px] text-slate-500">{l('Peak Drawdown', 'Penurunan Terbesar')}</span>
             </div>
           </div>
         </div>
@@ -297,7 +317,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
               <div className="flex items-center gap-2 font-bold text-sm text-slate-200">
                 <Sparkles className="w-4 h-4 text-indigo-400" />
-                <span>Perlindungan AI Terhadap Kerugian</span>
+                <span>{l('AI Downside Capital Protection', 'Perlindungan AI Terhadap Kerugian')}</span>
               </div>
               <span className="text-[10px] font-mono text-indigo-300 px-2 py-0.5 rounded bg-indigo-950 border border-indigo-500/30">
                 A/B Alpha Validator
@@ -306,42 +326,59 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-1">
-                <span className="text-[10px] text-slate-500 font-mono uppercase">Peluru Kerugian Dihindari</span>
+                <span className="text-[10px] text-slate-500 font-mono uppercase">
+                  {l('Loss Bullets Dodged', 'Peluru Kerugian Dihindari')}
+                </span>
                 <div className="text-lg font-bold text-emerald-400 font-mono">
-                  {report.aiEfficacy.bulletsDodged} Koin
+                  {report.aiEfficacy.bulletsDodged} {l('Coins', 'Koin')}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Trade berbahaya yang ditolak AI dan terbukti anjlok.
+                  {l(
+                    'Dangerous trades rejected by AI that subsequently plummeted.',
+                    'Trade berbahaya yang ditolak AI dan terbukti anjlok.'
+                  )}
                 </p>
               </div>
 
               <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-1">
-                <span className="text-[10px] text-slate-500 font-mono uppercase">Modal Terselamatkan</span>
+                <span className="text-[10px] text-slate-500 font-mono uppercase">
+                  {l('Capital Preserved', 'Modal Terselamatkan')}
+                </span>
                 <div className="text-lg font-bold text-emerald-400 font-mono">
-                  Rp {report.aiEfficacy.savedCapitalIdr.toLocaleString('id-ID')}
+                  {formatCurrency(report.aiEfficacy.savedCapitalIdr)}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Uang yang tidak hilang berkat filter AI Swarm.
+                  {l(
+                    'Funds protected from losses by AI Swarm filters.',
+                    'Uang yang tidak hilang berkat filter AI Swarm.'
+                  )}
                 </p>
               </div>
 
               <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-1">
-                <span className="text-[10px] text-slate-500 font-mono uppercase">Rasio Persetujuan AI</span>
+                <span className="text-[10px] text-slate-500 font-mono uppercase">
+                  {l('AI Approval Ratio', 'Rasio Persetujuan AI')}
+                </span>
                 <div className="text-base font-bold text-slate-200 font-mono">
-                  {report.aiEfficacy.approvedCount} Disetujui / {report.aiEfficacy.rejectedCount} Ditolak
+                  {report.aiEfficacy.approvedCount} {l('Approved', 'Disetujui')} / {report.aiEfficacy.rejectedCount} {l('Rejected', 'Ditolak')}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Total {report.aiEfficacy.evaluationsCount} sinyal teknikal diuji.
+                  {l('Total', 'Total')} {report.aiEfficacy.evaluationsCount} {l('technical signals evaluated.', 'sinyal teknikal diuji.')}
                 </p>
               </div>
 
               <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-1">
-                <span className="text-[10px] text-slate-500 font-mono uppercase">Rata-rata Durasi Hold</span>
+                <span className="text-[10px] text-slate-500 font-mono uppercase">
+                  {l('Avg Hold Duration', 'Rata-rata Durasi Hold')}
+                </span>
                 <div className="text-base font-bold text-slate-200 font-mono">
-                  {report.avgHoldDurationMinutes} Menit
+                  {report.avgHoldDurationMinutes} {l('Minutes', 'Menit')}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Waktu rata-rata posisi sebelum take profit / cut loss.
+                  {l(
+                    'Average holding duration prior to take profit or cut loss.',
+                    'Waktu rata-rata posisi sebelum take profit / cut loss.'
+                  )}
                 </p>
               </div>
             </div>
@@ -354,11 +391,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
               <div className="flex items-center gap-2 font-bold text-sm text-slate-200">
                 <Server className="w-4 h-4 text-emerald-400" />
-                <span>Kesehatan Server &amp; Sumber Daya (Resource Health)</span>
+                <span>{l('Server Health & Resource Telemetry', 'Kesehatan Server & Sumber Daya (Resource Health)')}</span>
               </div>
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950 border border-emerald-500/30 text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Optimal
+                {l('Optimal', 'Optimal')}
               </span>
             </div>
 
@@ -366,9 +403,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60">
                 <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Server Uptime</span>
                 <strong className="text-sm text-slate-200 font-mono block">
-                  {Math.floor(health.uptimeSeconds / 3600)}j {Math.floor((health.uptimeSeconds % 3600) / 60)}m
+                  {Math.floor(health.uptimeSeconds / 3600)}h {Math.floor((health.uptimeSeconds % 3600) / 60)}m
                 </strong>
-                <span className="text-[10px] text-slate-500">Berjalan stabil tanpa restart</span>
+                <span className="text-[10px] text-slate-500">{l('Stable without restarts', 'Berjalan stabil tanpa restart')}</span>
               </div>
 
               <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60">
@@ -405,10 +442,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
           <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wide flex items-center gap-2">
               <Layers className="w-4 h-4 text-blue-400" />
-              <span>Breakdown Performa per Simbol Koin</span>
+              <span>{l('Performance Breakdown by Coin Symbol', 'Breakdown Performa per Simbol Koin')}</span>
             </h3>
             <span className="text-xs text-slate-400 font-mono">
-              {report.coinBreakdown.length} Koin Diperdagangkan
+              {report.coinBreakdown.length} {l('Coins Traded', 'Koin Diperdagangkan')}
             </span>
           </div>
 
@@ -416,12 +453,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400 font-mono text-[11px] uppercase">
-                  <th className="py-2.5 px-3">Koin / Pair</th>
-                  <th className="py-2.5 px-3">Total Trade</th>
-                  <th className="py-2.5 px-3">Menang / Kalah</th>
-                  <th className="py-2.5 px-3">Win Rate %</th>
-                  <th className="py-2.5 px-3">Total PnL (IDR)</th>
-                  <th className="py-2.5 px-3">Rata-rata PnL %</th>
+                  <th className="py-2.5 px-3">{l('Coin / Pair', 'Koin / Pair')}</th>
+                  <th className="py-2.5 px-3">{l('Total Trades', 'Total Trade')}</th>
+                  <th className="py-2.5 px-3">{l('Win / Loss', 'Menang / Kalah')}</th>
+                  <th className="py-2.5 px-3">{l('Win Rate %', 'Win Rate %')}</th>
+                  <th className="py-2.5 px-3">{l('Total PnL (IDR)', 'Total PnL (IDR)')}</th>
+                  <th className="py-2.5 px-3">{l('Avg PnL %', 'Rata-rata PnL %')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50 font-mono">
@@ -434,7 +471,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                       <td className="py-2.5 px-3 text-slate-400">{c.wins} / {c.losses}</td>
                       <td className="py-2.5 px-3 text-slate-200">{c.winRatePercent.toFixed(1)}%</td>
                       <td className={`py-2.5 px-3 font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isProfit ? '+' : ''}Rp {c.totalPnlIdr.toLocaleString('id-ID')}
+                        {isProfit ? '+' : ''}{formatCurrency(c.totalPnlIdr)}
                       </td>
                       <td className={`py-2.5 px-3 ${c.avgPnlPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {c.avgPnlPercent >= 0 ? '+' : ''}{c.avgPnlPercent.toFixed(2)}%
@@ -454,10 +491,13 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
           <div>
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wide flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-400" />
-              <span>Jurnal Riwayat Transaksi Lengkap</span>
+              <span>{l('Full Trade Execution Journal', 'Jurnal Riwayat Transaksi Lengkap')}</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Daftar seluruh posisi tertutup dengan rincian harga masuk, harga keluar, durasi hold, dan alasan exit.
+              {l(
+                'List of all closed positions including entry price, exit price, hold duration, and exit trigger.',
+                'Daftar seluruh posisi tertutup dengan rincian harga masuk, harga keluar, durasi hold, dan alasan exit.'
+              )}
             </p>
           </div>
 
@@ -469,7 +509,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                 type="text"
                 value={searchSymbol}
                 onChange={(e) => setSearchSymbol(e.target.value)}
-                placeholder="Cari koin..."
+                placeholder={l('Search coin...', 'Cari koin...')}
                 className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500 w-32 sm:w-40"
               />
             </div>
@@ -482,7 +522,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                   statusFilter === 'all' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'
                 }`}
               >
-                Semua
+                {l('All', 'Semua')}
               </button>
               <button
                 type="button"
@@ -491,7 +531,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                   statusFilter === 'win' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
                 }`}
               >
-                Untung
+                {l('Wins', 'Untung')}
               </button>
               <button
                 type="button"
@@ -500,7 +540,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                   statusFilter === 'loss' ? 'bg-rose-600 text-white font-bold' : 'text-slate-400'
                 }`}
               >
-                Rugi
+                {l('Losses', 'Rugi')}
               </button>
             </div>
           </div>
@@ -508,9 +548,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
 
         {filteredTrades.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl space-y-1">
-            <p>Tidak ada transaksi yang cocok dengan filter.</p>
+            <p>{l('No trades match the current filter.', 'Tidak ada transaksi yang cocok dengan filter.')}</p>
             <p className="text-[11px] text-slate-500">
-              Coba ganti rentang waktu di atas atau bersihkan kata kunci pencarian.
+              {l('Try changing the timeframe above or clearing search keywords.', 'Coba ganti rentang waktu di atas atau bersihkan kata kunci pencarian.')}
             </p>
           </div>
         ) : (
@@ -521,37 +561,39 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400 font-mono text-[11px] uppercase">
                     <th className="py-2.5 px-3">No</th>
-                    <th className="py-2.5 px-3">Koin / Pair</th>
-                    <th className="py-2.5 px-3">Tanggal Selesai</th>
-                    <th className="py-2.5 px-3">Harga Beli</th>
-                    <th className="py-2.5 px-3">Harga Jual</th>
-                    <th className="py-2.5 px-3">Modal Awal</th>
-                    <th className="py-2.5 px-3">Net PnL (IDR)</th>
-                    <th className="py-2.5 px-3">PnL %</th>
-                    <th className="py-2.5 px-3">Durasi</th>
-                    <th className="py-2.5 px-3">Alasan Exit</th>
+                    <th className="py-2.5 px-3">{l('Coin / Pair', 'Koin / Pair')}</th>
+                    <th className="py-2.5 px-3">{l('Close Date', 'Tanggal Selesai')}</th>
+                    <th className="py-2.5 px-3">{l('Entry Price', 'Harga Beli')}</th>
+                    <th className="py-2.5 px-3">{l('Exit Price', 'Harga Jual')}</th>
+                    <th className="py-2.5 px-3">{l('Initial Cost', 'Modal Awal')}</th>
+                    <th className="py-2.5 px-3">{l('Net PnL (IDR)', 'Net PnL (IDR)')}</th>
+                    <th className="py-2.5 px-3">{l('PnL %', 'PnL %')}</th>
+                    <th className="py-2.5 px-3">{l('Duration', 'Durasi')}</th>
+                    <th className="py-2.5 px-3">{l('Exit Reason', 'Alasan Exit')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40 font-mono">
                   {filteredTrades.map((t, idx) => {
                     const isProfit = t.pnl_idr >= 0;
-                    const closeDate = t.closed_at ? new Date(t.closed_at).toLocaleDateString('id-ID') : '-';
+                    const closeDate = t.closed_at
+                      ? new Date(t.closed_at).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US')
+                      : '-';
 
                     return (
                       <tr key={t.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="py-2.5 px-3 text-slate-500">{idx + 1}</td>
                         <td className="py-2.5 px-3 font-bold text-slate-100">{t.symbol}</td>
                         <td className="py-2.5 px-3 text-slate-400">{closeDate}</td>
-                        <td className="py-2.5 px-3 text-slate-300">Rp {t.entry_price.toLocaleString('id-ID')}</td>
-                        <td className="py-2.5 px-3 text-slate-300">Rp {t.exit_price.toLocaleString('id-ID')}</td>
-                        <td className="py-2.5 px-3 text-slate-400">Rp {Math.round(t.initial_cost_idr).toLocaleString('id-ID')}</td>
+                        <td className="py-2.5 px-3 text-slate-300">{formatCurrency(t.entry_price)}</td>
+                        <td className="py-2.5 px-3 text-slate-300">{formatCurrency(t.exit_price)}</td>
+                        <td className="py-2.5 px-3 text-slate-400">{formatCurrency(Math.round(t.initial_cost_idr))}</td>
                         <td className={`py-2.5 px-3 font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isProfit ? '+' : ''}Rp {Math.round(t.pnl_idr).toLocaleString('id-ID')}
+                          {isProfit ? '+' : ''}{formatCurrency(Math.round(t.pnl_idr))}
                         </td>
                         <td className={`py-2.5 px-3 font-semibold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {isProfit ? '+' : ''}{t.pnl_percent.toFixed(2)}%
                         </td>
-                        <td className="py-2.5 px-3 text-slate-400 font-sans">{t.hold_minutes} mnt</td>
+                        <td className="py-2.5 px-3 text-slate-400 font-sans">{t.hold_minutes} {l('min', 'mnt')}</td>
                         <td className="py-2.5 px-3 font-sans text-slate-300 text-[11px] max-w-xs truncate" title={t.exit_reason}>
                           {t.exit_reason}
                         </td>
@@ -562,11 +604,13 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               </table>
             </div>
 
-            {/* Mobile Card Layout (< md screens) */}
+            {/* Mobile Card Layout */}
             <div className="md:hidden space-y-3">
               {filteredTrades.map((t, idx) => {
                 const isProfit = t.pnl_idr >= 0;
-                const closeDate = t.closed_at ? new Date(t.closed_at).toLocaleDateString('id-ID') : '-';
+                const closeDate = t.closed_at
+                  ? new Date(t.closed_at).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US')
+                  : '-';
 
                 return (
                   <div key={t.id} className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/50 space-y-2.5">
@@ -577,7 +621,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border ${
                           isProfit ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30' : 'bg-rose-950/60 text-rose-400 border-rose-500/30'
                         }`}>
-                          {isProfit ? 'UNTUNG' : 'RUGI'}
+                          {isProfit ? l('WIN', 'UNTUNG') : l('LOSS', 'RUGI')}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono">{closeDate} ({t.hold_minutes}m)</span>
@@ -585,24 +629,24 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
 
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                       <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">
-                        <span className="text-[10px] text-slate-500 block">Beli / Masuk</span>
-                        <span className="text-slate-300">Rp {t.entry_price.toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block">{l('Buy / Entry', 'Beli / Masuk')}</span>
+                        <span className="text-slate-300">{formatCurrency(t.entry_price)}</span>
                       </div>
                       <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">
-                        <span className="text-[10px] text-slate-500 block">Jual / Keluar</span>
-                        <span className="text-slate-300">Rp {t.exit_price.toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block">{l('Sell / Exit', 'Jual / Keluar')}</span>
+                        <span className="text-slate-300">{formatCurrency(t.exit_price)}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
                       <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Modal Awal</span>
-                        <span className="text-xs font-mono text-slate-300">Rp {Math.round(t.initial_cost_idr).toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">{l('Initial Cost', 'Modal Awal')}</span>
+                        <span className="text-xs font-mono text-slate-300">{formatCurrency(Math.round(t.initial_cost_idr))}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-slate-500 block uppercase font-mono">Net PnL</span>
                         <span className={`text-sm font-bold font-mono ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isProfit ? '+' : ''}Rp {Math.round(t.pnl_idr).toLocaleString('id-ID')}
+                          {isProfit ? '+' : ''}{formatCurrency(Math.round(t.pnl_idr))}
                           <span className="text-xs font-normal ml-1">
                             ({isProfit ? '+' : ''}{t.pnl_percent.toFixed(2)}%)
                           </span>
@@ -612,7 +656,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
 
                     {t.exit_reason && (
                       <div className="text-[11px] text-slate-400 bg-slate-950/40 p-1.5 rounded border border-slate-800/50 truncate" title={t.exit_reason}>
-                        <span className="text-slate-500 mr-1 font-semibold">Alasan:</span> {t.exit_reason}
+                        <span className="text-slate-500 mr-1 font-semibold">{l('Reason: ', 'Alasan: ')}</span> {t.exit_reason}
                       </div>
                     )}
                   </div>
@@ -628,20 +672,26 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
         <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
           <div className="flex items-center gap-2 font-bold text-sm text-slate-200">
             <HardDrive className="w-4 h-4 text-sky-400" />
-            <span>Cadangan Database SQLite (Disaster Recovery Snapshots)</span>
+            <span>{l('SQLite Database Backups (Disaster Recovery Snapshots)', 'Cadangan Database SQLite (Disaster Recovery Snapshots)')}</span>
           </div>
           <span className="text-xs text-slate-400 font-mono">
-            {backups.length} Snapshot Tersimpan
+            {backups.length} {l('Snapshots Stored', 'Snapshot Tersimpan')}
           </span>
         </div>
 
         <p className="text-xs text-slate-400 leading-relaxed">
-          Sistem secara otomatis membuat snapshot database SQLite lokal setiap 24 jam sekali untuk mencegah hilangnya riwayat posisi jika server mati mendadak.
+          {l(
+            'The system automatically snapshots the local SQLite database every 24 hours to prevent loss of trading history if the host reboots unexpectedly.',
+            'Sistem secara otomatis membuat snapshot database SQLite lokal setiap 24 jam sekali untuk mencegah hilangnya riwayat posisi jika server mati mendadak.'
+          )}
         </p>
 
         {backups.length === 0 ? (
           <p className="text-xs text-slate-500 italic py-2">
-            Belum ada snapshot cadangan. Klik tombol "Backup DB" di atas untuk membuat cadangan pertama.
+            {l(
+              'No backup snapshots yet. Click "Backup DB" above to create the first snapshot.',
+              'Belum ada snapshot cadangan. Klik tombol "Backup DB" di atas untuk membuat cadangan pertama.'
+            )}
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">

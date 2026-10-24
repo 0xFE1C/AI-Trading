@@ -1,122 +1,169 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Gamepad2,
   Sparkles,
-  ArrowRight,
   ArrowLeft,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  Activity,
-  Sliders,
-  Target,
   Bot,
-  Zap,
   Award,
   ChevronRight,
   HelpCircle,
+  Target,
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export interface TutorialStep {
   id: string;
   tab: 'dashboard' | 'reports' | 'scanner' | 'agents' | 'backtest' | 'whatsapp' | 'quota' | 'settings';
-  targetSelector?: string; // CSS selector for spotlight
-  title: string;
-  badge: string;
-  narrative: string;
-  tip: string;
-  buttonText: string;
-  centerModal?: boolean; // If true, display as centered dialog (intro or outro)
+  targetSelector?: string;
+  centerModal?: boolean;
+  title_en: string;
+  title_id: string;
+  badge_en: string;
+  badge_id: string;
+  narrative_en: string;
+  narrative_id: string;
+  tip_en: string;
+  tip_id: string;
+  buttonText_en: string;
+  buttonText_id: string;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'welcome',
     tab: 'dashboard',
-    title: 'Selamat Datang di Cockpit AI Trading!',
-    badge: 'MISI 1: ORIENTASI COCKPIT',
+    title_en: 'Welcome to the AI Trading Cockpit!',
+    title_id: 'Selamat Datang di Cockpit AI Trading!',
+    badge_en: 'MISSION 1: COCKPIT ORIENTATION',
+    badge_id: 'MISI 1: ORIENTASI COCKPIT',
     centerModal: true,
-    narrative:
+    narrative_en:
+      'Hello Trader! Welcome to the autonomous crypto trading platform powered by Multi-Agent AI. Think of this as a flight simulator where you are the Commander. From this cockpit, you can monitor the Indodax market, scan coin momentum, and let quantitative algorithms hunt for disciplined profits. A wise commander never flips switches without understanding their cockpit!',
+    narrative_id:
       'Halo Trader! Selamat datang di platform trading crypto otomatis bertenaga Multi-Agent AI. Seperti bermain game simulator, kamu adalah Komandan armada ini. Di cockpit ini, kamu bisa memantau pasar Indodax, membaca radar koin, dan membiarkan algoritma kuantitatif memburu profit secara terukur. Tapi ingat, komandan bijak tidak asal menekan tombol sebelum memahami fungsi cockpit-nya!',
-    tip: 'Jika kamu sudah memahami dasar trading, kamu dapat menekan tombol "Lewati Tur" kapan saja untuk langsung masuk ke cockpit.',
-    buttonText: 'Siap! Mulai Misi Pelatihan ➜',
+    tip_en: 'If you are already familiar with the system, you can click "Skip Tour" anytime to jump straight into the cockpit.',
+    tip_id: 'Jika kamu sudah memahami dasar trading, kamu dapat menekan tombol "Lewati Tur" kapan saja untuk langsung masuk ke cockpit.',
+    buttonText_en: 'Ready! Start Training Mission ➜',
+    buttonText_id: 'Siap! Mulai Misi Pelatihan ➜',
   },
   {
     id: 'trading-mode',
     tab: 'dashboard',
     targetSelector: '[data-tour="trading-mode"]',
-    title: 'Kenali Mode Trading: Paper vs Live',
-    badge: 'MISI 2: MODE SIMULASI',
-    narrative:
+    title_en: 'Know Your Trading Mode: Paper vs Live',
+    title_id: 'Kenali Mode Trading: Paper vs Live',
+    badge_en: 'MISSION 2: SIMULATION MODE',
+    badge_id: 'MISI 2: MODE SIMULASI',
+    narrative_en:
+      'Notice the glowing toggle up top! By default, the system boots into MODE: PAPER. In this mode, the trading bot runs on simulated virtual balance. Your real Rupiah is 100% SAFE because zero real exchange orders are transmitted. Never switch to MODE: LIVE before validating strategy performance in simulation!',
+    narrative_id:
       'Lihat tombol yang menyala di atas! Secara default, sistem berada di MODE: PAPER. Di mode ini, bot trading menggunakan uang virtual (simulasi). Uang Rupiah aslimu 100% AMAN karena tidak ada transaksi bursa nyata yang dikirim. Jangan pernah beralih ke MODE: LIVE sebelum kamu benar-benar menguji performa dan strategi bot di mode simulasi!',
-    tip: 'Mode Paper sangat cocok untuk melihat bagaimana bot bereaksi terhadap gejolak pasar tanpa resiko rugi.',
-    buttonText: 'Paham, Lanjut ke Sakelar Utama ➜',
+    tip_en: 'Paper mode is ideal to see how the bot reacts to market swings without risking a single penny.',
+    tip_id: 'Mode Paper sangat cocok untuk melihat bagaimana bot bereaksi terhadap gejolak pasar tanpa resiko rugi.',
+    buttonText_en: 'Understood, Proceed to Master Switch ➜',
+    buttonText_id: 'Paham, Lanjut ke Sakelar Utama ➜',
   },
   {
     id: 'auto-trading',
     tab: 'dashboard',
     targetSelector: '[data-tour="auto-trading"]',
-    title: 'Sakelar Mesin Bot: Auto-Trading Switch',
-    badge: 'MISI 3: KENDALI MESIN',
-    narrative:
+    title_en: 'Bot Engine Master Switch: Auto-Trading',
+    title_id: 'Sakelar Mesin Bot: Auto-Trading Switch',
+    badge_en: 'MISSION 3: ENGINE CONTROL',
+    badge_id: 'MISI 3: KENDALI MESIN',
+    narrative_en:
+      'This is your bot\'s Main Engine Ignition! When set to PAUSED (Gray / Off), the bot operates purely as an observer and WILL NOT open buy positions. When flipped to ACTIVE (Green / On), the engine autonomously performs periodic scans, evaluates indicators, and executes orders.',
+    narrative_id:
       'Ini adalah Sakelar Mesin Utama bot kamu! Ketika berstatus PAUSED (Abu-abu / Off), bot hanya memantau pasar sebagai pengamat dan TIDAK AKAN membuka posisi beli. Ketika kamu nyalakan menjadi ACTIVE (Hijau / On), mesin otomatis melakukan pemindaian berkala, mengevaluasi indikator, dan mengeksekusi order.',
-    tip: 'Saat baru menyalakan bot atau mengubah pengaturan, selalu pastikan status PAUSED agar kamu bisa memeriksa setting terlebih dahulu.',
-    buttonText: 'Lanjut ke Rem Darurat ➜',
+    tip_en: 'Whenever configuring new settings, always keep the switch on PAUSED to verify your parameters first.',
+    tip_id: 'Saat baru menyalakan bot atau mengubah pengaturan, selalu pastikan status PAUSED agar kamu bisa memeriksa setting terlebih dahulu.',
+    buttonText_en: 'Proceed to Emergency Brake ➜',
+    buttonText_id: 'Lanjut ke Rem Darurat ➜',
   },
   {
     id: 'panic-sell',
     tab: 'dashboard',
     targetSelector: '[data-tour="panic-sell"]',
-    title: 'Rem Darurat: Panic Sell',
-    badge: 'MISI 4: PROTEKSI MODAL',
-    narrative:
+    title_en: 'Emergency Brake: Panic Sell',
+    title_id: 'Rem Darurat: Panic Sell',
+    badge_en: 'MISSION 4: CAPITAL DEFENSE',
+    badge_id: 'MISI 4: PROTEKSI MODAL',
+    narrative_en:
+      'Every jet fighter has an ejection seat button — in trading, that is PANIC SELL! If crypto markets experience an abrupt crash or you wish to instantly secure all funds, this red button liquidates all open coin positions back to Rupiah (IDR) cash in one single confirmed click.',
+    narrative_id:
       'Setiap pesawat tempur punya tombol kursi pelontar darurat — di trading ada tombol PANIC SELL! Jika pasar crypto tiba-tiba mengalami crash mendadak atau kamu ingin segera mengamankan seluruh dana, tombol merah ini akan langsung melikuidasi seluruh posisi koin terbuka kembali ke saldo Rupiah (IDR) dalam satu klik konfirmasi.',
-    tip: 'Gunakan tombol ini hanya dalam kondisi darurat ketika kamu ingin keluar dari seluruh pasar seketika.',
-    buttonText: 'Pergi ke Markas Pengaturan ➜',
+    tip_en: 'Use this emergency feature only when you want an immediate, complete exit from all active market positions.',
+    tip_id: 'Gunakan tombol ini hanya dalam kondisi darurat ketika kamu ingin keluar dari seluruh pasar seketika.',
+    buttonText_en: 'Go to Settings HQ ➜',
+    buttonText_id: 'Pergi ke Markas Pengaturan ➜',
   },
   {
     id: 'settings-nav',
     tab: 'settings',
     targetSelector: '[data-tour="nav-settings"]',
-    title: 'Kunjungi Markas: AI Models & Settings',
-    badge: 'MISI 5: KUNJUNGI SHOP / MARKAS',
-    narrative:
+    title_en: 'Visit HQ: AI Models & Settings',
+    title_id: 'Kunjungi Markas: AI Models & Settings',
+    badge_en: 'MISSION 5: VISIT ARMORY / HQ',
+    badge_id: 'MISI 5: KUNJUNGI SHOP / MARKAS',
+    narrative_en:
+      'Just like visiting the Armory in an RPG to upgrade your equipment, in trading you must master your Settings HQ! Here you connect your artificial intelligence models (Gemini / Claude), tune capital allocation per trade, and select your risk profile.',
+    narrative_id:
       'Seperti di game RPG di mana kamu harus ke Shop / Inventory untuk upgrade senjata, di trading kamu wajib memahami Markas Pengaturan (Settings)! Di menu inilah kamu menghubungkan model kecerdasan buatan (Gemini / Claude), mengatur batas modal per trade, dan memilih profil risiko.',
-    tip: 'Kita baru saja berpindah ke tab Pengaturan. Mari kita lihat senjata rahasia untuk pemula!',
-    buttonText: 'Lihat Fitur 1-Klik Pemula ➜',
+    tip_en: 'We just transitioned to the Settings tab. Let\'s inspect the secret weapon designed for beginners!',
+    tip_id: 'Kita baru saja berpindah ke tab Pengaturan. Mari kita lihat senjata rahasia untuk pemula!',
+    buttonText_en: 'View 1-Click Beginner Preset ➜',
+    buttonText_id: 'Lihat Fitur 1-Klik Pemula ➜',
   },
   {
     id: 'beginner-preset',
     tab: 'settings',
     targetSelector: '[data-tour="beginner-preset"]',
-    title: 'Golden Rule: Gunakan Profil Konservatif!',
-    badge: 'MISI 6: ATURAN EMAS PEMULA',
-    narrative:
+    title_en: 'Golden Rule: Stick to Conservative Profile!',
+    title_id: 'Golden Rule: Gunakan Profil Konservatif!',
+    badge_en: 'MISSION 6: BEGINNER GOLDEN RULE',
+    badge_id: 'MISI 6: ATURAN EMAS PEMULA',
+    narrative_en:
+      'The #1 rule for beginners: CAPITAL DEFENSE IS FAR MORE IMPORTANT THAN CHASING FAST GAINS! Do not jump into the Aggressive profile. In this green banner, the "1-Click Automatic Preset for Beginners" instantly configures the bot into Conservative mode: trading only bluechips (BTC, ETH, SOL) with strict Stop Loss and zero memecoin risk!',
+    narrative_id:
       'Aturan paling penting bagi pemula adalah: PROTEKSI MODAL JAUH LEBIH PENTING DARIPADA MENGINCAR UNTUNG CEPAT! Jangan langsung memakai profil Agresif. Di banner hijau ini terdapat tombol "Setup Otomatis 1-Klik untuk Pemula" yang akan langsung menyetel bot ke profil Konservatif: hanya trading koin blue-chip terkuat (BTC, ETH, SOL) dengan Stop Loss ketat dan tanpa koin micin/memecoin!',
-    tip: 'Dengan profil konservatif, bot memiliki 9 gerbang pengaman untuk menahanmu dari jebakan FOMO.',
-    buttonText: 'Periksa Radar & Diagnostik Sinyal ➜',
+    tip_en: 'With a conservative profile, the bot relies on 9 safety gates to prevent emotional FOMO entries.',
+    tip_id: 'Dengan profil konservatif, bot memiliki 9 gerbang pengaman untuk menahanmu dari jebakan FOMO.',
+    buttonText_en: 'Inspect Radar & Entry Diagnostics ➜',
+    buttonText_id: 'Periksa Radar & Diagnostik Sinyal ➜',
   },
   {
     id: 'entry-diagnostics',
     tab: 'dashboard',
     targetSelector: '[data-tour="entry-diagnostics"]',
-    title: 'Transparansi Penuh: Diagnostik Gerbang Masuk',
-    badge: 'MISI 7: MONITOR RADAR',
-    narrative:
+    title_en: 'Total Transparency: 9 Gates Entry Diagnostics',
+    title_id: 'Transparansi Penuh: Diagnostik Gerbang Masuk',
+    badge_en: 'MISSION 7: RADAR MONITOR',
+    badge_id: 'MISI 7: MONITOR RADAR',
+    narrative_en:
+      'The most frequent beginner question: "Why is the bot idle and not buying?" The answer lies in this Entry Diagnostics panel! Your AI bot is equipped with 9 quantitative safety barriers (Circuit Breaker, BTC Crash Filter, Orderbook Slippage, Spread Trap, RSI Peak). This panel honestly reveals which gate is blocking coins to protect your money from drawdown!',
+    narrative_id:
       'Pertanyaan paling sering dari pemula: "Kenapa bot diam saja dan belum belanja?" Jawabannya ada di panel Diagnostik Gerbang Masuk ini! Bot AI kamu dilengkapi 9 lapis gerbang pengaman kuantitatif (Circuit Breaker, Crash Filter BTC, Slippage Book, Spread Trap, RSI Pucuk). Panel ini secara jujur dan transparan menampilkan gerbang mana yang menolak koin demi menyelamatkan uangmu dari kerugian!',
-    tip: 'Jika kondisi pasar tidak ideal, tidak trading adalah bentuk trading terbaik untuk melindungi modalmu.',
-    buttonText: 'Selesaikan Pelatihan Cockpit! 🎖️',
+    tip_en: 'When market conditions are poor, no trade is the best trade to protect your capital.',
+    tip_id: 'Jika kondisi pasar tidak ideal, tidak trading adalah bentuk trading terbaik untuk melindungi modalmu.',
+    buttonText_en: 'Complete Cockpit Training! 🎖️',
+    buttonText_id: 'Selesaikan Pelatihan Cockpit! 🎖️',
   },
   {
     id: 'completed',
     tab: 'dashboard',
-    title: 'Misi Selesai: Cockpit Unlocked! 🏆',
-    badge: 'PELATIHAN LULUS',
+    title_en: 'Mission Accomplished: Cockpit Unlocked! 🏆',
+    title_id: 'Misi Selesai: Cockpit Unlocked! 🏆',
+    badge_en: 'TRAINING GRADUATED',
+    badge_id: 'PELATIHAN LULUS',
     centerModal: true,
-    narrative:
+    narrative_en:
+      'Congratulations, Commander! You have successfully completed the initial flight orientation. You now understand Paper mode, the Auto-Trading master switch, Panic Sell safeguards, Conservative risk settings, and the transparent 9 Gates Entry Diagnostics.',
+    narrative_id:
       'Selamat, Komandan! Kamu telah menyelesaikan seluruh misi pelatihan awal. Sekarang kamu sudah memahami fungsi mode Paper, sakelar Auto-Trading, tombol Panic Sell, profil risiko Konservatif, serta transparansi Diagnostik Gerbang Masuk.',
-    tip: '3 Aturan Emas Trader Pemula: 1. Selalu mulai dari Paper Trading. 2. Gunakan profil risiko Konservatif. 3. Jangan panik saat bot menahan trading di pasar berbahaya.',
-    buttonText: 'Mulai Jelajahi Cockpit 🚀',
+    tip_en: '3 Golden Rules for Beginners: 1. Always start in Paper Trading. 2. Use Conservative risk profile. 3. Never panic when the bot waits patiently in dangerous markets.',
+    tip_id: '3 Aturan Emas Trader Pemula: 1. Selalu mulai dari Paper Trading. 2. Gunakan profil risiko Konservatif. 3. Jangan panik saat bot menahan trading di pasar berbahaya.',
+    buttonText_en: 'Explore Cockpit Now 🚀',
+    buttonText_id: 'Mulai Jelajahi Cockpit 🚀',
   },
 ];
 
@@ -133,6 +180,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
   activeTab,
   onSwitchTab,
 }) => {
+  const { l, language } = useLanguage();
   const [currentStepIndex, setCurrentStepIndex] = useState(() => {
     const saved = localStorage.getItem('ai_trading_tutorial_step');
     const parsed = saved ? parseInt(saved, 10) : 0;
@@ -141,7 +189,19 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const step = TUTORIAL_STEPS[currentStepIndex];
+  const rawStep = TUTORIAL_STEPS[currentStepIndex];
+  const step = useMemo(() => {
+    const isId = language === 'id';
+    return {
+      ...rawStep,
+      title: isId ? rawStep.title_id : rawStep.title_en,
+      badge: isId ? rawStep.badge_id : rawStep.badge_en,
+      narrative: isId ? rawStep.narrative_id : rawStep.narrative_en,
+      tip: isId ? rawStep.tip_id : rawStep.tip_en,
+      buttonText: isId ? rawStep.buttonText_id : rawStep.buttonText_en,
+    };
+  }, [rawStep, language]);
+
   const progressPercent = Math.round(((currentStepIndex + 1) / TUTORIAL_STEPS.length) * 100);
 
   // Sync activeTab when step changes
@@ -171,11 +231,9 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Small delay to allow tab render and layout transition
     const timeout = setTimeout(() => {
       updateTargetRect();
 
-      // Scroll target element into view smoothly if needed
       if (step.targetSelector) {
         const el = document.querySelector(step.targetSelector);
         if (el) {
@@ -232,7 +290,6 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
 
   const isFinalStep = currentStepIndex === TUTORIAL_STEPS.length - 1;
 
-  // Calculate position for dialog box relative to target rect
   const getDialogStyle = (): React.CSSProperties => {
     if (step.centerModal || !targetRect) {
       return {
@@ -248,17 +305,14 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     const viewportHeight = window.innerHeight;
     const dialogWidth = Math.min(480, viewportWidth - 32);
 
-    // Default: place below the target
     let top = targetRect.bottom + 16;
     let left = targetRect.left + targetRect.width / 2 - dialogWidth / 2;
 
-    // Boundary check for horizontal
     if (left < 16) left = 16;
     if (left + dialogWidth > viewportWidth - 16) {
       left = viewportWidth - dialogWidth - 16;
     }
 
-    // If target is too low in viewport, place above
     if (top + 280 > viewportHeight && targetRect.top > 300) {
       top = targetRect.top - 280 - 16;
     }
@@ -304,7 +358,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
           {/* Floating animated target pointer tag */}
           <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 animate-bounce">
             <Target className="w-3 h-3" />
-            <span>TARGET MISI</span>
+            <span>{l('MISSION TARGET', 'TARGET MISI')}</span>
           </div>
         </div>
       )}
@@ -327,7 +381,9 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
                 {step.badge}
               </span>
               <div className="text-xs font-bold text-slate-200">
-                Langkah {currentStepIndex + 1} dari {TUTORIAL_STEPS.length}
+                {language === 'id'
+                  ? `Langkah ${currentStepIndex + 1} dari ${TUTORIAL_STEPS.length}`
+                  : `Step ${currentStepIndex + 1} of ${TUTORIAL_STEPS.length}`}
               </div>
             </div>
           </div>
@@ -337,9 +393,9 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
               type="button"
               onClick={handleSkip}
               className="text-[10px] font-mono font-semibold text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 px-2 py-0.5 rounded-full transition-colors"
-              title="Lewati tutorial dan langsung ke terminal"
+              title={l('Skip tutorial and proceed directly to cockpit', 'Lewati tutorial dan langsung ke terminal')}
             >
-              Lewati Tur ✕
+              {l('Skip Tour ✕', 'Lewati Tur ✕')}
             </button>
             {/* Progress Bar */}
             <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -365,7 +421,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
               {step.title}
             </h3>
             <p className="text-xs text-blue-300/80 font-mono mt-0.5">
-              Instruksi AI Tactical Navigator
+              {l('AI Tactical Navigator Briefing', 'Instruksi AI Tactical Navigator')}
             </p>
           </div>
         </div>
@@ -379,12 +435,12 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
         <div className="flex items-start gap-2.5 p-3 rounded-xl border border-blue-500/30 bg-blue-950/30 text-xs text-blue-200">
           <Sparkles className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
           <div className="leading-snug">
-            <strong className="text-blue-300 font-semibold">Tips Pemula: </strong>
+            <strong className="text-blue-300 font-semibold">{l('Pro Tip: ', 'Tips Pemula: ')}</strong>
             <span>{step.tip}</span>
           </div>
         </div>
 
-        {/* Bottom Actions: Prev & Next Button (NO SKIP BUTTON) */}
+        {/* Bottom Actions: Prev & Next Button */}
         <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
           {currentStepIndex > 0 ? (
             <button
@@ -393,12 +449,12 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Sebelumnya</span>
+              <span>{l('Previous', 'Sebelumnya')}</span>
             </button>
           ) : (
             <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1">
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Ikuti panduan tahap demi tahap</span>
+              <span>{l('Follow step-by-step briefing', 'Ikuti panduan tahap demi tahap')}</span>
             </div>
           )}
 

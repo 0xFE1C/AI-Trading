@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface HelpTooltipProps {
   content: string;
@@ -9,6 +10,7 @@ interface HelpTooltipProps {
 
 export const HelpTooltip: React.FC<HelpTooltipProps> = ({ content, title, className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { l } = useLanguage();
 
   return (
     <span className={`relative inline-flex items-center ml-1 ${className}`}>
@@ -18,7 +20,7 @@ export const HelpTooltip: React.FC<HelpTooltipProps> = ({ content, title, classN
         onMouseEnter={() => setIsOpen(true)}
         onMouseLeave={() => setIsOpen(false)}
         className="p-0.5 rounded-full text-slate-400 hover:text-slate-200 focus:outline-none transition-colors"
-        aria-label={title || 'Bantuan'}
+        aria-label={title || l('Help', 'Bantuan')}
       >
         <HelpCircle className="w-3.5 h-3.5" />
       </button>

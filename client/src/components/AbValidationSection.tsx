@@ -17,8 +17,10 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { AbValidationMetrics } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const AbValidationSection: React.FC = () => {
+  const { l, formatCurrency, language } = useLanguage();
   const [metrics, setMetrics] = useState<AbValidationMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'ghosts' | 'evaluations'>('overview');
@@ -45,7 +47,7 @@ export const AbValidationSection: React.FC = () => {
     return (
       <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-6 text-center text-slate-400 text-sm">
         <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-indigo-400" />
-        Memuat data telemetri validasi A/B & AI Alpha...
+        {l('Loading A/B validation telemetry & AI Alpha...', 'Memuat data telemetri validasi A/B & AI Alpha...')}
       </div>
     );
   }
@@ -65,14 +67,17 @@ export const AbValidationSection: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-slate-100">
-                Uji Efektivitas AI
+                {l('AI Effectiveness Validation', 'Uji Efektivitas AI')}
               </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full border border-indigo-500/30 bg-indigo-950/40 text-indigo-300 font-mono">
-                Bukti Empiris
+                {l('Empirical Proof', 'Bukti Empiris')}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Validasi pembuktian nilai tambah (Alpha) layer AI Manajer Risiko vs sinyal mekanikal murni tanpa filter.
+              {l(
+                'Demonstrates the empirical value-add (Alpha) of the AI Risk Guard layer versus raw mechanical signals.',
+                'Validasi pembuktian nilai tambah (Alpha) layer AI Manajer Risiko vs sinyal mekanikal murni tanpa filter.'
+              )}
             </p>
           </div>
         </div>
@@ -86,7 +91,7 @@ export const AbValidationSection: React.FC = () => {
                 activeTab === 'overview' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Matriks Efektivitas
+              {l('Effectiveness Matrix', 'Matriks Efektivitas')}
             </button>
             <button
               onClick={() => setActiveTab('ghosts')}
@@ -95,7 +100,7 @@ export const AbValidationSection: React.FC = () => {
               }`}
             >
               <Ghost className="h-3.5 w-3.5" />
-              Posisi Bayangan ({activeGhosts.length})
+              {l('Ghost Positions', 'Posisi Bayangan')} ({activeGhosts.length})
             </button>
             <button
               onClick={() => setActiveTab('evaluations')}
@@ -103,7 +108,7 @@ export const AbValidationSection: React.FC = () => {
                 activeTab === 'evaluations' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Log Evaluasi ({metrics.totalEvaluations})
+              {l('Evaluation Log', 'Log Evaluasi')} ({metrics.totalEvaluations})
             </button>
           </div>
 
@@ -111,7 +116,7 @@ export const AbValidationSection: React.FC = () => {
             onClick={fetchMetrics}
             disabled={loading}
             className="p-1.5 rounded-lg border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white transition-colors"
-            title="Refresh Data"
+            title={l('Refresh Data', 'Refresh Data')}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -123,7 +128,7 @@ export const AbValidationSection: React.FC = () => {
         {/* Card 1: Net Alpha IDR */}
         <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4">
           <div className="flex items-center justify-between text-slate-400 mb-1.5">
-            <span className="text-xs font-medium uppercase tracking-wider">Nilai Tambah AI (IDR)</span>
+            <span className="text-xs font-medium uppercase tracking-wider">{l('AI Added Value (Alpha)', 'Nilai Tambah AI (IDR)')}</span>
             {isAlphaPositive ? (
               <TrendingUp className="h-4 w-4 text-emerald-400" />
             ) : (
@@ -131,52 +136,55 @@ export const AbValidationSection: React.FC = () => {
             )}
           </div>
           <div className={`text-2xl font-bold font-mono ${isAlphaPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {isAlphaPositive ? '+' : ''}Rp {Math.round(alpha.pnlAlphaIdr).toLocaleString('id-ID')}
+            {isAlphaPositive ? '+' : ''}{formatCurrency(Math.round(alpha.pnlAlphaIdr))}
           </div>
           <p className="mt-1.5 text-[11px] text-slate-400 leading-snug">
-            Nilai tambah bersih filter AI: Kerugian dihindari dikurangi peluang terlewat.
+            {l(
+              'Net value-add of AI filter: Losses avoided minus missed opportunities.',
+              'Nilai tambah bersih filter AI: Kerugian dihindari dikurangi peluang terlewat.'
+            )}
           </p>
         </div>
 
         {/* Card 2: Win Rate Delta */}
         <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4">
           <div className="flex items-center justify-between text-slate-400 mb-1.5">
-            <span className="text-xs font-medium uppercase tracking-wider">Selisih Win Rate</span>
+            <span className="text-xs font-medium uppercase tracking-wider">{l('Win Rate Delta', 'Selisih Win Rate')}</span>
             <Activity className="h-4 w-4 text-indigo-400" />
           </div>
           <div className={`text-2xl font-bold font-mono ${isWinRateAlphaPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
             {isWinRateAlphaPositive ? '+' : ''}{alpha.winRateDeltaPercent.toFixed(1)}%
           </div>
           <p className="mt-1.5 text-[11px] text-slate-400 leading-snug">
-            {groupAWithAi.winRatePercent.toFixed(1)}% (Dengan AI) vs {combinedWithoutAi.winRatePercent.toFixed(1)}% (Tanpa AI)
+            {groupAWithAi.winRatePercent.toFixed(1)}% {l('(With AI)', '(Dengan AI)')} vs {combinedWithoutAi.winRatePercent.toFixed(1)}% {l('(Without AI)', '(Tanpa AI)')}
           </p>
         </div>
 
         {/* Card 3: Bullets Dodged (Loss Avoided) */}
         <div className="rounded-xl border border-emerald-900/30 bg-emerald-950/10 p-4">
           <div className="flex items-center justify-between text-slate-400 mb-1.5">
-            <span className="text-xs font-medium uppercase tracking-wider text-emerald-300">Kerugian Terhindar</span>
+            <span className="text-xs font-medium uppercase tracking-wider text-emerald-300">{l('Losses Avoided', 'Kerugian Terhindar')}</span>
             <ShieldCheck className="h-4 w-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold font-mono text-emerald-400">
-            {groupBCounterfactual.bulletsDodged} Sinyal
+            {groupBCounterfactual.bulletsDodged} {l('Signals', 'Sinyal')}
           </div>
           <p className="mt-1.5 text-[11px] text-emerald-300/80 leading-snug">
-            Hemat <span className="font-semibold text-emerald-300">Rp {Math.round(groupBCounterfactual.savedCapitalIdr).toLocaleString('id-ID')}</span> dari posisi rugi yang ditolak AI.
+            {l('Saved ', 'Hemat ')}<span className="font-semibold text-emerald-300">{formatCurrency(Math.round(groupBCounterfactual.savedCapitalIdr))}</span> {l('from losing setups vetoed by AI.', 'dari posisi rugi yang ditolak AI.')}
           </p>
         </div>
 
         {/* Card 4: Opportunities Missed */}
         <div className="rounded-xl border border-amber-900/30 bg-amber-950/10 p-4">
           <div className="flex items-center justify-between text-slate-400 mb-1.5">
-            <span className="text-xs font-medium uppercase tracking-wider text-amber-300">Peluang Terlewat</span>
+            <span className="text-xs font-medium uppercase tracking-wider text-amber-300">{l('Missed Opportunities', 'Peluang Terlewat')}</span>
             <ShieldAlert className="h-4 w-4 text-amber-400" />
           </div>
           <div className="text-2xl font-bold font-mono text-amber-400">
-            {groupBCounterfactual.opportunitiesMissed} Sinyal
+            {groupBCounterfactual.opportunitiesMissed} {l('Signals', 'Sinyal')}
           </div>
           <p className="mt-1.5 text-[11px] text-amber-300/80 leading-snug">
-            Terlewat <span className="font-semibold text-amber-300">Rp {Math.round(groupBCounterfactual.missedProfitIdr).toLocaleString('id-ID')}</span> potensi profit pada koin yang ditolak.
+            {l('Missed ', 'Terlewat ')}<span className="font-semibold text-amber-300">{formatCurrency(Math.round(groupBCounterfactual.missedProfitIdr))}</span> {l('potential gains on vetoed setups.', 'potensi profit pada koin yang ditolak.')}
           </p>
         </div>
       </div>
@@ -187,10 +195,13 @@ export const AbValidationSection: React.FC = () => {
           <div className="rounded-lg border border-slate-800 overflow-hidden">
             <div className="px-4 py-3 bg-slate-900/70 border-b border-slate-800 flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-200">
-                Matriks Komparasi Empiris: Grup A (Dengan AI) vs Grup B (Posisi Bayangan Sinyal Ditolak) vs Baseline (Tanpa AI)
+                {l(
+                  'Empirical Comparison Matrix: Group A (With AI) vs Group B (Vetoed Ghost Positions) vs Baseline (No AI)',
+                  'Matriks Komparasi Empiris: Grup A (Dengan AI) vs Grup B (Posisi Bayangan Sinyal Ditolak) vs Baseline (Tanpa AI)'
+                )}
               </span>
               <span className="text-[11px] text-slate-400 font-mono">
-                Total Sinyal Dievaluasi: {metrics.totalEvaluations} ({metrics.approvalRatePercent.toFixed(1)}% Disetujui, {metrics.rejectionRatePercent.toFixed(1)}% Ditolak)
+                {l('Total Evaluated Signals:', 'Total Sinyal Dievaluasi:')} {metrics.totalEvaluations} ({metrics.approvalRatePercent.toFixed(1)}% {l('Approved', 'Disetujui')}, {metrics.rejectionRatePercent.toFixed(1)}% {l('Vetoed', 'Ditolak')})
               </span>
             </div>
 
@@ -198,18 +209,18 @@ export const AbValidationSection: React.FC = () => {
               <table className="w-full text-left text-xs font-mono">
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400">
-                    <th className="py-2.5 px-4 font-medium">Metrik Performa</th>
-                    <th className="py-2.5 px-4 font-medium text-indigo-400">Grup A (Dengan Filter AI)</th>
-                    <th className="py-2.5 px-4 font-medium text-amber-400">Grup B (Posisi Bayangan Ditolak)</th>
-                    <th className="py-2.5 px-4 font-medium text-slate-300">Hipotetis (Tanpa Filter AI)</th>
+                    <th className="py-2.5 px-4 font-medium">{l('Performance Metric', 'Metrik Performa')}</th>
+                    <th className="py-2.5 px-4 font-medium text-indigo-400">{l('Group A (With AI Guard)', 'Grup A (Dengan Filter AI)')}</th>
+                    <th className="py-2.5 px-4 font-medium text-amber-400">{l('Group B (Vetoed Ghost Setups)', 'Grup B (Posisi Bayangan Ditolak)')}</th>
+                    <th className="py-2.5 px-4 font-medium text-slate-300">{l('Hypothetical (No AI Filter)', 'Hipotetis (Tanpa Filter AI)')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
                   <tr>
-                    <td className="py-2.5 px-4 text-slate-400 font-sans">Total Eksekusi Selesai</td>
-                    <td className="py-2.5 px-4 font-bold text-indigo-300">{groupAWithAi.totalTrades} Trade</td>
-                    <td className="py-2.5 px-4 font-bold text-amber-300">{groupBCounterfactual.closedGhosts} Posisi Bayangan</td>
-                    <td className="py-2.5 px-4 font-bold text-slate-300">{combinedWithoutAi.totalTrades} Trade Gabungan</td>
+                    <td className="py-2.5 px-4 text-slate-400 font-sans">{l('Total Closed Executions', 'Total Eksekusi Selesai')}</td>
+                    <td className="py-2.5 px-4 font-bold text-indigo-300">{groupAWithAi.totalTrades} {l('Trades', 'Trade')}</td>
+                    <td className="py-2.5 px-4 font-bold text-amber-300">{groupBCounterfactual.closedGhosts} {l('Ghost Positions', 'Posisi Bayangan')}</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-300">{combinedWithoutAi.totalTrades} {l('Combined Trades', 'Trade Gabungan')}</td>
                   </tr>
                   <tr>
                     <td className="py-2.5 px-4 text-slate-400 font-sans">Win Rate (%)</td>
@@ -218,28 +229,28 @@ export const AbValidationSection: React.FC = () => {
                     <td className="py-2.5 px-4 text-slate-300">{combinedWithoutAi.winRatePercent.toFixed(1)}%</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 text-slate-400 font-sans">Menang / Kalah</td>
+                    <td className="py-2.5 px-4 text-slate-400 font-sans">{l('Wins / Losses', 'Menang / Kalah')}</td>
                     <td className="py-2.5 px-4 text-slate-300">{groupAWithAi.wins} Win / {groupAWithAi.losses} Loss</td>
                     <td className="py-2.5 px-4 text-slate-300">{groupBCounterfactual.counterfactualWins} Win / {groupBCounterfactual.closedGhosts - groupBCounterfactual.counterfactualWins} Loss</td>
                     <td className="py-2.5 px-4 text-slate-300">{combinedWithoutAi.wins} Win / {combinedWithoutAi.losses} Loss</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 text-slate-400 font-sans">Total Realized PnL (IDR)</td>
+                    <td className="py-2.5 px-4 text-slate-400 font-sans">Total Realized PnL</td>
                     <td className={`py-2.5 px-4 font-bold ${groupAWithAi.totalPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {groupAWithAi.totalPnlIdr >= 0 ? '+' : ''}Rp {Math.round(groupAWithAi.totalPnlIdr).toLocaleString('id-ID')}
+                      {groupAWithAi.totalPnlIdr >= 0 ? '+' : ''}{formatCurrency(Math.round(groupAWithAi.totalPnlIdr))}
                     </td>
                     <td className={`py-2.5 px-4 font-bold ${groupBCounterfactual.counterfactualPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {groupBCounterfactual.counterfactualPnlIdr >= 0 ? '+' : ''}Rp {Math.round(groupBCounterfactual.counterfactualPnlIdr).toLocaleString('id-ID')}
+                      {groupBCounterfactual.counterfactualPnlIdr >= 0 ? '+' : ''}{formatCurrency(Math.round(groupBCounterfactual.counterfactualPnlIdr))}
                     </td>
                     <td className={`py-2.5 px-4 font-bold ${combinedWithoutAi.totalPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {combinedWithoutAi.totalPnlIdr >= 0 ? '+' : ''}Rp {Math.round(combinedWithoutAi.totalPnlIdr).toLocaleString('id-ID')}
+                      {combinedWithoutAi.totalPnlIdr >= 0 ? '+' : ''}{formatCurrency(Math.round(combinedWithoutAi.totalPnlIdr))}
                     </td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 text-slate-400 font-sans">Efisiensi Proteksi (Rasio Kerugian Terhindar)</td>
+                    <td className="py-2.5 px-4 text-slate-400 font-sans">{l('Protection Efficiency (Dodged Loss Ratio)', 'Efisiensi Proteksi (Rasio Kerugian Terhindar)')}</td>
                     <td className="py-2.5 px-4 font-bold text-indigo-300">—</td>
                     <td className="py-2.5 px-4 font-bold text-emerald-400">
-                      {alpha.dodgedLossRatioPercent.toFixed(1)}% Kerugian Terhindar
+                      {alpha.dodgedLossRatioPercent.toFixed(1)}% {l('Loss Avoided', 'Kerugian Terhindar')}
                     </td>
                     <td className="py-2.5 px-4 text-slate-400">—</td>
                   </tr>
@@ -251,8 +262,11 @@ export const AbValidationSection: React.FC = () => {
           <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/30 text-xs text-slate-400 flex items-start gap-2.5">
             <Sparkles className="h-4 w-4 text-indigo-400 mt-0.5 shrink-0" />
             <p className="leading-relaxed font-sans">
-              <strong className="text-slate-200">Bagaimana sistem membuktikan efektivitas AI: </strong> 
-              Setiap kali sinyal pasar terdeteksi, AI Manajer Risiko memutuskan apakah akan masuk (Grup A) atau menolak (Grup B). Sinyal yang ditolak tidak menyentuh modal pengguna, namun dicatat sebagai <em>Posisi Bayangan (Simulasi)</em> dan disimulasikan menggunakan trailing stop identik dengan transaksi nyata. Jika sinyal yang ditolak berakhir rugi, ini tercatat sebagai <strong className="text-emerald-400">Kerugian Terhindar</strong> (modal terselamatkan).
+              <strong className="text-slate-200">{l('How the system benchmarks AI performance: ', 'Bagaimana sistem membuktikan efektivitas AI: ')}</strong> 
+              {l(
+                'Every time a market opportunity is detected, the AI Risk Manager decides whether to approve (Group A) or veto (Group B). Vetoed signals never debit user capital, but are recorded as Ghost Positions and simulated in real-time with trailing stops identical to live trades. If a vetoed setup closes at a loss, it is cataloged as a Loss Avoided (capital protected).',
+                'Setiap kali sinyal pasar terdeteksi, AI Manajer Risiko memutuskan apakah akan masuk (Grup A) atau menolak (Grup B). Sinyal yang ditolak tidak menyentuh modal pengguna, namun dicatat sebagai Posisi Bayangan (Simulasi) dan disimulasikan menggunakan trailing stop identik dengan transaksi nyata. Jika sinyal yang ditolak berakhir rugi, ini tercatat sebagai Kerugian Terhindar (modal terselamatkan).'
+              )}
             </p>
           </div>
         </div>
@@ -262,16 +276,19 @@ export const AbValidationSection: React.FC = () => {
       {activeTab === 'ghosts' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Posisi Shadow (Ghost) yang sedang berjalan di background:</span>
-            <span className="font-mono">{activeGhosts.length} koin aktif dipantau</span>
+            <span>{l('Active Shadow (Ghost) Positions running in background:', 'Posisi Shadow (Ghost) yang sedang berjalan di background:')}</span>
+            <span className="font-mono">{activeGhosts.length} {l('coins tracked', 'koin aktif dipantau')}</span>
           </div>
 
           {activeGhosts.length === 0 ? (
             <div className="rounded-lg border border-slate-800 bg-slate-900/20 p-8 text-center text-xs text-slate-400 space-y-2">
               <Ghost className="h-6 w-6 mx-auto text-slate-600" />
-              <p>Tidak ada Ghost Position yang sedang aktif saat ini.</p>
+              <p>{l('No Ghost Positions currently active.', 'Tidak ada Ghost Position yang sedang aktif saat ini.')}</p>
               <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-                Ketika AI Master Evaluator menolak sinyal entry dari koin kandidat, koin tersebut akan langsung muncul di sini dan trailing stop-nya disimulasikan secara real-time.
+                {l(
+                  'When the AI Evaluator vetoes a candidate coin setup, it immediately appears here and its simulated trailing stop is tracked in real-time.',
+                  'Ketika AI Master Evaluator menolak sinyal entry dari koin kandidat, koin tersebut akan langsung muncul di sini dan trailing stop-nya disimulasikan secara real-time.'
+                )}
               </p>
             </div>
           ) : (
@@ -279,12 +296,12 @@ export const AbValidationSection: React.FC = () => {
               <table className="w-full text-left text-xs font-mono">
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400">
-                    <th className="py-2.5 px-4 font-medium">Koin</th>
-                    <th className="py-2.5 px-4 font-medium">Harga Masuk</th>
-                    <th className="py-2.5 px-4 font-medium">Harga Live</th>
+                    <th className="py-2.5 px-4 font-medium">{l('Coin', 'Koin')}</th>
+                    <th className="py-2.5 px-4 font-medium">{l('Entry Price', 'Harga Masuk')}</th>
+                    <th className="py-2.5 px-4 font-medium">{l('Live Price', 'Harga Live')}</th>
                     <th className="py-2.5 px-4 font-medium">Trailing Stop</th>
                     <th className="py-2.5 px-4 font-medium">Simulated PnL</th>
-                    <th className="py-2.5 px-4 font-medium">Waktu Dibuka</th>
+                    <th className="py-2.5 px-4 font-medium">{l('Opened At', 'Waktu Dibuka')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
@@ -297,19 +314,19 @@ export const AbValidationSection: React.FC = () => {
                           {g.symbol.toUpperCase()}
                         </td>
                         <td className="py-2.5 px-4 text-slate-300">
-                          Rp {Math.round(g.entry_price).toLocaleString('id-ID')}
+                          {formatCurrency(Math.round(g.entry_price))}
                         </td>
                         <td className="py-2.5 px-4 text-slate-200 font-semibold">
-                          Rp {Math.round(g.current_price).toLocaleString('id-ID')}
+                          {formatCurrency(Math.round(g.current_price))}
                         </td>
                         <td className="py-2.5 px-4 text-rose-300 font-mono">
-                          Rp {Math.round(g.trailing_stop_price).toLocaleString('id-ID')}
+                          {formatCurrency(Math.round(g.trailing_stop_price))}
                         </td>
                         <td className={`py-2.5 px-4 font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isProfit ? '+' : ''}{(g.pnl_percent || 0).toFixed(2)}% (Rp {Math.round(g.pnl_idr || 0).toLocaleString('id-ID')})
+                          {isProfit ? '+' : ''}{(g.pnl_percent || 0).toFixed(2)}% ({formatCurrency(Math.round(g.pnl_idr || 0))})
                         </td>
                         <td className="py-2.5 px-4 text-slate-400 font-sans">
-                          {new Date(g.opened_at).toLocaleTimeString('id-ID')}
+                          {new Date(g.opened_at).toLocaleTimeString(language === 'id' ? 'id-ID' : 'en-US')}
                         </td>
                       </tr>
                     );
@@ -325,13 +342,13 @@ export const AbValidationSection: React.FC = () => {
       {activeTab === 'evaluations' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>15 Keputusan Evaluasi Terakhir oleh AI Master Evaluator:</span>
-            <span className="font-mono">Real-Time Audit</span>
+            <span>{l('Recent Evaluation Decisions by AI Evaluator:', '15 Keputusan Evaluasi Terakhir oleh AI Master Evaluator:')}</span>
+            <span className="font-mono">{l('Real-Time Audit', 'Real-Time Audit')}</span>
           </div>
 
           {recentEvaluations.length === 0 ? (
             <div className="rounded-lg border border-slate-800 bg-slate-900/20 p-8 text-center text-xs text-slate-400">
-              Belum ada evaluasi sinyal yang tercatat. Sinyal akan muncul saat bot memindai pasar.
+              {l('No signal evaluations recorded yet. Evaluations will appear as the bot scans the market.', 'Belum ada evaluasi sinyal yang tercatat. Sinyal akan muncul saat bot memindai pasar.')}
             </div>
           ) : (
             <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
@@ -353,7 +370,7 @@ export const AbValidationSection: React.FC = () => {
                         </span>
                         <span className="font-bold text-slate-100">{ev.symbol.toUpperCase()}</span>
                         <span className="text-slate-400 text-[11px]">
-                          @ Rp {Math.round(ev.candidate_price).toLocaleString('id-ID')}
+                          @ {formatCurrency(Math.round(ev.candidate_price))}
                         </span>
                       </div>
 
@@ -375,18 +392,18 @@ export const AbValidationSection: React.FC = () => {
 
                         <span className="text-[10px] text-slate-400 flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {new Date(ev.timestamp).toLocaleTimeString('id-ID')}
+                          {new Date(ev.timestamp).toLocaleTimeString(language === 'id' ? 'id-ID' : 'en-US')}
                         </span>
                       </div>
                     </div>
 
                     <div className="text-[11px] text-slate-300 space-y-1 font-sans">
                       <div>
-                        <span className="text-slate-400 font-medium">Setup Sinyal: </span>
+                        <span className="text-slate-400 font-medium">{l('Signal Setup: ', 'Setup Sinyal: ')}</span>
                         <span>{ev.technical_reason}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 font-medium">Pertimbangan AI: </span>
+                        <span className="text-slate-400 font-medium">{l('AI Reasoning: ', 'Pertimbangan AI: ')}</span>
                         <span className="italic text-slate-300 font-mono text-[10px]">"{ev.ai_reasoning}"</span>
                       </div>
                     </div>

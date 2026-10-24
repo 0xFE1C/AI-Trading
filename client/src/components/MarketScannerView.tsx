@@ -11,8 +11,10 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { MarketTicker, NewCoinAlert } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const MarketScannerView: React.FC = () => {
+  const { l, formatCurrency, formatNumber } = useLanguage();
   const [gainers, setGainers] = useState<MarketTicker[]>([]);
   const [newCoins, setNewCoins] = useState<NewCoinAlert[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,9 +54,14 @@ export const MarketScannerView: React.FC = () => {
             <Radio className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-100">Market Scanner & Radar Listing Koin Baru</h2>
+            <h2 className="text-base font-bold text-slate-100">
+              {l('Market Scanner & New Coin Listing Radar', 'Market Scanner & Radar Listing Koin Baru')}
+            </h2>
             <p className="text-xs text-slate-400">
-              Memindai seluruh pair Indodax secara real-time untuk mendeteksi koin baru, memecoin, dan lonjakan volume.
+              {l(
+                'Scanning all Indodax pairs in real-time to detect new listings, memecoins, and volume surges.',
+                'Memindai seluruh pair Indodax secara real-time untuk mendeteksi koin baru, memecoin, dan lonjakan volume.'
+              )}
             </p>
           </div>
         </div>
@@ -64,7 +71,7 @@ export const MarketScannerView: React.FC = () => {
             <Search className="h-4 w-4 text-slate-500 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Cari koin (BTC, SOL, PEPE)..."
+              placeholder={l('Search coin (BTC, SOL, PEPE)...', 'Cari koin (BTC, SOL, PEPE)...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/90 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
@@ -76,7 +83,7 @@ export const MarketScannerView: React.FC = () => {
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-xs text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Scan Sekarang</span>
+            <span>{l('Scan Now', 'Scan Sekarang')}</span>
           </button>
         </div>
       </div>
@@ -87,19 +94,22 @@ export const MarketScannerView: React.FC = () => {
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-amber-400" />
             <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">
-              Early Pump Radar: Koin Baru Masuk Indodax
+              {l('Early Pump Radar: New Indodax Coin Listings', 'Early Pump Radar: Koin Baru Masuk Indodax')}
             </h3>
           </div>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-900/40 border border-blue-500/30 text-blue-300">
-            Auto-Detect New Pairs
+            {l('Auto-Detect New Pairs', 'Auto-Detect New Pairs')}
           </span>
         </div>
 
         {newCoins.length === 0 ? (
           <div className="py-6 text-center text-slate-400 text-xs">
-            <p>Tidak ada koin baru yang sedang di-pump dalam jendela pengawasan 24 jam terakhir.</p>
+            <p>{l('No new coin pump alerts within the last 24-hour observation window.', 'Tidak ada koin baru yang sedang di-pump dalam jendela pengawasan 24 jam terakhir.')}</p>
             <p className="text-[11px] text-slate-500 mt-1">
-              Saat Indodax menambahkan koin baru, bot akan langsung mendeteksinya di sini dan menganalisa likuiditas awal.
+              {l(
+                'When Indodax adds a new token, the bot detects it immediately and analyzes initial liquidity.',
+                'Saat Indodax menambahkan koin baru, bot akan langsung mendeteksinya di sini dan menganalisa likuiditas awal.'
+              )}
             </p>
           </div>
         ) : (
@@ -119,7 +129,7 @@ export const MarketScannerView: React.FC = () => {
                 </div>
                 <div className="text-xs text-slate-300">{coin.name}</div>
                 <div className="flex items-center justify-between text-xs font-mono pt-1 border-t border-slate-800 text-slate-400">
-                  <span>Harga Awal: Rp {coin.initial_price.toLocaleString('id-ID')}</span>
+                  <span>{l('Initial Price: ', 'Harga Awal: ')}{formatCurrency(coin.initial_price)}</span>
                   <span className="text-emerald-400 flex items-center gap-0.5">
                     <ArrowUpRight className="h-3 w-3" />
                     +{coin.surge_percent.toFixed(1)}%
@@ -137,11 +147,11 @@ export const MarketScannerView: React.FC = () => {
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-400" />
             <h3 className="text-sm font-semibold text-slate-200">
-              Top Momentum Gainers & Altcoins (Indodax IDR Pairs)
+              {l('Top Momentum Gainers & Altcoins (Indodax IDR Pairs)', 'Top Momentum Gainers & Altcoins (Indodax IDR Pairs)')}
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            Total {filteredGainers.length} Pairs Terpantau
+            {l('Total', 'Total')} {filteredGainers.length} {l('Pairs Monitored', 'Pairs Terpantau')}
           </span>
         </div>
 
@@ -151,12 +161,12 @@ export const MarketScannerView: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-800/60 bg-slate-900/60 text-slate-400 font-mono text-[11px] uppercase">
                 <th className="py-3 px-4">#</th>
-                <th className="py-3 px-4">Pair</th>
-                <th className="py-3 px-4">Harga Terakhir</th>
-                <th className="py-3 px-4">Perubahan 24h</th>
-                <th className="py-3 px-4">Volume 24h (IDR)</th>
-                <th className="py-3 px-4">Range 24h (Low - High)</th>
-                <th className="py-3 px-4">Indodax Link</th>
+                <th className="py-3 px-4">{l('Pair', 'Pair')}</th>
+                <th className="py-3 px-4">{l('Last Price', 'Harga Terakhir')}</th>
+                <th className="py-3 px-4">{l('24h Change', 'Perubahan 24h')}</th>
+                <th className="py-3 px-4">{l('24h Volume', 'Volume 24h (IDR)')}</th>
+                <th className="py-3 px-4">{l('24h Range (Low - High)', 'Range 24h (Low - High)')}</th>
+                <th className="py-3 px-4">{l('Indodax Link', 'Indodax Link')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40 font-mono">
@@ -169,16 +179,16 @@ export const MarketScannerView: React.FC = () => {
                       {g.pair}
                     </td>
                     <td className="py-3 px-4 text-slate-100 font-semibold">
-                      Rp {g.last.toLocaleString('id-ID')}
+                      {formatCurrency(g.last)}
                     </td>
                     <td className={`py-3 px-4 font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {isPositive ? '+' : ''}{g.gain24h.toFixed(2)}%
                     </td>
                     <td className="py-3 px-4 text-slate-300">
-                      Rp {(g.volIdr / 1e6).toFixed(1)} Jt
+                      {formatCurrency(g.volIdr)}
                     </td>
                     <td className="py-3 px-4 text-slate-400 text-[11px]">
-                      {g.low.toLocaleString('id-ID')} - {g.high.toLocaleString('id-ID')}
+                      {formatNumber(g.low)} - {formatNumber(g.high)}
                     </td>
                     <td className="py-3 px-4">
                       <a
@@ -187,7 +197,7 @@ export const MarketScannerView: React.FC = () => {
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 font-sans"
                       >
-                        Buka Market
+                        {l('Open Market', 'Buka Market')}
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     </td>
@@ -222,17 +232,17 @@ export const MarketScannerView: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/80">
                   <div>
-                    <span className="text-[10px] text-slate-500 block uppercase">Harga Terakhir</span>
-                    <span className="text-slate-100 font-semibold">Rp {g.last.toLocaleString('id-ID')}</span>
+                    <span className="text-[10px] text-slate-500 block uppercase">{l('Last Price', 'Harga Terakhir')}</span>
+                    <span className="text-slate-100 font-semibold">{formatCurrency(g.last)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 block uppercase">Volume 24h</span>
-                    <span className="text-slate-300">Rp {(g.volIdr / 1e6).toFixed(1)} Jt</span>
+                    <span className="text-[10px] text-slate-500 block uppercase">{l('24h Volume', 'Volume 24h')}</span>
+                    <span className="text-slate-300">{formatCurrency(g.volIdr)}</span>
                   </div>
                   <div className="col-span-2 pt-1 border-t border-slate-800/50">
-                    <span className="text-[10px] text-slate-500 block uppercase">Range 24h (Low - High)</span>
+                    <span className="text-[10px] text-slate-500 block uppercase">{l('24h Range (Low - High)', 'Range 24h (Low - High)')}</span>
                     <span className="text-slate-400 text-[11px]">
-                      Rp {g.low.toLocaleString('id-ID')} - {g.high.toLocaleString('id-ID')}
+                      {formatNumber(g.low)} - {formatNumber(g.high)}
                     </span>
                   </div>
                 </div>
@@ -244,7 +254,7 @@ export const MarketScannerView: React.FC = () => {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 py-1 px-2.5 rounded bg-blue-950/30 border border-blue-500/20 font-sans"
                   >
-                    <span>Buka di Indodax</span>
+                    <span>{l('Open on Indodax', 'Buka di Indodax')}</span>
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
