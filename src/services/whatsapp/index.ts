@@ -547,6 +547,8 @@ Contoh:
           targetProfile = 'conservative';
         } else if (profileInput.includes('agresif') || profileInput.includes('aggressive')) {
           targetProfile = 'aggressive';
+        } else if (profileInput.includes('seimbang') || profileInput.includes('balanced')) {
+          targetProfile = 'balanced';
         } else {
           targetProfile = (getSetting('risk_profile', 'balanced') as any) || 'balanced';
         }

@@ -67,8 +67,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [activeModelName, setActiveModelName] = useState<string>('');
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(() => {
     const saved = localStorage.getItem('ai_trading_guide_open');
-    return saved !== null ? saved === 'true' : true;
+    if (saved !== null) return saved === 'true';
+    return displayMode === 'simple';
   });
+  const [showHowItWorks, setShowHowItWorks] = useState<boolean>(false);
   const [showChartInSimple, setShowChartInSimple] = useState<boolean>(false);
   const [showAbInSimple, setShowAbInSimple] = useState<boolean>(false);
   const [showDiagnosticsInSimple, setShowDiagnosticsInSimple] = useState<boolean>(true);
@@ -165,46 +167,245 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const isAiConfigured = hasProvider && hasModels && Boolean(settings.master_model);
   const isWaConnected = status?.whatsapp?.connected ?? false;
 
+  const completedSetupCount = [
+    hasProvider,
+    isAiConfigured,
+    isWaConnected,
+    Boolean(settings.risk_profile),
+  ].filter(Boolean).length;
+
   return (
-    <div className="space-y-6">
-      {/* 1. Quick-Start Onboarding Wizard & Stepper */}
-      <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#090e1a] p-5 shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/70">
+    <div className="space-y-5 sm:space-y-6">
+      {/* 1. Executive Telemetry & Financial KPI Cards (Priority Top Row) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Balance & Capital */}
+        <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
+          <div>
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {status?.mode === 'paper'
+                  ? l('Virtual Balance (Paper)', 'Saldo Virtual (Paper)')
+                  : l('Real Indodax Balance', 'Saldo Riil Indodax')}
+              </span>
+              <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                <DollarSign className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-100 tracking-tight">
+              {formatCurrency(balance)}
+            </div>
+            <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${status?.mode === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
+              <span>{l('Mode: ', 'Mode: ')}<strong className="text-slate-200 uppercase">{status?.mode} Trading</strong></span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/60">
+            {status?.mode === 'paper' ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-300 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                <span className="truncate">{l('Simulation Mode: 100% Risk-Free Virtual Capital', 'Mode Simulasi: Saldo Virtual (Bebas Risiko)')}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-500/30 text-[10px] text-amber-300 font-medium">
+                <Shield className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                <span className="truncate">{l('Live Mode: Real Funds & Stop Loss Active', 'Live Riil: Pengaman Stop Loss Aktif')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Card 2: Floating Profit / Loss */}
+        <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
+          <div>
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {l('Floating Profit / Loss', 'Keuntungan / Rugi Berjalan')}
+              </span>
+              <div className={`p-1.5 rounded-lg border ${
+                totalFloatingPnl >= 0
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+              }`}>
+                {totalFloatingPnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              </div>
+            </div>
+            <div className={`text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${
+              totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+            }`}>
+              {totalFloatingPnl >= 0 ? '+' : ''}{formatCurrency(Math.round(totalFloatingPnl))}
+            </div>
+            <div className={`mt-2 text-xs font-mono font-medium flex items-center gap-1.5 ${
+              totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+            }`}>
+              {totalFloatingPnl >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+              <span>
+                {totalFloatingPnlPercent >= 0 ? '+' : ''}{totalFloatingPnlPercent.toFixed(2)}% {l('across', 'dari')} {openPositions.length} {l('coins', 'koin')}
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span>{l('Active Positions: ', 'Posisi Aktif: ')}<strong className="text-slate-200">{openPositions.length}</strong></span>
+            <span>•</span>
+            <span>{l('Completed: ', 'Selesai: ')}<strong className="text-slate-200">{recentTrades.length}</strong></span>
+          </div>
+        </div>
+
+        {/* Card 3: AI Market Condition Index */}
+        <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
+          <div>
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {l('AI Market Condition Index', 'Kondisi Pasar Menurut AI')}
+              </span>
+              <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                <Layers className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-100 tracking-tight">
+                {sentiment > 0 ? `+${sentiment}` : sentiment}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                sentiment >= 0.2
+                  ? 'border-emerald-500/30 bg-emerald-950/50 text-emerald-300'
+                  : sentiment <= -0.2
+                  ? 'border-rose-500/30 bg-rose-950/50 text-rose-300'
+                  : 'border-slate-700 bg-slate-800 text-slate-300'
+              }`}>
+                {sentiment >= 0.2
+                  ? l('BULLISH', 'BULLISH (NAIK)')
+                  : sentiment <= -0.2
+                  ? l('BEARISH', 'BEARISH (TURUN)')
+                  : l('NEUTRAL', 'NETRAL')}
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="truncate">{l('10 Subagents & Signals Radar', '10 Subagent & Radar Sinyal')}</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>{l('Risk Profile: ', 'Profil Risiko: ')}</span>
+            <span className="font-semibold text-slate-200 uppercase font-mono">{currentProfileKey}</span>
+          </div>
+        </div>
+
+        {/* Card 4: Engine Status & Bot Alerts */}
+        <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
+          <div>
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {l('Trading Engine & Alerts', 'Status Mesin & Notifikasi')}
+              </span>
+              <div className={`p-1.5 rounded-lg border ${
+                isAuto
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+              }`}>
+                {isAuto ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4" />}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${isAuto ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+              <span className="text-lg font-bold text-slate-100 font-mono">
+                {isAuto
+                  ? l('ACTIVE (RUNNING)', 'AKTIF (MEMANTAU)')
+                  : l('PAUSED (STANDBY)', 'DIJEDA (SIAGA)')}
+              </span>
+            </div>
+            <div className="mt-1.5 text-xs text-slate-400 truncate">
+              {isAuto
+                ? l('Actively scanning Indodax pairs', 'Memindai koin Indodax real-time')
+                : l('Market monitored, orders held', 'Sinyal dipantau, order ditahan')}
+            </div>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isWaConnected ? l('WA Online', 'WA Aktif') : l('WA Standby', 'WA Siaga')}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleTrading}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                isAuto
+                  ? 'bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-500/30'
+                  : 'bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              {isAuto ? l('Pause', 'Jeda') : l('Start', 'Mulai')}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Unified, Collapsible Quick Start Guide & Checklist */}
+      <div className="rounded-2xl border border-slate-800/90 bg-gradient-to-b from-[#0c1426] via-[#090f1d] to-[#070b14] shadow-md overflow-hidden transition-all">
+        {/* Guide Header Bar */}
+        <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60 bg-slate-900/30">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-inner">
-              <Sparkles className="h-5 w-5 text-blue-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0">
+              <Sparkles className="h-4.5 w-4.5 text-blue-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-100 tracking-tight">
-                  {l('Quick Start Wizard', 'Panduan Memulai Cepat (Quick Start Wizard)')}
+                <h2 className="text-sm font-bold text-slate-100 tracking-tight">
+                  {l('Quick Start Setup Guide', 'Panduan Memulai Cepat (Quick Start)')}
                 </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-950/40 text-blue-300 font-semibold font-mono">
-                  {l('Steps 1 - 2 - 3', 'Langkah 1 - 2 - 3')}
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-950/50 text-blue-300 font-semibold font-mono">
+                  {completedSetupCount}/4 {l('Configured', 'Terkonfigurasi')}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-[11px] text-slate-400 mt-0.5">
                 {l(
-                  'Follow these simple steps to configure and run your automated trading bot.',
-                  'Ikuti langkah mudah ini untuk mengonfigurasi dan menjalankan bot trading otomatis Anda.'
+                  'Essential orientation to configure AI connection, models, alerts, and risk management.',
+                  'Orientasi penting untuk menghubungkan AI, memilih model, notifikasi, dan profil risiko.'
                 )}
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleGuide}
-            className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-300 transition-colors"
-          >
-            <span>{isGuideOpen ? l('Hide Guide', 'Sembunyikan Panduan') : l('Show Guide Steps', 'Buka Panduan Langkah')}</span>
-            {isGuideOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setShowHowItWorks(!showHowItWorks)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700/70 bg-slate-800/50 hover:bg-slate-800 text-[11px] text-blue-300 hover:text-blue-200 transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+              <span>{l('How it Works', 'Cara Kerja')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={toggleGuide}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-200 transition-colors"
+            >
+              <span>{isGuideOpen ? l('Hide Guide', 'Sembunyikan Panduan') : l('Show Steps', 'Buka Langkah')}</span>
+              {isGuideOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
         </div>
 
-        {/* Stepper Content */}
+        {/* Expandable "How Does the Bot Work for You?" Section */}
+        {showHowItWorks && (
+          <div className="p-4 border-b border-slate-800/80 bg-blue-950/20 text-xs text-blue-200 flex items-start gap-3 animate-in fade-in duration-200">
+            <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-slate-100 block">
+                {l('How Does the Bot Work for You?', 'Bagaimana Bot Bekerja untuk Anda?')}
+              </span>
+              <p className="leading-relaxed text-blue-200/90 text-[11px]">
+                {l(
+                  'The bot automatically scans all pairs on Indodax every 15 seconds. When safe upward momentum is confirmed by the AI evaluator, the bot executes the buy and immediately sets dynamic trailing stop-loss protection to lock profits and safeguard your capital.',
+                  'Bot secara otomatis memindai seluruh koin di Indodax setiap 15 detik. Jika ada koin yang memiliki momentum kenaikan yang aman dan disetujui oleh evaluator AI, bot akan membelinya serta langsung memasang pengaman otomatis (stop-loss dinamis) agar keuntungan Anda terkunci dan modal Anda terlindungi dari kerugian.'
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Collapsible Stepper & Action Content */}
         {isGuideOpen && (
-          <div className="pt-4 space-y-4">
+          <div className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
             {/* 4 Interactive Step Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               {/* Step 1: AI Provider */}
@@ -421,10 +622,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
 
-            {/* Step 5: Big Call to Action Button */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-800 bg-slate-900/50">
+            {/* Checklist Strip inside Guide */}
+            <div className="pt-2 border-t border-slate-800/60">
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                  <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{l('Trader Readiness Checklist:', 'Checklist Kesiapan Trader:')}</span>
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  {Object.values(checklist).filter(Boolean).length} / 4 {l('Completed', 'Selesai')}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                {[
+                  { id: 'step1', label: l('1. Connect AI Model (Google/Claude)', '1. Hubungkan Model AI (Google/Claude)') },
+                  { id: 'step2', label: l('2. Set Safe Risk Profile (Conservative)', '2. Pasang Profil Risiko Aman (Konservatif)') },
+                  { id: 'step3', label: l('3. Test for 7+ days in Paper Mode', '3. Uji minimal 7 hari di Mode Paper') },
+                  { id: 'step4', label: l('4. Create periodic database backups', '4. Buat cadangan database berkala') },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleChecklistItem(item.id)}
+                    className={`p-2 rounded-lg border text-left flex items-center gap-2 transition-all ${
+                      checklist[item.id]
+                        ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300'
+                        : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    {checklist[item.id] ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                    )}
+                    <span className={`text-[11px] leading-snug truncate ${checklist[item.id] ? 'line-through text-slate-400' : ''}`}>
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Action Bar inside Guide */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/60">
               <div className="flex items-center gap-2.5">
-                <span className={`h-3 w-3 rounded-full shrink-0 ${isAuto ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
+                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${isAuto ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
                 <div>
                   <div className="text-xs font-bold text-slate-200">
                     {isAuto
@@ -442,7 +684,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={onToggleTrading}
-                className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition-all ${
+                className={`w-full sm:w-auto px-5 py-2 rounded-xl text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition-all ${
                   isAuto
                     ? 'border border-amber-500/40 bg-amber-600/20 text-amber-300 hover:bg-amber-600/30'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
@@ -463,204 +705,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
         )}
-      </div>
-
-      {/* Real-time Status Narrative */}
-      <div className="p-3.5 rounded-xl border border-slate-800 bg-[#090e1a] text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAuto ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isAuto ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-          </span>
-          <span>
-            <strong>{l('Engine Status: ', 'Kondisi Mesin: ')}</strong>
-            {isAuto
-              ? l(
-                  `Bot is actively monitoring Indodax pairs in real-time, managing risk via ${currentProfileKey.toUpperCase()} profile, and managing ${openPositions.length} open positions.`,
-                  `Bot sedang memantau koin Indodax secara real-time, menahan risiko dengan profil ${currentProfileKey.toUpperCase()}, dan mengelola ${openPositions.length} posisi terbuka.`
-                )
-              : l(
-                  'Bot is currently paused. Market signals are monitored, but new orders are held until you activate auto-trading.',
-                  'Bot sedang dalam posisi jeda (PAUSED). Sinyal pasar tetap dipantau, namun order baru ditahan sampai Anda menyalakan auto-trading.'
-                )}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 shrink-0">
-          <span>{l('Active Positions: ', 'Posisi Aktif: ')}<strong className="text-slate-200">{openPositions.length}</strong></span>
-          <span>•</span>
-          <span>{l('Completed: ', 'Selesai: ')}<strong className="text-slate-200">{recentTrades.length}</strong></span>
-        </div>
-      </div>
-
-      {/* Mode Pemula Explainer Card */}
-      {displayMode === 'simple' && (
-        <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-200">
-          <div className="flex items-start gap-2.5">
-            <HelpCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-slate-100 block mb-0.5">
-                {l('How Does the Bot Work for You?', 'Bagaimana Bot Bekerja untuk Anda?')}
-              </span>
-              {l(
-                'The bot automatically scans all pairs on Indodax every 15 seconds. When safe upward momentum is confirmed by the AI evaluator, the bot executes the buy and immediately sets dynamic trailing stop-loss protection to lock profits and safeguard your capital.',
-                'Bot secara otomatis memindai seluruh koin di Indodax setiap 15 detik. Jika ada koin yang memiliki momentum kenaikan yang aman dan disetujui oleh evaluator AI, bot akan membelinya serta langsung memasang pengaman otomatis (stop-loss dinamis) agar keuntungan Anda terkunci dan modal Anda terlindungi dari kerugian.'
-              )}
-            </div>
-          </div>
-          <span className="text-[10px] px-2 py-1 rounded bg-blue-900/50 text-blue-300 font-mono shrink-0 self-end sm:self-auto border border-blue-500/30">
-            {l('Beginner Mode Active', 'Mode Pemula Aktif')}
-          </span>
-        </div>
-      )}
-
-      {/* Persistent Onboarding Checklist */}
-      <div className="p-4 rounded-xl border border-slate-800 bg-[#080d17] space-y-2.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-slate-200 flex items-center gap-2">
-            <CheckSquare className="w-4 h-4 text-emerald-400" />
-            <span>{l('4-Step Beginner Trader Safety Checklist:', 'Checklist 4 Langkah Keselamatan Trader Pemula:')}</span>
-          </span>
-          <span className="text-[11px] font-mono text-slate-400">
-            {Object.values(checklist).filter(Boolean).length} / 4 {l('Completed', 'Selesai')}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-          {[
-            { id: 'step1', label: l('1. Connect AI Model (Google/Claude)', '1. Hubungkan Model AI (Google/Claude)') },
-            { id: 'step2', label: l('2. Set Safe Risk Profile (Conservative)', '2. Pasang Profil Risiko Aman (Konservatif)') },
-            { id: 'step3', label: l('3. Test for 7+ days in Paper Mode', '3. Uji minimal 7 hari di Mode Paper') },
-            { id: 'step4', label: l('4. Create periodic database backups', '4. Buat cadangan database berkala') },
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => toggleChecklistItem(item.id)}
-              className={`p-2.5 rounded-lg border text-left flex items-center gap-2 transition-all ${
-                checklist[item.id]
-                  ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-300'
-                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700'
-              }`}
-            >
-              {checklist[item.id] ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              ) : (
-                <Square className="w-4 h-4 text-slate-600 shrink-0" />
-              )}
-              <span className={`text-[11px] leading-snug ${checklist[item.id] ? 'line-through text-slate-400' : ''}`}>
-                {item.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Balance */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">
-                {status?.mode === 'paper'
-                  ? l('Virtual Balance (Paper)', 'Saldo Virtual (Paper)')
-                  : l('Real Indodax Balance', 'Saldo Riil Indodax')}
-              </span>
-              <DollarSign className="h-4 w-4 text-blue-400" />
-            </div>
-            <div className="text-2xl font-bold font-mono text-slate-100">
-              {formatCurrency(balance)}
-            </div>
-            <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${status?.mode === 'live' ? 'bg-emerald-400' : 'bg-blue-400'}`} />
-              {l('Mode: ', 'Mode: ')}<span className="font-semibold text-slate-300 uppercase">{status?.mode} Trading</span>
-            </div>
-          </div>
-          <div className="mt-2.5">
-            {status?.mode === 'paper' ? (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-300 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                <span>{l('Simulation Mode: Virtual Capital (Risk-Free)', 'Mode Simulasi: Saldo Virtual (100% Bebas Risiko Rugi)')}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-950/40 border border-amber-500/30 text-[10px] text-amber-300 font-medium">
-                <Shield className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                <span>{l('Live Mode: Active Stop Loss Protection', 'Live Riil: Pengaman Stop Loss Aktif')}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Card 2: Floating PnL */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium uppercase tracking-wider">
-              {l('Floating Profit / Loss', 'Keuntungan / Rugi Berjalan')}
-            </span>
-            {totalFloatingPnl >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-emerald-400" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-rose-400" />
-            )}
-          </div>
-          <div className={`text-2xl font-bold font-mono ${totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {totalFloatingPnl >= 0 ? '+' : ''}{formatCurrency(Math.round(totalFloatingPnl))}
-          </div>
-          <div className={`mt-2 text-xs font-mono font-medium flex items-center gap-1 ${totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {totalFloatingPnl >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            {totalFloatingPnlPercent >= 0 ? '+' : ''}{totalFloatingPnlPercent.toFixed(2)}% {l('across', 'dari')} {openPositions.length} {l('active coins', 'koin aktif')}
-          </div>
-        </div>
-
-        {/* Card 3: Multi-Agent Sentiment Index */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium uppercase tracking-wider">
-              {l('AI Market Condition Index', 'Kondisi Pasar Menurut AI')}
-            </span>
-            <Layers className="h-4 w-4 text-indigo-400" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-slate-100 flex items-center gap-2">
-            <span>{sentiment > 0 ? `+${sentiment}` : sentiment}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full border ${
-              sentiment >= 0.2
-                ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
-                : sentiment <= -0.2
-                ? 'border-rose-500/30 bg-rose-950/40 text-rose-400'
-                : 'border-slate-700 bg-slate-800 text-slate-300'
-            }`}>
-              {sentiment >= 0.2
-                ? l('BULLISH (UP)', 'BULLISH (NAIK)')
-                : sentiment <= -0.2
-                ? l('BEARISH (DOWN)', 'BEARISH (TURUN)')
-                : l('NEUTRAL', 'NETRAL')}
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-slate-400">
-            {l('Monitored by 10 Subagents (News & Exchange)', 'Dipantau 10 Subagent (Berita & Bursa)')}
-          </div>
-        </div>
-
-        {/* Card 4: WhatsApp Bot Link */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium uppercase tracking-wider">
-              {l('WhatsApp Bot Alert', 'WhatsApp Bot Alert')}
-            </span>
-            <Shield className="h-4 w-4 text-emerald-400" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${status?.whatsapp?.connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-            <span className="text-base font-bold text-slate-100">
-              {status?.whatsapp?.connected
-                ? l('Connected (Online)', 'Terhubung (Online)')
-                : l('Awaiting Pairing QR', 'Menunggu Pairing QR')}
-            </span>
-          </div>
-          <div className="mt-2 text-xs text-slate-400 truncate">
-            Admin: {status?.whatsapp?.adminNumber || l('Not set in Settings', 'Belum diisi di Settings')}
-          </div>
-        </div>
       </div>
 
       {/* Main Section: Posisi Koin Aktif */}
