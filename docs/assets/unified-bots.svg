@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 450" width="100%" height="100%">
+  <defs>
+    <linearGradient id="botHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+    <linearGradient id="waGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14532d" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+    <linearGradient id="tgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0c4a6e" />
+      <stop offset="100%" stop-color="#082f49" />
+    </linearGradient>
+    <filter id="botGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="450" rx="14" fill="#090d16" stroke="#1e293b" stroke-width="2" />
+
+  <!-- Title Header Banner -->
+  <g transform="translate(50, 30)">
+    <rect width="1000" height="46" rx="10" fill="url(#botHeader)" filter="url(#botGlow)" />
+    <text x="500" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">
+      🤖 PUSAT PENGATURAN BOTS TERPADU (WHATSAPP &amp; TELEGRAM)
+    </text>
+  </g>
+
+  <!-- Notification Channel Selector Bar -->
+  <g transform="translate(50, 92)">
+    <rect width="1000" height="60" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
+    <text x="24" y="35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#94a3b8">
+      SALURAN NOTIFIKASI:
+    </text>
+
+    <!-- Pill 1: Keduanya Sekaligus (Selected) -->
+    <g transform="translate(180, 12)">
+      <rect width="210" height="36" rx="8" fill="#10b981" />
+      <circle cx="18" cy="18" r="6" fill="#ffffff" />
+      <text x="32" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="800" fill="#ffffff">
+        🚀 Keduanya Sekaligus (Aktif)
+      </text>
+    </g>
+
+    <!-- Pill 2: Hanya WhatsApp -->
+    <g transform="translate(410, 12)">
+      <rect width="170" height="36" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <circle cx="18" cy="18" r="5" fill="none" stroke="#64748b" stroke-width="2" />
+      <text x="32" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">
+        🟢 Hanya WhatsApp
+      </text>
+    </g>
+
+    <!-- Pill 3: Hanya Telegram -->
+    <g transform="translate(600, 12)">
+      <rect width="170" height="36" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <circle cx="18" cy="18" r="5" fill="none" stroke="#64748b" stroke-width="2" />
+      <text x="32" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">
+        🔵 Hanya Telegram
+      </text>
+    </g>
+
+    <!-- Pill 4: Nonaktif -->
+    <g transform="translate(790, 12)">
+      <rect width="190" height="36" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <circle cx="18" cy="18" r="5" fill="none" stroke="#64748b" stroke-width="2" />
+      <text x="32" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">
+        🛑 Nonaktifkan Semua Bot
+      </text>
+    </g>
+  </g>
+
+  <!-- Two Main Columns: WhatsApp vs Telegram -->
+  <!-- Column 1: WhatsApp -->
+  <g transform="translate(50, 168)">
+    <rect width="485" height="200" rx="12" fill="#0f172a" stroke="#10b981" stroke-width="1.5" filter="url(#botGlow)" />
+    <rect x="0" y="0" width="485" height="34" rx="12" fill="#047857" />
+    <text x="18" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff">
+      🟢 WHATSAPP (Baileys Web Multi-Device)
+    </text>
+
+    <!-- WhatsApp Details -->
+    <text x="20" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="700">
+      • Status Koneksi: <tspan fill="#34d399">TERHUBUNG &amp; AUTO-RECONNECT</tspan>
+    </text>
+    <text x="20" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Pairing: Scan QR Code langsung di dashboard tanpa instalasi emulator
+    </text>
+    <text x="20" y="110" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Identitas HP: Mendukung nomor MSISDN standar &amp; WhatsApp LID
+    </text>
+    <text x="20" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Keamanan: Pemisahan perintah aman publik vs perintah kritis admin
+    </text>
+    <text x="20" y="158" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Remote Pairing: Pendaftaran admin baru via chat <tspan fill="#38bdf8" font-family="monospace">/admin &lt;token&gt;</tspan>
+    </text>
+
+    <rect x="18" y="172" width="449" height="20" rx="4" fill="#14532d" />
+    <text x="242" y="186" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#86efac" font-weight="600" text-anchor="middle">
+      ✓ Notifikasi Transaksi Beli/Jual &amp; Peringatan Darurat Aktif Real-Time
+    </text>
+  </g>
+
+  <!-- Column 2: Telegram -->
+  <g transform="translate(565, 168)">
+    <rect width="485" height="200" rx="12" fill="#0f172a" stroke="#0284c7" stroke-width="1.5" filter="url(#botGlow)" />
+    <rect x="0" y="0" width="485" height="34" rx="12" fill="#0369a1" />
+    <text x="18" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff">
+      🔵 TELEGRAM (Official Bot API)
+    </text>
+
+    <!-- Telegram Details -->
+    <text x="20" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="700">
+      • Status Integrasi: <tspan fill="#38bdf8">RESMI (Official Bot API via polling)</tspan>
+    </text>
+    <text x="20" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Token Keamanan: Password masked dengan toggle mata lihat/sembunyi
+    </text>
+    <text x="20" y="110" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Setup Mudah: Buat bot di <tspan fill="#38bdf8">@BotFather</tspan> &amp; cek Chat ID di <tspan fill="#38bdf8">@userinfobot</tspan>
+    </text>
+    <text x="20" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Verifikasi Instan: Tombol <tspan fill="#38bdf8">"Kirim Pesan Tes Telegram"</tspan> di dashboard
+    </text>
+    <text x="20" y="158" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      • Interactive Keyboard: Tombol interaktif untuk eksekusi perintah cepat
+    </text>
+
+    <rect x="18" y="172" width="449" height="20" rx="4" fill="#0c4a6e" />
+    <text x="242" y="186" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#7dd3fc" font-weight="600" text-anchor="middle">
+      ✓ Alert Stop Loss Ratchet &amp; Sinyal AI Terkirim Tanpa Perlu Scan QR Ulang
+    </text>
+  </g>
+
+  <!-- Remote Commands Row (Bottom Pills) -->
+  <g transform="translate(50, 385)">
+    <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#64748b">
+      PERINTAH POPULER:
+    </text>
+    <!-- Command Pills -->
+    <g transform="translate(130, 8)">
+      <rect width="70" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="35" y="16" font-family="monospace" font-size="10" fill="#38bdf8" text-anchor="middle">/status</text>
+    </g>
+    <g transform="translate(208, 8)">
+      <rect width="66" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="33" y="16" font-family="monospace" font-size="10" fill="#38bdf8" text-anchor="middle">/profit</text>
+    </g>
+    <g transform="translate(282, 8)">
+      <rect width="180" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="90" y="16" font-family="monospace" font-size="10" fill="#34d399" text-anchor="middle">/modal &lt;nominal&gt; [profil]</text>
+    </g>
+    <g transform="translate(470, 8)">
+      <rect width="60" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="30" y="16" font-family="monospace" font-size="10" fill="#38bdf8" text-anchor="middle">/koin</text>
+    </g>
+    <g transform="translate(538, 8)">
+      <rect width="60" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="30" y="16" font-family="monospace" font-size="10" fill="#22c55e" text-anchor="middle">/start</text>
+    </g>
+    <g transform="translate(606, 8)">
+      <rect width="60" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="30" y="16" font-family="monospace" font-size="10" fill="#f59e0b" text-anchor="middle">/stop</text>
+    </g>
+    <g transform="translate(674, 8)">
+      <rect width="66" height="24" rx="5" fill="#1e293b" stroke="#ef4444" stroke-width="1" />
+      <text x="33" y="16" font-family="monospace" font-size="10" fill="#f87171" font-weight="700" text-anchor="middle">/panic</text>
+    </g>
+    <g transform="translate(748, 8)">
+      <rect width="75" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="37" y="16" font-family="monospace" font-size="10" fill="#c084fc" text-anchor="middle">/balance</text>
+    </g>
+    <g transform="translate(831, 8)">
+      <rect width="60" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <text x="30" y="16" font-family="monospace" font-size="10" fill="#94a3b8" text-anchor="middle">/help</text>
+    </g>
+  </g>
+</svg>

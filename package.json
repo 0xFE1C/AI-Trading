@@ -1,0 +1,39 @@
+{
+  "name": "ai-trading",
+  "version": "1.0.0",
+  "description": "Autonomous AI Crypto Trading Platform for Indodax",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "server": "tsx src/server.ts",
+    "client": "npm --prefix client run dev",
+    "dev": "tsx src/server.ts",
+    "test": "tsx --test tests/**/*.test.ts",
+    "build": "tsc && npm --prefix client run build",
+    "optimize": "tsx scripts/optimize_strategy.ts",
+    "db:reset": "tsx scripts/init_fresh_db.ts"
+  },
+  "dependencies": {
+    "@ngrok/ngrok": "^1.7.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc.14",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "untun": "^0.2.2",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

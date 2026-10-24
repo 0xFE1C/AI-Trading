@@ -1,0 +1,525 @@
+import express from 'express';
+import http from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { db, initDatabase, getSetting } from './db/index.js';
+import { apiRouter } from './api/routes.js';
+import { indodax } from './services/indodax/index.js';
+import { aiClient } from './services/ai/index.js';
+import { agentSwarm } from './services/agents/index.js';
+import { tradingEngine } from './services/trading/index.js';
+import { whatsappService } from './services/whatsapp/index.js';
+import { telegramService } from './services/telegram/index.js';
+import { backupService } from './services/backup/index.js';
+import { tunnelService } from './services/tunnel/index.js';
+import { indodaxMarketStream } from './services/indodax/marketStream.js';
+import { adminTokenService, secureCompareTokens } from './services/auth/tokenRotation.js';
+
+import dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
+
+dotenv.config();
+
+// 1. Initialize SQLite Database
+initDatabase();
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+// CORS Hardening: allow local access and configured tunnels
+export function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    const host = parsed.hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    const isTunnel =
+      host.endsWith('.trycloudflare.com') ||
+      host.endsWith('.ngrok-free.app') ||
+      host.endsWith('.ngrok.app') ||
+      host.endsWith('.ngrok.io');
+
+    return isLocal || isTunnel;
+  } catch {
+    return false;
+  }
+}
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Akses ditolak oleh CORS'));
+    },
+    credentials: true,
+  })
+);
+
+// Standard HTTP Security Headers (H.1 #10)
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+app.use(express.json());
+
+// Extended WebSocket interface for heartbeat tracking
+interface ExtWebSocket extends WebSocket {
+  isAlive?: boolean;
+}
+
+// Track authenticated WebSocket connections
+const authenticatedSockets = new WeakSet<WebSocket>();
+
+// Broadcast helper to all connected WebSocket clients (Admin and View-Only observers)
+function broadcast(type: string, data: any) {
+  const message = JSON.stringify({ type, data, timestamp: Date.now() });
+
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(message);
+      } catch {}
+    }
+  }
+}
+
+// Admin-only broadcast helper (never sends admin data to unauthenticated observer sockets)
+function broadcastAdmin(type: string, data: any) {
+  const message = JSON.stringify({ type, data, timestamp: Date.now() });
+
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN && authenticatedSockets.has(client)) {
+      try {
+        client.send(message);
+      } catch {}
+    }
+  }
+}
+
+// 2. Attach Cross-Service Integration Callbacks
+
+// AI Key Failover Emergency: notify WhatsApp, Telegram & broadcast alert with graceful degradation
+aiClient.setEmergencyCallback(async (providerName, errorSummary) => {
+  broadcast('EMERGENCY_AI_FAILURE', { providerName, errorSummary });
+  const currentAiMode = getSetting('ai_mode', 'confirm');
+  let msg = '';
+  if (currentAiMode === 'confirm') {
+    msg = `⚠️ *[PERINGATAN - AI PROVIDER OFFLINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau error!\n\n${errorSummary}\n\n🛡️ *Mode Otomatis Aktif*: Sistem beralih sementara ke Engine Deterministik (Tanpa AI). Pemindaian pasar & trading tetap berjalan normal dan aman berbasis indikator & risk guard.`;
+  } else {
+    msg = `🚨 *[EMERGENCY - AI ENGINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau gagal!\n\n${errorSummary}\n\nAuto-trading di-pause demi keamanan modal. Perbarui API Key di Web Settings.`;
+  }
+  await whatsappService.sendAlert(msg);
+  await telegramService.sendAlert(msg);
+});
+
+// New Coin Listing detected on Indodax: notify WhatsApp, Telegram & broadcast
+indodax.setNewCoinCallback(async (coin) => {
+  broadcast('NEW_COIN_ALERT', coin);
+  const msg = `⚡ *[NEW COIN LISTING INDODAX]*\nKoin baru terdeteksi: *${coin.name} (${coin.symbol.toUpperCase()})*\nHarga Awal: Rp ${coin.price.toLocaleString('id-ID')}\nAI Subagents sedang memantau momentum pump awal!`;
+  await whatsappService.sendAlert(msg);
+  await telegramService.sendAlert(msg);
+});
+
+// Trade executed (BUY or SELL): notify WhatsApp, Telegram & broadcast
+tradingEngine.setTradeCallback(async (event) => {
+  broadcast('TRADE_EVENT', event);
+  if (event.type === 'BUY') {
+    const msg = `🟢 *[BUY ORDER EXECUTED]*\nPair: *${event.data.symbol.toUpperCase()}*\nHarga: Rp ${event.data.price.toLocaleString('id-ID')}\nTotal: Rp ${event.data.totalIdr.toLocaleString('id-ID')} (${event.data.mode.toUpperCase()})\nAlasan: ${event.data.reason}`;
+    await whatsappService.sendAlert(msg);
+    await telegramService.sendAlert(msg);
+  } else if (event.type === 'SELL') {
+    const msg = `🔴 *[SELL / EXIT EXECUTED]*\nPair: *${event.data.symbol.toUpperCase()}*\nHarga Jual: Rp ${event.data.price.toLocaleString('id-ID')}\nTotal: Rp ${event.data.totalIdr.toLocaleString('id-ID')} (${event.data.mode.toUpperCase()})\nAlasan: ${event.data.reason}`;
+    await whatsappService.sendAlert(msg);
+    await telegramService.sendAlert(msg);
+  } else if (event.type === 'ALERT') {
+    const msg = `⚠️ *[${event.data.title}]*\n${event.data.message}`;
+    await whatsappService.sendAlert(msg);
+    await telegramService.sendAlert(msg);
+  }
+});
+
+// Wire Telegram 2-Way Remote Bot panic action and start polling
+telegramService.setPanicHandler(async () => {
+  const soldCount = await tradingEngine.panicSellAll();
+  return { success: true, message: `${soldCount} posisi berhasil dilikuidasi darurat ke IDR.` };
+});
+if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes('test'))) {
+  telegramService.startPolling();
+}
+
+// Subagent produce log: broadcast live to UI
+agentSwarm.setLogCallback((log) => {
+  broadcast('SUBAGENT_LOG', log);
+});
+
+// Admin Token Rotation: broadcast live to UI (NEVER broadcast raw token string to public sockets!)
+adminTokenService.onRotate((newToken, reason) => {
+  broadcast('ADMIN_TOKEN_ROTATED', { rotated: true, reason, timestamp: Date.now() });
+});
+
+// Real-time price ticks from Indodax WebSocket & Sub-second Trailing Stop Engine
+indodaxMarketStream.setTickCallback((tick) => {
+  broadcast('PRICE_TICK', tick);
+  tradingEngine.handleRealtimeTick(tick);
+});
+
+// WhatsApp Baileys status & QR updates: broadcast live to UI & failover alert to Telegram
+let wasWaConnected = false;
+whatsappService.setCallbacks(
+  (qrCodeDataUrl) => {
+    broadcast('WHATSAPP_QR', { qrCode: qrCodeDataUrl });
+  },
+  async (status) => {
+    broadcast('WHATSAPP_STATUS', status);
+    if (status.connected) {
+      wasWaConnected = true;
+    } else if (wasWaConnected) {
+      wasWaConnected = false;
+      await telegramService.sendAlert(
+        '⚠️ *[WHATSAPP BOT OFFLINE]*\nKoneksi WhatsApp Web terputus. AI Trading tetap aktif dan notifikasi darurat otomatis dialihkan ke Telegram.'
+      );
+    }
+  }
+);
+
+// Start Indodax Live Market WebSocket
+if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes('test'))) {
+  indodaxMarketStream.startLiveSocket();
+}
+
+// 3. Mount API Routes
+app.use('/api', apiRouter);
+
+// OAuth Callback Route for Google / Antigravity OAuth Handshake
+app.get('/callback', (req, res) => {
+  const code = (req.query.code as string) || '';
+  res.send(`<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Otentikasi Google / Antigravity Selesai - AI Trading</title>
+  <style>
+    body {
+      background: #070b14;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      padding: 32px 28px;
+      max-width: 540px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    .icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #10b981;
+      font-size: 24px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 10px;
+      color: #38bdf8;
+    }
+    p {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin: 0 0 20px;
+    }
+    .url-box {
+      background: #020617;
+      border: 1px solid #334155;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      word-break: break-all;
+      color: #34d399;
+      margin-bottom: 20px;
+      text-align: left;
+      user-select: all;
+    }
+    .btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #1d4ed8;
+    }
+    .status {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#10003;</div>
+    <h1>Otentikasi Antigravity Berhasil!</h1>
+    <p>Otentikasi Google telah selesai. Jika jendela ini terbuka sebagai popup, token sedang otomatis ditransfer ke AI Trading. Jika Anda membuka di tab terpisah atau popup terblokir, silakan salin URL di bawah ini:</p>
+    <div class="url-box" id="urlDisplay"></div>
+    <button class="btn" onclick="copyAndClose()">Salin URL & Tutup</button>
+    <div class="status" id="statusText">Mengirim otentikasi ke AI Trading...</div>
+  </div>
+
+  <script>
+    const fullUrl = window.location.href;
+    document.getElementById('urlDisplay').innerText = fullUrl;
+
+    if (window.opener) {
+      try {
+        const targetOrigin = window.location.origin;
+        window.opener.postMessage({
+          type: 'ANTIGRAVITY_OAUTH_CALLBACK',
+          url: fullUrl,
+          code: ${JSON.stringify(code)}
+        }, targetOrigin);
+        document.getElementById('statusText').innerText = 'Berhasil ditransfer! Jendela akan ditutup otomatis...';
+        setTimeout(() => {
+          window.close();
+        }, 1200);
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      document.getElementById('statusText').innerText = 'Silakan salin URL di atas dan tempelkan ke form verifikasi manual di AI Trading.';
+    }
+
+    function copyAndClose() {
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        alert('URL Callback berhasil disalin! Silakan tempelkan ke kolom input di AI Trading.');
+        if (window.opener) window.close();
+      });
+    }
+  </script>
+</body>
+</html>`);
+});
+
+// Serve static frontend build if available
+const clientDistPath = path.resolve(process.cwd(), 'client', 'dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/ws')) {
+      return res.sendFile(path.join(clientDistPath, 'index.html'));
+    }
+    next();
+  });
+}
+
+// 4. WebSocket connection lifecycle (Supports both Admin and Observer/View-Only)
+let wsHeartbeatInterval: NodeJS.Timeout | null = null;
+if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes('test'))) {
+  wsHeartbeatInterval = setInterval(() => {
+    for (const client of wss.clients) {
+      const extWs = client as ExtWebSocket;
+      if (extWs.isAlive === false) {
+        client.terminate();
+        continue;
+      }
+      extWs.isAlive = false;
+      client.ping();
+    }
+  }, 30000);
+  if (wsHeartbeatInterval.unref) {
+    wsHeartbeatInterval.unref();
+  }
+}
+
+wss.on('connection', (ws: WebSocket, req) => {
+  const extWs = ws as ExtWebSocket;
+  extWs.isAlive = true;
+
+  ws.on('pong', () => {
+    extWs.isAlive = true;
+  });
+
+  const configuredToken = getSetting('admin_access_token', '').trim();
+  const urlObj = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+  const tokenQuery = urlObj.searchParams.get('token');
+
+  const isAdmin = !configuredToken || (!!tokenQuery && secureCompareTokens(tokenQuery, configuredToken));
+  if (isAdmin) {
+    authenticatedSockets.add(ws);
+    ws.send(JSON.stringify({ type: 'CONNECTED', authenticated: true, isAdmin: true, message: 'Connected to Realtime WebSocket (Admin Mode)' }));
+  } else {
+    // Connect in Observer / View-Only mode without kicking out
+    ws.send(JSON.stringify({ type: 'CONNECTED', authenticated: false, isAdmin: false, message: 'Connected to Realtime WebSocket (View-Only Observer)' }));
+  }
+
+  ws.on('message', (raw) => {
+    try {
+      const data = JSON.parse(raw.toString());
+      if (data.type === 'AUTH' && configuredToken && data.token && secureCompareTokens(data.token, configuredToken)) {
+        authenticatedSockets.add(ws);
+        ws.send(JSON.stringify({ type: 'AUTH_SUCCESS', authenticated: true, isAdmin: true }));
+      }
+    } catch {}
+  });
+});
+
+// 5. Start Background Engines & Graceful Shutdown
+const PORT = process.env.PORT || 3001;
+
+// Pairs cache refresh interval (seeds pair rules + new-listing radar detection)
+let pairsRefreshInterval: NodeJS.Timeout | null = null;
+let walCheckpointInterval: NodeJS.Timeout | null = null;
+
+if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes('test'))) {
+  server.listen(PORT, async () => {
+    // Check and trigger admin token rotation on startup if configured ('on_startup')
+    try {
+      await adminTokenService.handleStartup();
+    } catch (err: any) {
+      console.warn('[Server] Gagal menjalankan rotasi token startup:', err?.message || err);
+    }
+
+    const adminToken = getSetting('admin_access_token', '');
+    console.log(`\n======================================================`);
+    console.log(`🚀 AI Trading Server running on http://localhost:${PORT}`);
+    console.log(`📡 WebSocket endpoint: ws://localhost:${PORT}/ws`);
+    console.log(`🔐 ADMIN ACCESS TOKEN: ${adminToken}`);
+    console.log(`   (Gunakan token ini untuk otentikasi dashboard & API)`);
+    console.log(`======================================================\n`);
+
+    // Start background engines
+    tradingEngine.start(15000);
+    agentSwarm.start(60000);
+    backupService.startAutoBackup();
+    adminTokenService.start(15000);
+
+    // Warm up Indodax pairs cache on boot: seeds pair rules (quantity increment,
+    // min trade size) and primes the new-listing radar with the known pair set.
+    indodax
+      .getPairs()
+      .then((pairs) => console.log(`[Indodax] Pairs cache siap: ${pairs.length} pair IDR terpantau. Radar koin baru aktif.`))
+      .catch((err) => console.warn('[Indodax] Gagal memuat pairs cache saat startup:', err.message));
+
+    // Refresh pairs every 5 minutes so new coin listings are detected promptly
+    // (internal cache TTL is 10 minutes; alternate calls dedupe via cache).
+    pairsRefreshInterval = setInterval(() => {
+      indodax.getPairs().catch(() => {
+        // Silent: transient network failures retry on the next interval
+      });
+    }, 5 * 60 * 1000);
+
+    // Periodic WAL Checkpoint every 10 minutes to prevent -wal file growth
+    walCheckpointInterval = setInterval(() => {
+      try {
+        db.pragma('wal_checkpoint(PASSIVE)');
+      } catch (err: any) {
+        console.warn('[SQLite] WAL Passive Checkpoint error:', err?.message);
+      }
+    }, 10 * 60 * 1000);
+    if (walCheckpointInterval.unref) {
+      walCheckpointInterval.unref();
+    }
+  });
+}
+
+// Graceful Shutdown Handler (SIGINT / SIGTERM)
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n[Server] Sinyal ${signal} diterima. Menjalankan graceful shutdown...`);
+
+  try {
+    adminTokenService.stop();
+    tradingEngine.stop();
+    agentSwarm.stop();
+    backupService.stopAutoBackup();
+    telegramService.stopPolling();
+    indodaxMarketStream.stop();
+    await tunnelService.stop();
+    if (pairsRefreshInterval) {
+      clearInterval(pairsRefreshInterval);
+      pairsRefreshInterval = null;
+    }
+    if (walCheckpointInterval) {
+      clearInterval(walCheckpointInterval);
+      walCheckpointInterval = null;
+    }
+    if (wsHeartbeatInterval) {
+      clearInterval(wsHeartbeatInterval);
+      wsHeartbeatInterval = null;
+    }
+    await whatsappService.disconnect();
+    await indodax.cancelDeadmanSwitch();
+
+    wss.close();
+    server.close(() => {
+      console.log('[Server] Koneksi jaringan ditutup.');
+      try {
+        db.pragma('wal_checkpoint(TRUNCATE)');
+        db.close();
+        console.log('[Server] Database SQLite ditutup dengan aman.');
+      } catch {}
+      process.exit(0);
+    });
+
+    setTimeout(() => {
+      console.warn('[Server] Timeout shutdown tercapai, keluar paksa.');
+      try {
+        db.pragma('wal_checkpoint(TRUNCATE)');
+        db.close();
+      } catch {}
+      process.exit(0);
+    }, 4000);
+  } catch (err) {
+    console.error('[Server] Kesalahan shutdown:', err);
+    process.exit(1);
+  }
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+});

@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="pCardBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <filter id="pCardGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <rect width="1100" height="360" rx="14" fill="#090d16" stroke="#1e293b" stroke-width="2" />
+
+  <!-- Title -->
+  <text x="50" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="800" fill="#f8fafc">
+    🎯 3 PILIHAN PROFIL RISIKO INVESTASI
+  </text>
+  <text x="50" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#94a3b8">
+    Sesuaikan karakter bot dengan gaya trading dan toleransi risiko Anda secara instan di tab Pengaturan.
+  </text>
+
+  <!-- Profile 1: Konservatif -->
+  <g transform="translate(50, 95)">
+    <rect width="310" height="235" rx="12" fill="url(#pCardBg)" stroke="#38bdf8" stroke-width="1.6" filter="url(#pCardGlow)" />
+    <rect x="0" y="0" width="310" height="36" rx="12" fill="#0284c7" />
+    <text x="155" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="800" fill="#ffffff" text-anchor="middle">
+      🛡️ KONSERVATIF
+    </text>
+    
+    <text x="24" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Target Untung (TP):</text>
+    <text x="286" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#38bdf8" text-anchor="end">3.5%</text>
+
+    <text x="24" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Trailing Stop:</text>
+    <text x="286" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#38bdf8" text-anchor="end">1.8% (Ketat)</text>
+
+    <text x="24" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Maksimal Posisi:</text>
+    <text x="286" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="end">2 Koin</text>
+
+    <text x="24" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Fokus Aset:</text>
+    <text x="286" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="end">BTC, ETH, SOL</text>
+
+    <text x="24" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Circuit Breaker:</text>
+    <text x="286" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ef4444" text-anchor="end">3.0% Max Loss</text>
+
+    <rect x="20" y="196" width="270" height="26" rx="6" fill="#0f172a" />
+    <text x="155" y="213" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">
+      Cocok: Modal besar &amp; pemula pencari stabilitas
+    </text>
+  </g>
+
+  <!-- Profile 2: Seimbang (Recommended) -->
+  <g transform="translate(395, 95)">
+    <rect width="310" height="235" rx="12" fill="url(#pCardBg)" stroke="#10b981" stroke-width="2" filter="url(#pCardGlow)" />
+    <rect x="0" y="0" width="310" height="36" rx="12" fill="#047857" />
+    <text x="155" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="800" fill="#ffffff" text-anchor="middle">
+      ⚖️ SEIMBANG (REKOMENDASI)
+    </text>
+    
+    <text x="24" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Target Untung (TP):</text>
+    <text x="286" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#10b981" text-anchor="end">5.0%</text>
+
+    <text x="24" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Trailing Stop:</text>
+    <text x="286" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#10b981" text-anchor="end">2.5% (Moderat)</text>
+
+    <text x="24" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Maksimal Posisi:</text>
+    <text x="286" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="end">3 Koin</text>
+
+    <text x="24" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Fokus Aset:</text>
+    <text x="286" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="end">Top 20 Likuiditas</text>
+
+    <text x="24" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Circuit Breaker:</text>
+    <text x="286" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ef4444" text-anchor="end">5.0% Max Loss</text>
+
+    <rect x="20" y="196" width="270" height="26" rx="6" fill="#0f172a" />
+    <text x="155" y="213" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#34d399" text-anchor="middle">
+      Keseimbangan optimal profit &amp; risiko harian
+    </text>
+  </g>
+
+  <!-- Profile 3: Agresif -->
+  <g transform="translate(740, 95)">
+    <rect width="310" height="235" rx="12" fill="url(#pCardBg)" stroke="#a855f7" stroke-width="1.6" filter="url(#pCardGlow)" />
+    <rect x="0" y="0" width="310" height="36" rx="12" fill="#7e22ce" />
+    <text x="155" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="800" fill="#ffffff" text-anchor="middle">
+      🚀 AGRESIF
+    </text>
+    
+    <text x="24" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Target Untung (TP):</text>
+    <text x="286" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#c084fc" text-anchor="end">7.5%</text>
+
+    <text x="24" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Trailing Stop:</text>
+    <text x="286" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#c084fc" text-anchor="end">3.5% (Longgar)</text>
+
+    <text x="24" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Maksimal Posisi:</text>
+    <text x="286" y="124" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="end">5 Koin</text>
+
+    <text x="24" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Fokus Aset:</text>
+    <text x="286" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="end">Momentum &amp; New Listing</text>
+
+    <text x="24" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">Circuit Breaker:</text>
+    <text x="286" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ef4444" text-anchor="end">7.0% Max Loss</text>
+
+    <rect x="20" y="196" width="270" height="26" rx="6" fill="#0f172a" />
+    <text x="155" y="213" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">
+      Cocok: Trader agresif di fase pasar Bull Run
+    </text>
+  </g>
+</svg>

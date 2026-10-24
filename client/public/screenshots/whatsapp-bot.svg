@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070b13"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="680" fill="url(#bgGrad)"/>
+  
+  <!-- Header -->
+  <rect x="40" y="30" width="1120" height="70" rx="12" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="60" y="62" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#f8fafc">DUAL-CHANNEL REMOTE OPERATIONS (WHATSAPP &amp; TELEGRAM BOTS)</text>
+  <text x="60" y="85" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">Kontrol bot dari smartphone dengan Baileys WhatsApp Multi-Device &amp; Telegram 2-Way Bot.</text>
+  <rect x="960" y="48" width="180" height="34" rx="8" fill="#065f46" stroke="#10b981" stroke-width="1"/>
+  <text x="1050" y="70" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#a7f3d0" text-anchor="middle">● 2-WAY ACTIVE</text>
+
+  <!-- Left Side: Smartphone Chat Frame -->
+  <g transform="translate(60, 120)">
+    <!-- Phone Mockup Body -->
+    <rect width="360" height="520" rx="28" fill="#020617" stroke="#334155" stroke-width="3"/>
+    
+    <!-- Phone Header -->
+    <rect width="360" height="60" rx="28" fill="#064e3b"/>
+    <circle cx="35" cy="30" r="16" fill="#10b981"/>
+    <text x="35" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#ffffff" text-anchor="middle">AI</text>
+    <text x="60" y="27" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ffffff">AI-Trading Remote Bot</text>
+    <text x="60" y="43" font-family="system-ui, sans-serif" font-size="10" fill="#a7f3d0">online &bull; Baileys Multi-Device</text>
+
+    <!-- Chat Messages -->
+    <!-- User Msg 1 -->
+    <rect x="180" y="80" width="160" height="36" rx="10" fill="#065f46"/>
+    <text x="195" y="103" font-family="monospace" font-size="13" fill="#ffffff">/status</text>
+
+    <!-- Bot Reply 1 -->
+    <rect x="20" y="125" width="300" height="110" rx="10" fill="#1e293b"/>
+    <text x="35" y="145" font-family="monospace" font-size="11" font-weight="700" fill="#38bdf8">🤖 AI TRADING STATUS REPORT</text>
+    <text x="35" y="165" font-family="monospace" font-size="10" fill="#cbd5e1">Mode: PAPER TRADING (Active)</text>
+    <text x="35" y="180" font-family="monospace" font-size="10" fill="#cbd5e1">Saldo Kas: Rp 12.450.000</text>
+    <text x="35" y="195" font-family="monospace" font-size="10" fill="#10b981">Posisi Terbuka: 3 Koin (BTC, SOL, PEPE)</text>
+    <text x="35" y="210" font-family="monospace" font-size="10" fill="#34d399">Floating Gain: +Rp 1.617.450 (+13.4%)</text>
+    <text x="35" y="225" font-family="monospace" font-size="9" fill="#94a3b8">Ketik /panic confirm jika butuh likuidasi</text>
+
+    <!-- User Msg 2 -->
+    <rect x="120" y="250" width="220" height="36" rx="10" fill="#065f46"/>
+    <text x="135" y="273" font-family="system-ui, sans-serif" font-size="12" fill="#ffffff">koin apa yang momentumnya bagus?</text>
+
+    <!-- Bot Reply 2 (Conversational AI Assistant) -->
+    <rect x="20" y="295" width="300" height="120" rx="10" fill="#1e293b"/>
+    <text x="35" y="315" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a855f7">🧠 AI Financial Assistant:</text>
+    <text x="35" y="335" font-family="system-ui, sans-serif" font-size="10" fill="#cbd5e1">Berdasarkan analisa 10 Subagent Swarm saat ini:</text>
+    <text x="35" y="355" font-family="system-ui, sans-serif" font-size="10" fill="#e2e8f0">&bull; PEPE/IDR (+18.4%): Volume buyer wall 3.2x</text>
+    <text x="35" y="370" font-family="system-ui, sans-serif" font-size="10" fill="#e2e8f0">&bull; BERA/IDR (+24.8%): Listing radar mendeteksi early pump</text>
+    <text x="35" y="390" font-family="system-ui, sans-serif" font-size="10" fill="#38bdf8">Gunakan /buy &lt;symbol&gt; &lt;nominal&gt; untuk beli.</text>
+
+    <!-- User Msg 3 -->
+    <rect x="180" y="430" width="160" height="36" rx="10" fill="#065f46"/>
+    <text x="195" y="453" font-family="monospace" font-size="12" fill="#ffffff">/buy pepe_idr 50000</text>
+  </g>
+
+  <!-- Right Side: Features & Command Matrix -->
+  <g transform="translate(460, 120)">
+    <rect width="680" height="520" rx="16" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="30" y="40" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#f8fafc">FITUR KEAMANAN OPERASIONAL JARAK JAUH</text>
+    
+    <!-- Feature 1 -->
+    <rect x="30" y="65" width="620" height="90" rx="10" fill="#070b13" stroke="#1e293b"/>
+    <text x="50" y="95" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#10b981">1. Dual-Channel Redundancy &amp; Auto-Failover</text>
+    <text x="50" y="120" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Jika sesi WhatsApp Baileys terputus atau ponsel mati, bot otomatis mengalihkan seluruh sinyal trade dan alert darurat ke bot Telegram tanpa jeda.</text>
+
+    <!-- Feature 2 -->
+    <rect x="30" y="170" width="620" height="90" rx="10" fill="#070b13" stroke="#1e293b"/>
+    <text x="50" y="200" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#38bdf8">2. Whitelist Admin &amp; Anti-Group Hijacking</text>
+    <text x="50" y="225" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Hanya nomor telepon atau Chat ID yang terdaftar yang memiliki izin mengeksekusi order. Pesan dari grup dilarang mengeksekusi `/admin` atau likuidasi.</text>
+
+    <!-- Feature 3 -->
+    <rect x="30" y="275" width="620" height="90" rx="10" fill="#070b13" stroke="#1e293b"/>
+    <text x="50" y="305" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f59e0b">3. Two-Step Emergency Panic Gate (`/panic confirm`)</text>
+    <text x="50" y="330" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Perintah panic sell memerlukan kata konfirmasi untuk mencegah tersenggol tidak sengaja. Membatalkan seluruh order dan melikuidasi semua posisi ke Rupiah.</text>
+
+    <!-- Feature 4 -->
+    <rect x="30" y="380" width="620" height="110" rx="10" fill="#1e1b4b" stroke="#4338ca"/>
+    <text x="50" y="410" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#c7d2fe">4. AI Natural Language Action Detection</text>
+    <text x="50" y="435" font-family="system-ui, sans-serif" font-size="11" fill="#e0e7ff">Selain perintah slash (`/`), bot dapat memahami bahasa manusia biasa seperti "tolong jeda trading dulu ya" atau "cek berapa saldo saya sekarang".</text>
+    <text x="50" y="465" font-family="monospace" font-size="11" fill="#a5b4fc">Didukung Claude Sonnet 4.6 &bull; Respons rata-rata &lt; 800ms</text>
+  </g>
+</svg>

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070b13"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="eqGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="680" fill="url(#bgGrad)"/>
+  
+  <!-- Header -->
+  <rect x="40" y="30" width="1120" height="70" rx="12" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="60" y="62" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#f8fafc">QUANTITATIVE BACKTEST ENGINE &amp; EQUITY CURVE SIMULATOR</text>
+  <text x="60" y="85" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">Simulasi historis multi-timeframe (15m, 1h, 4h, 1d) dengan intra-bar wick execution dan pemodelan fee bursa.</text>
+  <rect x="940" y="48" width="200" height="34" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="1"/>
+  <text x="1040" y="70" font-family="monospace" font-size="12" font-weight="700" fill="#a5b4fc" text-anchor="middle">PROFIT FACTOR: 4.82</text>
+
+  <!-- Metric Badges Row -->
+  <g transform="translate(40, 115)">
+    <!-- Metric 1 -->
+    <rect width="210" height="80" rx="8" fill="#0b101b" stroke="#1e293b"/>
+    <text x="15" y="28" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">NET PROFIT (30 HARI)</text>
+    <text x="15" y="55" font-family="monospace" font-size="18" font-weight="800" fill="#10b981">+Rp 2.450.000</text>
+    <text x="15" y="70" font-family="monospace" font-size="10" fill="#34d399">+24.50% Return</text>
+
+    <!-- Metric 2 -->
+    <rect x="225" width="210" height="80" rx="8" fill="#0b101b" stroke="#1e293b"/>
+    <text x="240" y="28" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">WIN RATE HISTORIS</text>
+    <text x="240" y="55" font-family="monospace" font-size="18" font-weight="800" fill="#38bdf8">83.33%</text>
+    <text x="240" y="70" font-family="monospace" font-size="10" fill="#94a3b8">15 Menang / 3 Kalah</text>
+
+    <!-- Metric 3 -->
+    <rect x="450" width="210" height="80" rx="8" fill="#0b101b" stroke="#1e293b"/>
+    <text x="465" y="28" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">MAX DRAWDOWN (MDD)</text>
+    <text x="465" y="55" font-family="monospace" font-size="18" font-weight="800" fill="#f43f5e">3.12%</text>
+    <text x="465" y="70" font-family="monospace" font-size="10" fill="#94a3b8">Resiko Penurunan Sangat Terjaga</text>
+
+    <!-- Metric 4 -->
+    <rect x="675" width="210" height="80" rx="8" fill="#0b101b" stroke="#1e293b"/>
+    <text x="690" y="28" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">RATA-RATA RETURN/TRADE</text>
+    <text x="690" y="55" font-family="monospace" font-size="18" font-weight="800" fill="#10b981">+1.36%</text>
+    <text x="690" y="70" font-family="monospace" font-size="10" fill="#94a3b8">Durasi Rata-rata 14.5 Jam</text>
+
+    <!-- Metric 5 -->
+    <rect x="900" width="220" height="80" rx="8" fill="#0b101b" stroke="#1e293b"/>
+    <text x="915" y="28" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">SHARPE &amp; SORTINO</text>
+    <text x="915" y="55" font-family="monospace" font-size="18" font-weight="800" fill="#a855f7">2.84 / 4.12</text>
+    <text x="915" y="70" font-family="monospace" font-size="10" fill="#c084fc">Kualitas Keuntungan Institusional</text>
+  </g>
+
+  <!-- Equity Curve Graph -->
+  <g transform="translate(40, 215)">
+    <rect width="1120" height="425" rx="10" fill="#0b101b" stroke="#1e293b" stroke-width="1"/>
+    <text x="25" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">KURVA PERTUMBUHAN EKUITAS (EQUITY CURVE) &bull; BTC/IDR (30 HARI &bull; 720 CANDLES)</text>
+
+    <!-- Chart SVG Curve -->
+    <path d="M 50,340 L 180,310 L 320,280 L 480,240 L 640,190 L 800,160 L 960,110 L 1070,80 L 1070,360 L 50,360 Z" fill="url(#eqGrad)"/>
+    <path d="M 50,340 L 180,310 L 320,280 L 480,240 L 640,190 L 800,160 L 960,110 L 1070,80" fill="none" stroke="#10b981" stroke-width="3.5" stroke-linecap="round"/>
+
+    <!-- Data Points -->
+    <circle cx="50" cy="340" r="4" fill="#10b981"/>
+    <circle cx="180" cy="310" r="4" fill="#10b981"/>
+    <circle cx="320" cy="280" r="4" fill="#10b981"/>
+    <circle cx="480" cy="240" r="4" fill="#10b981"/>
+    <circle cx="640" cy="190" r="4" fill="#10b981"/>
+    <circle cx="800" cy="160" r="4" fill="#10b981"/>
+    <circle cx="960" cy="110" r="4" fill="#10b981"/>
+    <circle cx="1070" cy="80" r="5" fill="#ffffff" stroke="#10b981" stroke-width="2"/>
+
+    <!-- Labels on Curve -->
+    <text x="50" y="375" font-family="monospace" font-size="11" fill="#64748b">20 Sep (Rp 10.0M)</text>
+    <text x="480" y="375" font-family="monospace" font-size="11" fill="#64748b">05 Okt (Rp 11.3M)</text>
+    <text x="960" y="375" font-family="monospace" font-size="11" fill="#64748b">20 Okt (Rp 12.45M)</text>
+    <text x="1000" y="65" font-family="monospace" font-size="12" font-weight="700" fill="#34d399">Rp 12.450.000</text>
+  </g>
+</svg>

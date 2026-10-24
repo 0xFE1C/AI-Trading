@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 480" width="100%" height="100%">
+  <defs>
+    <linearGradient id="busGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+    <linearGradient id="agentCard" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="aiOptGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <filter id="glowSub" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="480" rx="14" fill="#090d16" stroke="#1e293b" stroke-width="2" />
+
+  <!-- Title -->
+  <text x="50" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="800" fill="#f8fafc">
+    🤖 ARSITEKTUR TIM RISET AI SWARM (10 SUB-AGENTS &amp; BLACKBOARD BUS)
+  </text>
+  <text x="50" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#94a3b8">
+    Koordinasi otonom 10 analis intelijen berbasis event bus terdesentralisasi dengan deduplikasi hash konteks SHA-256.
+  </text>
+
+  <!-- Central Blackboard Hub -->
+  <g transform="translate(325, 95)">
+    <rect width="450" height="74" rx="12" fill="url(#busGrad)" filter="url(#glowSub)" />
+    <text x="225" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">
+      BLACKBOARD EVENT BUS &amp; SQLITE OUTBOX
+    </text>
+    <text x="225" y="54" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#e0e7ff" text-anchor="middle">
+      Pub/Sub Real-Time • SHA256 Context Deduplication • Hemat &gt;90% Token
+    </text>
+  </g>
+
+  <!-- Connection Lines from Bus to Agents -->
+  <path d="M 550 170 L 550 200" stroke="#7c3aed" stroke-width="3" />
+  <path d="M 140 200 L 960 200" stroke="#7c3aed" stroke-width="2.5" />
+  
+  <line x1="140" y1="200" x2="140" y2="230" stroke="#7c3aed" stroke-width="2" />
+  <line x1="345" y1="200" x2="345" y2="230" stroke="#7c3aed" stroke-width="2" />
+  <line x1="550" y1="200" x2="550" y2="230" stroke="#7c3aed" stroke-width="2" />
+  <line x1="755" y1="200" x2="755" y2="230" stroke="#7c3aed" stroke-width="2" />
+  <line x1="960" y1="200" x2="960" y2="230" stroke="#7c3aed" stroke-width="2" />
+
+  <!-- ROW 1: 5 Agents (Top Row) -->
+  <!-- Agent 1: Global News -->
+  <g transform="translate(45, 230)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#38bdf8" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#0284c7" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">1. Global News Radar</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Berita Kripto Dunia</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">CoinDesk, Cointelegraph</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Sentimen Makro Global</text>
+  </g>
+
+  <!-- Agent 2: Tech & Code -->
+  <g transform="translate(250, 230)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#38bdf8" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#0284c7" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">2. Tech &amp; Ecosystem</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Developer &amp; Mainnet</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">GitHub commits &amp; forks</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Kesiapan Teknologi</text>
+  </g>
+
+  <!-- Agent 3: Social Reddit -->
+  <g transform="translate(455, 230)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#38bdf8" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#0284c7" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">3. Social Sentiment</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Komunitas Reddit</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">r/CryptoCurrency, subreddits</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Euforia &amp; Ketakutan</text>
+  </g>
+
+  <!-- Agent 4: Twitter/X Viral -->
+  <g transform="translate(660, 230)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#38bdf8" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#0284c7" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">4. Twitter/X Radar</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Influencer &amp; Trending</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Deteksi tweet viral</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Lonjakan Diskusi</text>
+  </g>
+
+  <!-- Agent 5: Indodax Listing -->
+  <g transform="translate(865, 230)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#38bdf8" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#0284c7" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">5. Listing Indodax</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Koin Baru Rilis</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Deteksi listing detik 1</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#38bdf8">Peluang Listing Pump</text>
+  </g>
+
+  <!-- ROW 2: 5 Agents (Bottom Row) -->
+  <!-- Agent 6: Breakout Momentum -->
+  <g transform="translate(45, 345)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#a855f7" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#7e22ce" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">6. Momentum Hunter</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Lonjakan Volume</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Volume breakout spike</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#c084fc">Konfirmasi Likuiditas</text>
+  </g>
+
+  <!-- Agent 7: Protocol Exploit -->
+  <g transform="translate(250, 345)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#a855f7" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#7e22ce" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">7. Exploit &amp; Security</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Audit Smart Contract</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Laporan peretasan &amp; bug</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#ef4444" font-weight="700">Veto Otomatis</text>
+  </g>
+
+  <!-- Agent 8: Macro & Reg -->
+  <g transform="translate(455, 345)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#a855f7" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#7e22ce" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">8. Macro &amp; Regulatory</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Kebijakan Global</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">The Fed, suku bunga, CPI</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#c084fc">Regulasi Bappebti</text>
+  </g>
+
+  <!-- Agent 9: Whale Tracker -->
+  <g transform="translate(660, 345)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#a855f7" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#7e22ce" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">9. Whale On-Chain</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Arus Modal Paus</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Inflow / outflow bursa</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#c084fc">Arah Akumulasi</text>
+  </g>
+
+  <!-- Agent 10: Global Arbitrage -->
+  <g transform="translate(865, 345)">
+    <rect width="190" height="100" rx="10" fill="url(#agentCard)" stroke="#a855f7" stroke-width="1.2" filter="url(#glowSub)" />
+    <rect x="0" y="0" width="190" height="26" rx="10" fill="#7e22ce" />
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#ffffff">10. Global Delta</text>
+    <text x="12" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="600">Selisih Harga Bursa</text>
+    <text x="12" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">Indodax vs Binance/Bybit</text>
+    <text x="12" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#c084fc">Penyelarasan Harga</text>
+  </g>
+</svg>

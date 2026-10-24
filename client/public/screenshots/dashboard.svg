@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070b13"/>
+      <stop offset="100%" stop-color="#0b1324"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#0b101b"/>
+    </linearGradient>
+    <linearGradient id="blueGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="greenArea" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1200" height="680" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Grid Lines -->
+  <g stroke="#1e293b" stroke-width="0.75" stroke-dasharray="4,4" opacity="0.4">
+    <line x1="60" y1="100" x2="1140" y2="100"/>
+    <line x1="60" y1="200" x2="1140" y2="200"/>
+    <line x1="60" y1="300" x2="1140" y2="300"/>
+    <line x1="60" y1="400" x2="1140" y2="400"/>
+    <line x1="60" y1="500" x2="1140" y2="500"/>
+    <line x1="60" y1="600" x2="1140" y2="600"/>
+  </g>
+
+  <!-- Header Bar -->
+  <rect x="40" y="30" width="1120" height="60" rx="12" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <circle cx="70" cy="60" r="14" fill="#2563eb"/>
+  <text x="70" y="65" font-family="system-ui, sans-serif" font-size="12" font-weight="900" fill="#ffffff" text-anchor="middle">AI</text>
+  <text x="95" y="65" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#f8fafc">AI-TRADING TERMINAL</text>
+  <rect x="270" y="48" width="85" height="24" rx="6" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+  <text x="312" y="64" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#34d399" text-anchor="middle">● LIVE ACTIVE</text>
+  
+  <!-- Header Right Stats -->
+  <rect x="880" y="46" width="130" height="28" rx="6" fill="#1e293b"/>
+  <text x="945" y="64" font-family="monospace" font-size="11" fill="#94a3b8" text-anchor="middle">PORT: 437 PAIRS</text>
+  <rect x="1020" y="46" width="120" height="28" rx="6" fill="#7f1d1d" stroke="#dc2626" stroke-width="1"/>
+  <text x="1080" y="64" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fca5a5" text-anchor="middle">PANIC SELL ALL</text>
+
+  <!-- KPI Cards -->
+  <!-- Card 1: Balance -->
+  <g transform="translate(40, 110)">
+    <rect width="265" height="110" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">TOTAL BALANCE (IDR)</text>
+    <text x="20" y="70" font-family="monospace" font-size="22" font-weight="800" fill="#ffffff">Rp 12.450.000</text>
+    <text x="20" y="95" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#10b981">+24.5% Profit Sejak Mulai</text>
+  </g>
+
+  <!-- Card 2: Open Positions -->
+  <g transform="translate(325, 110)">
+    <rect width="265" height="110" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">POSISI AKTIF BERJALAN</text>
+    <text x="20" y="70" font-family="monospace" font-size="22" font-weight="800" fill="#38bdf8">3 Koin Aktif</text>
+    <text x="20" y="95" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">BTC, SOL, PEPE (Trailing SL)</text>
+  </g>
+
+  <!-- Card 3: Floating PnL -->
+  <g transform="translate(610, 110)">
+    <rect width="265" height="110" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">FLOATING PnL (UNREALIZED)</text>
+    <text x="20" y="70" font-family="monospace" font-size="22" font-weight="800" fill="#10b981">+Rp 1.617.450</text>
+    <text x="20" y="95" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#10b981">+13.4% Rata-rata Gain</text>
+  </g>
+
+  <!-- Card 4: Swarm AI Status -->
+  <g transform="translate(895, 110)">
+    <rect width="265" height="110" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">MULTI-AGENT SWARM</text>
+    <text x="20" y="70" font-family="monospace" font-size="22" font-weight="800" fill="#a855f7">10 Subagents</text>
+    <text x="20" y="95" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#38bdf8">Consensus: BULLISH_CONFLUENCE</text>
+  </g>
+
+  <!-- Main Chart Panel -->
+  <g transform="translate(40, 240)">
+    <rect width="760" height="400" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="25" y="35" font-family="monospace" font-size="14" font-weight="700" fill="#f8fafc">BTC/IDR &bull; 15m &bull; Real-time Indodax Candlestick</text>
+    <text x="620" y="35" font-family="monospace" font-size="15" font-weight="800" fill="#10b981">Rp 1.617.000.000</text>
+    
+    <!-- Render Chart Curve and Candlestick Mockup -->
+    <path d="M 30,300 Q 150,280 250,230 T 450,180 T 600,120 T 730,90 L 730,360 L 30,360 Z" fill="url(#greenArea)"/>
+    <path d="M 30,300 Q 150,280 250,230 T 450,180 T 600,120 T 730,90" fill="none" stroke="#10b981" stroke-width="3"/>
+    
+    <!-- Trailing Stop Line -->
+    <line x1="30" y1="210" x2="730" y2="210" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <text x="630" y="205" font-family="monospace" font-size="10" fill="#f43f5e">STOP LOSS FLOOR (BEP)</text>
+
+    <!-- Candlestick Mini Bars -->
+    <g transform="translate(0, 0)">
+      <!-- Green Candles -->
+      <rect x="200" y="220" width="10" height="35" fill="#10b981"/>
+      <line x1="205" y1="210" x2="205" y2="265" stroke="#10b981" stroke-width="1.5"/>
+      <rect x="320" y="170" width="10" height="45" fill="#10b981"/>
+      <line x1="325" y1="160" x2="325" y2="225" stroke="#10b981" stroke-width="1.5"/>
+      <rect x="460" y="140" width="10" height="50" fill="#10b981"/>
+      <line x1="465" y1="130" x2="465" y2="200" stroke="#10b981" stroke-width="1.5"/>
+      <rect x="580" y="100" width="10" height="40" fill="#10b981"/>
+      <line x1="585" y1="85" x2="585" y2="150" stroke="#10b981" stroke-width="1.5"/>
+    </g>
+  </g>
+
+  <!-- Right Side Panel: Active Positions & Telemetry -->
+  <g transform="translate(820, 240)">
+    <rect width="340" height="400" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">POSISI AKTIF (DECOUPLED TP1)</text>
+
+    <!-- Pos 1 -->
+    <rect x="15" y="55" width="310" height="95" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+    <text x="25" y="80" font-family="monospace" font-size="13" font-weight="700" fill="#ffffff">BTC/IDR</text>
+    <rect x="235" y="67" width="80" height="18" rx="4" fill="#064e3b"/>
+    <text x="275" y="80" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">+5.0% TP1 HIT</text>
+    <text x="25" y="105" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Entri: Rp 1.540.000.000</text>
+    <text x="25" y="125" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">SL Floor: Rp 1.585.000.000 (Locked)</text>
+    <text x="240" y="125" font-family="monospace" font-size="12" font-weight="700" fill="#10b981">+Rp 96.250</text>
+
+    <!-- Pos 2 -->
+    <rect x="15" y="165" width="310" height="95" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+    <text x="25" y="190" font-family="monospace" font-size="13" font-weight="700" fill="#ffffff">SOL/IDR</text>
+    <rect x="235" y="177" width="80" height="18" rx="4" fill="#064e3b"/>
+    <text x="275" y="190" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">+8.0% TP1 HIT</text>
+    <text x="25" y="215" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Entri: Rp 3.200.000</text>
+    <text x="25" y="235" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">SL Floor: Rp 3.376.000 (Trailing)</text>
+    <text x="230" y="235" font-family="monospace" font-size="12" font-weight="700" fill="#10b981">+Rp 371.200</text>
+
+    <!-- Pos 3 -->
+    <rect x="15" y="275" width="310" height="105" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+    <text x="25" y="300" font-family="monospace" font-size="13" font-weight="700" fill="#ffffff">PEPE/IDR</text>
+    <rect x="235" y="287" width="80" height="18" rx="4" fill="#064e3b"/>
+    <text x="275" y="300" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">+15.8% MOON</text>
+    <text x="25" y="325" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Entri: Rp 0.145</text>
+    <text x="25" y="345" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">SL Floor: Rp 0.160 (Trailing)</text>
+    <text x="220" y="345" font-family="monospace" font-size="12" font-weight="700" fill="#10b981">+Rp 1.150.000</text>
+  </g>
+</svg>

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070b13"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="680" fill="url(#bgGrad)"/>
+  
+  <!-- Header -->
+  <rect x="40" y="30" width="1120" height="70" rx="12" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="60" y="62" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#f8fafc">10-SUBAGENT MULTI-AGENT SWARM INTELLIGENCE</text>
+  <text x="60" y="85" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">Konteks terisolasi, anti-halusinasi data bursa &amp; RSS feed CoinDesk/CoinTelegraph live.</text>
+  <rect x="980" y="48" width="160" height="34" rx="8" fill="#1e1b4b" stroke="#4338ca" stroke-width="1"/>
+  <text x="1060" y="70" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#a5b4fc" text-anchor="middle">⚡ 50/50 Multi-Account</text>
+
+  <!-- Agent Cards Grid (2 rows x 3 columns) -->
+  <!-- Agent 1 -->
+  <g transform="translate(40, 120)">
+    <rect width="360" height="160" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#38bdf8">Macro &amp; BTC Trend Analyst</text>
+    <rect x="250" y="15" width="90" height="20" rx="4" fill="#064e3b"/>
+    <text x="295" y="29" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">SCORE: +0.75</text>
+    <text x="20" y="55" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#e2e8f0">BTC Institutional Inflows Exceed $1.2B</text>
+    <text x="20" y="75" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Inflow spot ETF menunjukkan akumulasi stabil. BTC Macro Crash filter memberi izin entri altcoin.</text>
+    <line x1="20" y1="125" x2="340" y2="125" stroke="#1e293b"/>
+    <text x="20" y="145" font-family="monospace" font-size="10" fill="#64748b">Sumber: CoinDesk RSS &bull; 45s ago</text>
+  </g>
+
+  <!-- Agent 2 -->
+  <g transform="translate(420, 120)">
+    <rect width="360" height="160" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ec4899">Memecoin &amp; Listing Radar</text>
+    <rect x="250" y="15" width="90" height="20" rx="4" fill="#064e3b"/>
+    <text x="295" y="29" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">SCORE: +0.85</text>
+    <text x="20" y="55" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#e2e8f0">PEPE Orderbook Buyer Wall Dominance</text>
+    <text x="20" y="75" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Imbalans buku order menunjukkan kedalaman beli 3.2x lebih besar dari tembok jual. Slippage terhitung 0.08%.</text>
+    <line x1="20" y1="125" x2="340" y2="125" stroke="#1e293b"/>
+    <text x="20" y="145" font-family="monospace" font-size="10" fill="#64748b">Sumber: Indodax WebSocket &bull; 95s ago</text>
+  </g>
+
+  <!-- Agent 3 -->
+  <g transform="translate(800, 120)">
+    <rect width="360" height="160" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#10b981">Security Threat &amp; Hack Scanner</text>
+    <rect x="250" y="15" width="90" height="20" rx="4" fill="#1e293b"/>
+    <text x="295" y="29" font-family="monospace" font-size="10" font-weight="700" fill="#94a3b8" text-anchor="middle">NO THREAT</text>
+    <text x="20" y="55" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#e2e8f0">Zero Exploits Across Monitored Pairs</text>
+    <text x="20" y="75" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Kontrak token altcoin terpantau bersih dari exploit minting dan tidak ada pengumuman delisting mendadak.</text>
+    <line x1="20" y1="125" x2="340" y2="125" stroke="#1e293b"/>
+    <text x="20" y="145" font-family="monospace" font-size="10" fill="#64748b">Sumber: CoinTelegraph RSS &bull; 140s ago</text>
+  </g>
+
+  <!-- Agent 4 -->
+  <g transform="translate(40, 300)">
+    <rect width="360" height="160" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#a855f7">Scalping &amp; Micro-Momentum</text>
+    <rect x="250" y="15" width="90" height="20" rx="4" fill="#064e3b"/>
+    <text x="295" y="29" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">SCORE: +0.80</text>
+    <text x="20" y="55" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#e2e8f0">SOL 15m EMA 21 Bullish Crossover</text>
+    <text x="20" y="75" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">RSI 14 berada di 61.5 dengan volume ekspansi. ATR 14 memberikan ruang trailing stop ideal 2.8%.</text>
+    <line x1="20" y1="125" x2="340" y2="125" stroke="#1e293b"/>
+    <text x="20" y="145" font-family="monospace" font-size="10" fill="#64748b">Sumber: Indodax Trade Stream &bull; 180s ago</text>
+  </g>
+
+  <!-- Agent 5: Master Confluence -->
+  <g transform="translate(420, 300)">
+    <rect width="360" height="160" rx="10" fill="#1e1b4b" stroke="#6366f1" stroke-width="2"/>
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#818cf8">Master AI Confluence Evaluator</text>
+    <rect x="250" y="15" width="90" height="20" rx="4" fill="#312e81"/>
+    <text x="295" y="29" font-family="monospace" font-size="10" font-weight="800" fill="#c7d2fe" text-anchor="middle">VERDICT: BUY</text>
+    <text x="20" y="55" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff">9/10 Subagents Affirmative Consensus</text>
+    <text x="20" y="75" font-family="system-ui, sans-serif" font-size="10" fill="#c7d2fe">Kondisi pasar memenuhi kriteria entri. Fail-Closed Gate lolos, alokasi lot dihitung berbasis True ATR.</text>
+    <line x1="20" y1="125" x2="340" y2="125" stroke="#4338ca"/>
+    <text x="20" y="145" font-family="monospace" font-size="10" fill="#a5b4fc">Claude Sonnet 4.6 via Antigravity OAuth</text>
+  </g>
+
+  <!-- Agent 6 -->
+  <g transform="translate(800, 300)">
+    <rect width="360" height="160" rx="10" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f59e0b">On-Chain Whale Tracker</text>
+    <rect x="250" y="15" width="90" height="20" rx="4" fill="#064e3b"/>
+    <text x="295" y="29" font-family="monospace" font-size="10" font-weight="700" fill="#34d399" text-anchor="middle">NET OUTFLOW</text>
+    <text x="20" y="55" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#e2e8f0">Exchange Reserves Drop by 4,200 BTC</text>
+    <text x="20" y="75" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Penarikan koin dari bursa ke cold storage mengindikasikan tekanan jual berkurang drastis.</text>
+    <line x1="20" y1="125" x2="340" y2="125" stroke="#1e293b"/>
+    <text x="20" y="145" font-family="monospace" font-size="10" fill="#64748b">Sumber: Whale Alert RSS &bull; 4m ago</text>
+  </g>
+
+  <!-- Bottom Banner -->
+  <rect x="40" y="480" width="1120" height="160" rx="12" fill="#0b101b" stroke="#1e293b" stroke-width="1"/>
+  <text x="60" y="520" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#f8fafc">ARSITEKTUR SWARM SELF-LEARNING (POST-MORTEM REVIEW)</text>
+  <text x="60" y="545" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">Setiap trade yang selesai (TP maupun SL) di-evaluasi secara otonom oleh AI Reviewer dan disimpan ke tabel SQLite `lessons_learned`.</text>
+  <text x="60" y="570" font-family="monospace" font-size="11" fill="#38bdf8">Memori kognitif: 142 Pelajaran Disimpan &bull; Win Rate Adaptif Naik dari 64.2% ke 82.5% &bull; Zero Recurring Mistakes</text>
+</svg>

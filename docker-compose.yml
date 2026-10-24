@@ -1,0 +1,18 @@
+services:
+  ai-trading:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-trading-bot
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+      - ./trading_data.db:/app/trading_data.db
+      - ./trading_data.db-wal:/app/trading_data.db-wal
+      - ./trading_data.db-shm:/app/trading_data.db-shm
+      - ./backups:/app/backups

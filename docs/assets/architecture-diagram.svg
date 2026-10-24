@@ -1,0 +1,262 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" width="100%" height="100%">
+  <defs>
+    <linearGradient id="panelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+    <linearGradient id="gateGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#0d9488" />
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="1200" height="780" rx="16" fill="#090d16" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- Diagram Title Header -->
+  <text x="60" y="50" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="800" fill="#f8fafc">
+    ARSHITEKTUR SISTEM END-TO-END — AI TRADING TERMINAL
+  </text>
+  <text x="60" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="500" fill="#94a3b8">
+    Alur Data Real-Time: Ingestion Bursa ➔ Pipeline Deterministik ➔ Tim Riset AI ➔ 9 Gerbang Risiko ➔ Eksekusi &amp; Bot Notifikasi
+  </text>
+
+  <!-- LAYER 1: DATA INGESTION & MARKET ADAPTER (Left Top) -->
+  <g transform="translate(60, 105)">
+    <rect width="330" height="180" rx="12" fill="url(#panelGrad)" stroke="#38bdf8" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="330" height="36" rx="12" fill="#0369a1"/>
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
+      1. Market Ingestion &amp; Adapter
+    </text>
+    <text x="16" y="60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#e2e8f0" font-weight="600">
+      • IndodaxAdapter (REST v2 &amp; WebSocket)
+    </text>
+    <text x="16" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - 6-Sec In-Flight TTL Cache &amp; Batch Tickers
+    </text>
+    <text x="16" y="102" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Promise Deduplication (Anti Rate-Limit)
+    </text>
+    <text x="16" y="122" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Order Book Depth (Top 5 Bids &amp; Asks)
+    </text>
+    <text x="16" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Global Arbitrage Feed (Binance/Bybit Delta)
+    </text>
+    <text x="16" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#38bdf8" font-weight="600">
+      Output: Normalized Market Snapshot Event
+    </text>
+  </g>
+
+  <!-- LAYER 2: SECTION 9 DETERMINISTIC SIGNAL ENGINE (Middle Top) -->
+  <g transform="translate(425, 105)">
+    <rect width="350" height="180" rx="12" fill="url(#panelGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="350" height="36" rx="12" fill="#047857"/>
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
+      2. Section 9 Deterministic Pipeline
+    </text>
+    <text x="16" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • <tspan font-weight="700" fill="#34d399">Features:</tspan> RSI(14), EMA(21), True ATR, Depth Imbalance
+    </text>
+    <text x="16" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • <tspan font-weight="700" fill="#34d399">Lexicon:</tspan> Kamus Finansial ID/EN + Tanh [-1, +1]
+    </text>
+    <text x="16" y="98" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • <tspan font-weight="700" fill="#34d399">Threat Blocker:</tspan> Scoped per coin, 30m freshness
+    </text>
+    <text x="16" y="118" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • <tspan font-weight="700" fill="#34d399">BTC Macro Regime:</tspan> 1h (&lt; -3%) &amp; 4h (&lt; -5%) Windows
+    </text>
+    <text x="16" y="138" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • <tspan font-weight="700" fill="#34d399">Opportunity Scorer:</tspan> Conservative Blue-Chip Pullback
+    </text>
+    <text x="16" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#10b981" font-weight="600">
+      Keunggulan: 0 Biaya Token &amp; Zero Network Latency
+    </text>
+  </g>
+
+  <!-- LAYER 3: MULTI-AGENT RESEARCH SWARM (Right Top) -->
+  <g transform="translate(810, 105)">
+    <rect width="330" height="180" rx="12" fill="url(#panelGrad)" stroke="#a855f7" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="330" height="36" rx="12" fill="#7e22ce"/>
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
+      3. Tim Riset AI (10 Sub-Agents)
+    </text>
+    <text x="16" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • Global News, Tech/Ecosystem, Social Reddit
+    </text>
+    <text x="16" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • Twitter/X Radar, New Indodax Listing Detector
+    </text>
+    <text x="16" y="98" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • Protocol Hack &amp; Security Radar, Whale On-Chain
+    </text>
+    <text x="16" y="118" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
+      • Antigravity Multi-Account (Gemini 3.8 / Claude 4.6)
+    </text>
+    <text x="16" y="138" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#c084fc" font-weight="600">
+      • SHA256 Context Dedup (Hemat &gt;90% Token)
+    </text>
+    <text x="16" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#a855f7" font-weight="600">
+      Fail-Safe: Otomatis Degraded Mode saat AI Down
+    </text>
+  </g>
+
+  <!-- Connective Arrows -->
+  <line x1="390" y1="195" x2="425" y2="195" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 2"/>
+  <line x1="775" y1="195" x2="810" y2="195" stroke="#a855f7" stroke-width="2" stroke-dasharray="4 2"/>
+
+  <!-- Downward Connectors to Risk Gates -->
+  <path d="M 600 285 L 600 325" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- LAYER 4: PURE RISK GUARD (9 DEFENSE GATES) (Full Width Middle) -->
+  <g transform="translate(60, 325)">
+    <rect width="1080" height="150" rx="14" fill="#0f172a" stroke="#eab308" stroke-width="1.8" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="1080" height="34" rx="14" fill="#ca8a04"/>
+    <text x="20" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="800" fill="#ffffff">
+      4. PURE RISK GUARD — 9 GERBANG PERLINDUNGAN MODAL (WAJIB LOLOS 100%)
+    </text>
+
+    <!-- 9 Mini Gate Badges -->
+    <!-- G1 -->
+    <g transform="translate(20, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G1: Circuit</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Max Daily Loss</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">24h Cooldown</text>
+    </g>
+    <!-- G2 -->
+    <g transform="translate(136, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G2: Exposure</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Max Positions</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">Cap 1-5 Coins</text>
+    </g>
+    <!-- G3 -->
+    <g transform="translate(252, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G3: BTC Regime</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Flash Crash Veto</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">1h &amp; 4h Drop</text>
+    </g>
+    <!-- G4 -->
+    <g transform="translate(368, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G4: Spread Trap</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Bid-Ask Ratio</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">&lt; 0.8% - 1.5%</text>
+    </g>
+    <!-- G5 -->
+    <g transform="translate(484, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G5: RSI Guard</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Anti-FOMO Top</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">RSI &lt; 70-75</text>
+    </g>
+    <!-- G6 -->
+    <g transform="translate(600, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G6: Threat Scope</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Hack / Lawsuit</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">Veto per-koin</text>
+    </g>
+    <!-- G7 -->
+    <g transform="translate(716, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G7: Slippage</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Order Depth</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">Within Budget</text>
+    </g>
+    <!-- G8 -->
+    <g transform="translate(832, 50)">
+      <rect width="105" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="52" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G8: Tech Score</text>
+      <text x="52" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Threshold Matched</text>
+      <text x="52" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">Score &gt;= 70</text>
+    </g>
+    <!-- G9 -->
+    <g transform="translate(948, 50)">
+      <rect width="112" height="75" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="56" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#facc15" text-anchor="middle">G9: Min Floor</text>
+      <text x="56" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Indodax Rule</text>
+      <text x="56" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#22c55e" text-anchor="middle">&gt;= Rp 10.000</text>
+    </g>
+    <text x="20" y="138" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">
+      *Jika salah satu gerbang gagal: Order ditolak seketika, alasan dicatat di `entry_gate_logs` &amp; disimulasikan sebagai Ghost Position untuk A/B Alpha Testing.
+    </text>
+  </g>
+
+  <!-- Connectors to Execution & Infrastructure -->
+  <line x1="300" y1="475" x2="300" y2="515" stroke="#eab308" stroke-width="2.5"/>
+  <line x1="900" y1="475" x2="900" y2="515" stroke="#eab308" stroke-width="2.5"/>
+
+  <!-- LAYER 5: EXECUTION & POSITION MANAGEMENT (Left Bottom) -->
+  <g transform="translate(60, 515)">
+    <rect width="520" height="225" rx="12" fill="url(#panelGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="520" height="34" rx="12" fill="#047857"/>
+    <text x="16" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
+      5. Eksekusi Order &amp; Dynamic Ratchet
+    </text>
+    <text x="16" y="60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#e2e8f0" font-weight="700">
+      • Dual Mode: Paper Trading (Simulasi) / Live Indodax (Real)
+    </text>
+    <text x="16" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Auto-Set Capital Engine: Alokasi modal cerdas berdasarkan saldo IDR
+    </text>
+    <text x="16" y="102" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Trailing Stop Ratchet: Mengunci floating profit tanpa risiko rollback
+    </text>
+    <text x="16" y="122" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Take Profit Dinamis: Profil Konservatif (3.5%), Seimbang (5%), Agresif (7.5%)
+    </text>
+    <text x="16" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Panic Sell Sub-Second: Likuidasi darurat seluruh koin dalam &lt; 1 detik
+    </text>
+    <text x="16" y="166" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#10b981" font-weight="600">
+      - Counterfactual Ghost Position: Mengukur AI Alpha empiris tanpa risiko kapital
+    </text>
+    <text x="16" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Database Persistence: SQLite WAL mode + Automatic snapshot backups
+    </text>
+  </g>
+
+  <!-- LAYER 6: OBSERVABILITY, UNIFIED BOTS & UI (Right Bottom) -->
+  <g transform="translate(620, 515)">
+    <rect width="520" height="225" rx="12" fill="url(#panelGrad)" stroke="#6366f1" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="520" height="34" rx="12" fill="#4338ca"/>
+    <text x="16" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
+      6. Telemetri, Unified Bots &amp; React UI
+    </text>
+    <text x="16" y="60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#e2e8f0" font-weight="700">
+      • Unified Bots View (WhatsApp &amp; Telegram Terpadu)
+    </text>
+    <text x="16" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Notification Selector: Keduanya Sekaligus / WA Saja / TG Saja / Nonaktif
+    </text>
+    <text x="16" y="102" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Remote Commands: /status, /profit, /modal, /koin, /panic, /start, /stop
+    </text>
+    <text x="16" y="122" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - WhatsApp Baileys Multi-Device (QR login) &amp; Telegram Official Bot API
+    </text>
+    <text x="16" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0" font-weight="700">
+      • React 18 + Vite + Tailwind CSS Dashboard (PWA Enabled)
+    </text>
+    <text x="16" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Live Entry Diagnostics Table, 9-Gate Visual Radar, Quota Monitor
+    </text>
+    <text x="16" y="186" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
+      - Zero-Trust Admin Token Auth with constant-time comparison &amp; auto-rotation
+    </text>
+    <text x="16" y="208" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#818cf8" font-weight="600">
+      - Laporan Pajak &amp; Transaksi: Download Database, Ekspor CSV, &amp; PDF Resmi
+    </text>
+  </g>
+</svg>

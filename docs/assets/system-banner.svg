@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#0d1527" />
+      <stop offset="100%" stop-color="#070a10" />
+    </linearGradient>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <linearGradient id="badgeGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="badgeGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <linearGradient id="badgeGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#6d28d9" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="1" stroke-opacity="0.4" />
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="360" fill="url(#bgGrad)" />
+  <rect width="1200" height="360" fill="url(#grid)" />
+
+  <!-- Ambient Glow Circles -->
+  <circle cx="200" cy="180" r="140" fill="#38bdf8" opacity="0.08" filter="url(#glow)" />
+  <circle cx="1000" cy="120" r="160" fill="#10b981" opacity="0.08" filter="url(#glow)" />
+  <circle cx="600" cy="280" r="180" fill="#6366f1" opacity="0.07" filter="url(#glow)" />
+
+  <!-- Border Accent -->
+  <rect x="1" y="1" width="1198" height="358" rx="16" fill="none" stroke="#334155" stroke-width="2" />
+  <rect x="0" y="356" width="1200" height="4" fill="url(#primaryGrad)" />
+
+  <!-- Terminal Icon Box -->
+  <g transform="translate(80, 70)">
+    <rect width="72" height="72" rx="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+    <!-- Candlestick Graphic inside icon -->
+    <line x1="24" y1="20" x2="24" y2="52" stroke="#38bdf8" stroke-width="2" />
+    <rect x="18" y="26" width="12" height="18" rx="2" fill="#38bdf8" />
+    <line x1="48" y1="16" x2="48" y2="56" stroke="#10b981" stroke-width="2" />
+    <rect x="42" y="22" width="12" height="24" rx="2" fill="#10b981" />
+  </g>
+
+  <!-- Title & Subtitles -->
+  <text x="176" y="112" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="900" fill="url(#primaryGrad)" letter-spacing="1.5">
+    AI TRADING TERMINAL
+  </text>
+  <text x="178" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#94a3b8" letter-spacing="0.5">
+    Autonomous Spot Trading Engine &amp; Multi-Agent Quantitative Research for Indodax
+  </text>
+
+  <!-- Tagline Features -->
+  <text x="80" y="200" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" fill="#e2e8f0" font-weight="500">
+    ⚡ <tspan fill="#38bdf8" font-weight="700">Section 9 Deterministik</tspan> (0 Token Cost) + <tspan fill="#a855f7" font-weight="700">10 AI Swarm Analysts</tspan> + <tspan fill="#10b981" font-weight="700">9 Pure Risk Gates</tspan> + <tspan fill="#f59e0b" font-weight="700">Bots Terpadu (WA &amp; Telegram)</tspan>
+  </text>
+
+  <!-- Badges Row -->
+  <!-- Badge 1: 95/95 Tests Passing -->
+  <g transform="translate(80, 240)">
+    <rect width="180" height="38" rx="8" fill="url(#badgeGrad2)" />
+    <text x="90" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">
+      ✓ 95/95 Tests (100% PASS)
+    </text>
+  </g>
+
+  <!-- Badge 2: 9 Pure Risk Gates -->
+  <g transform="translate(275, 240)">
+    <rect width="170" height="38" rx="8" fill="url(#badgeGrad1)" />
+    <text x="85" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">
+      🛡️ 9 Pure Risk Gates
+    </text>
+  </g>
+
+  <!-- Badge 3: 10 AI Research Agents -->
+  <g transform="translate(460, 240)">
+    <rect width="180" height="38" rx="8" fill="url(#badgeGrad3)" />
+    <text x="90" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">
+      🤖 10 AI Swarm Agents
+    </text>
+  </g>
+
+  <!-- Badge 4: Indodax Spot Engine -->
+  <g transform="translate(655, 240)">
+    <rect width="190" height="38" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+    <text x="95" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#38bdf8" text-anchor="middle">
+      🇮🇩 Indodax API v2 + Cache
+    </text>
+  </g>
+
+  <!-- Badge 5: WhatsApp & Telegram -->
+  <g transform="translate(860, 240)">
+    <rect width="210" height="38" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+    <text x="105" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#34d399" text-anchor="middle">
+      📱 WA &amp; TG Dual Remote Bot
+    </text>
+  </g>
+
+  <!-- System Health & Status indicator in right corner -->
+  <g transform="translate(1000, 75)">
+    <circle cx="12" cy="12" r="6" fill="#10b981">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" />
+    </circle>
+    <text x="26" y="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#10b981">
+      PRODUCTION READY
+    </text>
+    <text x="26" y="34" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="500" fill="#64748b">
+      Zero-Trust Auth &amp; PWA
+    </text>
+  </g>
+</svg>

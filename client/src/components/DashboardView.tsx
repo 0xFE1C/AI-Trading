@@ -1,0 +1,1004 @@
+import React, { useState, useEffect } from 'react';
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Shield,
+  Clock,
+  Layers,
+  ArrowUpRight,
+  ArrowDownRight,
+  Lightbulb,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  Pause,
+  ArrowRight,
+  Zap,
+  Sliders,
+  HelpCircle,
+  ShieldCheck,
+  Cpu,
+  MessageSquare,
+  BarChart2,
+  Activity,
+  Info,
+  CheckSquare,
+  Square,
+  BookOpen,
+  Calculator,
+} from 'lucide-react';
+import { SystemStatus, RiskProfileKey } from '../types';
+import { CryptoChart } from './CryptoChart';
+import { AbValidationSection } from './AbValidationSection';
+import { EntryDiagnosticsSection } from './EntryDiagnosticsSection';
+import { HelpTooltip } from './HelpTooltip';
+import { Toast } from './Toast';
+import { api } from '../services/api';
+
+interface DashboardViewProps {
+  status: SystemStatus | null;
+  onRefresh: () => void;
+  displayMode?: 'simple' | 'pro';
+  onSwitchTab?: (tab: string, subTab?: string) => void;
+  isAdmin?: boolean;
+  onOpenAuthModal?: () => void;
+  onToggleTrading?: () => void;
+}
+
+export const DashboardView: React.FC<DashboardViewProps> = ({
+  status,
+  onRefresh,
+  displayMode = 'simple',
+  onSwitchTab,
+  isAdmin = false,
+  onOpenAuthModal,
+  onToggleTrading,
+}) => {
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [hasProvider, setHasProvider] = useState<boolean>(false);
+  const [hasModels, setHasModels] = useState<boolean>(false);
+  const [activeModelName, setActiveModelName] = useState<string>('');
+  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('ai_trading_guide_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [showChartInSimple, setShowChartInSimple] = useState<boolean>(false);
+  const [showAbInSimple, setShowAbInSimple] = useState<boolean>(false);
+  const [showDiagnosticsInSimple, setShowDiagnosticsInSimple] = useState<boolean>(true);
+  const [updatingProfile, setUpdatingProfile] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Persistent Onboarding Checklist
+  const [checklist, setChecklist] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('ai_trading_checklist');
+      return saved ? JSON.parse(saved) : { step1: false, step2: false, step3: false, step4: false };
+    } catch {
+      return { step1: false, step2: false, step3: false, step4: false };
+    }
+  });
+
+  const toggleChecklistItem = (key: string) => {
+    setChecklist((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('ai_trading_checklist', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const openPositions = status?.openPositions || [];
+  const recentTrades = status?.recentTrades || [];
+  const lessons = status?.lessonsLearned || [];
+  const sentiment = status?.sentiment?.averageSentiment ?? 0;
+  const balance = status?.balanceIdr ?? 0;
+  const isAuto = status?.isAutoTradingActive ?? false;
+
+  // Calculate total unrealized floating PnL
+  const totalFloatingPnl = openPositions.reduce((acc, p) => acc + (p.pnl_idr || 0), 0);
+  const totalFloatingPnlPercent = openPositions.length > 0
+    ? openPositions.reduce((acc, p) => acc + (p.pnl_percent || 0), 0) / openPositions.length
+    : 0;
+
+  useEffect(() => {
+    const loadDashboardContext = async () => {
+      try {
+        const [sett, provs, models] = await Promise.all([
+          api.getSettings(),
+          api.getProviders(),
+          api.getModels(),
+        ]);
+        setSettings(sett);
+        setHasProvider(provs.length > 0);
+        setHasModels(models.length > 0);
+
+        const currentModel = sett.master_model || sett.subagent_model || '';
+        const foundModel = models.find((m) => m.alias_model_id === currentModel);
+        setActiveModelName(foundModel ? foundModel.display_name : currentModel || 'Belum dipilih');
+      } catch (e) {
+        // Silent catch
+      }
+    };
+    loadDashboardContext();
+  }, []);
+
+  const toggleGuide = () => {
+    setIsGuideOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem('ai_trading_guide_open', String(next));
+      return next;
+    });
+  };
+
+  const handleQuickSelectRisk = async (profile: RiskProfileKey) => {
+    if (!isAdmin) {
+      if (onOpenAuthModal) onOpenAuthModal();
+      return;
+    }
+    setUpdatingProfile(true);
+    try {
+      await api.setRiskProfile(profile);
+      const freshSettings = await api.getSettings();
+      setSettings(freshSettings);
+      setToast({ message: `Profil risiko berhasil diubah menjadi: ${profile.toUpperCase()}`, type: 'success' });
+      onRefresh();
+    } catch (err: any) {
+      setToast({ message: `Gagal memilih profil risiko: ${err.message}`, type: 'error' });
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
+  const currentProfileKey = (settings.risk_profile || 'balanced') as RiskProfileKey;
+  const isAiConfigured = hasProvider && hasModels && Boolean(settings.master_model);
+  const isWaConnected = status?.whatsapp?.connected ?? false;
+
+  return (
+    <div className="space-y-6">
+      {/* 1. Quick-Start Onboarding Wizard & Stepper (Ramah Pemula) */}
+      <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#090e1a] p-5 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/70">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-inner">
+              <Sparkles className="h-5 w-5 text-blue-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-100 tracking-tight">
+                  Panduan Memulai Cepat (Quick Start Wizard)
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-950/40 text-blue-300 font-semibold font-mono">
+                  Langkah 1 - 2 - 3
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Ikuti langkah mudah ini untuk mengonfigurasi dan menjalankan bot trading otomatis Anda.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleGuide}
+            className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-300 transition-colors"
+          >
+            <span>{isGuideOpen ? 'Sembunyikan Panduan' : 'Buka Panduan Langkah'}</span>
+            {isGuideOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Stepper Content */}
+        {isGuideOpen && (
+          <div className="pt-4 space-y-4">
+            {/* 4 Interactive Step Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              {/* Step 1: AI Provider */}
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                hasProvider
+                  ? 'border-emerald-500/30 bg-emerald-950/20 text-slate-200'
+                  : 'border-blue-500/30 bg-blue-950/20 text-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 1</span>
+                  {hasProvider ? (
+                    <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Terhubung
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-400 font-medium">Perlu Dihubungkan</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Cpu className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span className="text-xs font-bold text-slate-100">Koneksi Akun AI</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug mb-3">
+                  {hasProvider ? 'Provider AI (Google Antigravity / Token Harbor) telah aktif.' : 'Hubungkan akun Google atau masukkan API Key AI.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onSwitchTab && onSwitchTab('settings', 'ai')}
+                  className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                    hasProvider
+                      ? 'border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm'
+                  }`}
+                >
+                  <span>{hasProvider ? 'Lihat Provider' : 'Hubungkan AI'}</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Step 2: Model Routing */}
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                isAiConfigured
+                  ? 'border-emerald-500/30 bg-emerald-950/20 text-slate-200'
+                  : 'border-indigo-500/30 bg-indigo-950/20 text-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 2</span>
+                  {isAiConfigured ? (
+                    <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Siap
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-400 font-medium">Pilih Model</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Zap className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span className="text-xs font-bold text-slate-100">Model AI Terpilih</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug mb-3 truncate" title={activeModelName}>
+                  {activeModelName ? `Model: ${activeModelName}` : 'Pilih model rekomendasi (Gemini / Claude)'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onSwitchTab && onSwitchTab('settings', 'ai')}
+                  className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                    isAiConfigured
+                      ? 'border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
+                  }`}
+                >
+                  <span>{isAiConfigured ? 'Ubah Model' : 'Pilih Model AI'}</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Step 3: Notification Bots (WhatsApp & Telegram) */}
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                isWaConnected
+                  ? 'border-emerald-500/30 bg-emerald-950/20 text-slate-200'
+                  : 'border-slate-800 bg-slate-900/40 text-slate-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 3 (Opsional)</span>
+                  {isWaConnected ? (
+                    <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Online
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">Belum Terhubung</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <MessageSquare className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs font-bold text-slate-100">Bot Notifikasi (WA &amp; Telegram)</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug mb-3">
+                  {isWaConnected ? 'Notifikasi transaksi aktif ke HP Anda (WhatsApp / Telegram).' : 'Hubungkan WhatsApp atau Telegram untuk menerima notifikasi profit di HP.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onSwitchTab && onSwitchTab('bots')}
+                  className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                    isWaConnected
+                      ? 'border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                      : 'border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
+                  }`}
+                >
+                  <span>{isWaConnected ? 'Kelola Bots' : 'Atur Bot Notifikasi'}</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Step 4: Risk Profile */}
+              <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-950/15 text-slate-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Langkah 4</span>
+                    <span className="text-[11px] text-amber-400 font-medium">
+                      {currentProfileKey === 'conservative' ? 'Konservatif' : currentProfileKey === 'aggressive' ? 'Agresif' : 'Seimbang'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-xs font-bold text-slate-100">Profil Risiko Modal</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-snug mb-2.5">
+                    Pilih gaya trading Anda dengan 1-klik:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1">
+                  <button
+                    type="button"
+                    disabled={updatingProfile}
+                    onClick={() => handleQuickSelectRisk('conservative')}
+                    title="Hanya koin likuid teratas (BTC, ETH, SOL), Stop Loss 1.5%"
+                    className={`py-1 px-1.5 rounded text-[10px] font-semibold text-center transition-all ${
+                      currentProfileKey === 'conservative'
+                        ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    Aman
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingProfile}
+                    onClick={() => handleQuickSelectRisk('balanced')}
+                    title="Momentum koin teratas + Take Profit 5%"
+                    className={`py-1 px-1.5 rounded text-[10px] font-semibold text-center transition-all ${
+                      currentProfileKey === 'balanced'
+                        ? 'bg-blue-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    Seimbang
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingProfile}
+                    onClick={() => handleQuickSelectRisk('aggressive')}
+                    title="Mengincar listing baru & koin memecoin"
+                    className={`py-1 px-1.5 rounded text-[10px] font-semibold text-center transition-all ${
+                      currentProfileKey === 'aggressive'
+                        ? 'bg-amber-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    Agresif
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSwitchTab && onSwitchTab('settings', 'risk')}
+                  className="w-full mt-2.5 py-1 px-2 rounded-lg border border-amber-500/30 bg-amber-950/30 hover:bg-amber-900/40 text-[10px] text-amber-300 font-medium flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Calculator className="w-3 h-3 text-amber-400" />
+                  <span>Hitung Alokasi Modal Otomatis</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Step 5: Big Call to Action Button */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-800 bg-slate-900/50">
+              <div className="flex items-center gap-2.5">
+                <span className={`h-3 w-3 rounded-full shrink-0 ${isAuto ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
+                <div>
+                  <div className="text-xs font-bold text-slate-200">
+                    {isAuto ? 'Auto-Trading Sedang AKTIF Memantau Pasar' : 'Auto-Trading Saat Ini Sedang PAUSED (Siaga)'}
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Mode saat ini: <strong className="text-slate-300 font-mono">{status?.mode?.toUpperCase()} TRADING</strong> (Simulasi modal virtual Rp {balance.toLocaleString('id-ID')}).
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onToggleTrading}
+                className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition-all ${
+                  isAuto
+                    ? 'border border-amber-500/40 bg-amber-600/20 text-amber-300 hover:bg-amber-600/30'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
+                }`}
+              >
+                {isAuto ? (
+                  <>
+                    <Pause className="w-4 h-4 text-amber-400" />
+                    <span>Jeda Auto-Trading (Pause)</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Mulai Auto-Trading Sekarang (Aman)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Real-time Status Narrative (Plain Indonesian) */}
+      <div className="p-3.5 rounded-xl border border-slate-800 bg-[#090e1a] text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-2.5 w-2.5 shrink-0">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAuto ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isAuto ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+          </span>
+          <span>
+            <strong>Kondisi Mesin: </strong>
+            {isAuto
+              ? `Bot sedang memantau koin Indodax secara real-time, menahan risiko dengan profil ${currentProfileKey.toUpperCase()}, dan mengelola ${openPositions.length} posisi terbuka.`
+              : `Bot sedang dalam posisi jeda (PAUSED). Sinyal pasar tetap dipantau, namun order baru ditahan sampai Anda menyalakan auto-trading.`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 shrink-0">
+          <span>Posisi Aktif: <strong className="text-slate-200">{openPositions.length}</strong></span>
+          <span>•</span>
+          <span>Selesai: <strong className="text-slate-200">{recentTrades.length}</strong></span>
+        </div>
+      </div>
+
+      {/* Mode Pemula Explainer Card (Plain Indonesian) */}
+      {displayMode === 'simple' && (
+        <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-200">
+          <div className="flex items-start gap-2.5">
+            <HelpCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-slate-100 block mb-0.5">Bagaimana Bot Bekerja untuk Anda?</span>
+              Bot secara otomatis memindai seluruh koin di Indodax setiap 15 detik. Jika ada koin yang memiliki momentum kenaikan yang aman dan disetujui oleh evaluator AI, bot akan membelinya serta langsung memasang pengaman otomatis (*stop-loss dinamis*) agar keuntungan Anda terkunci dan modal Anda terlindungi dari kerugian.
+            </div>
+          </div>
+          <span className="text-[10px] px-2 py-1 rounded bg-blue-900/50 text-blue-300 font-mono shrink-0 self-end sm:self-auto border border-blue-500/30">
+            Mode Pemula Aktif
+          </span>
+        </div>
+      )}
+
+      {/* Persistent Onboarding Checklist */}
+      <div className="p-4 rounded-xl border border-slate-800 bg-[#080d17] space-y-2.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold text-slate-200 flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-emerald-400" />
+            <span>Checklist 4 Langkah Keselamatan Trader Pemula:</span>
+          </span>
+          <span className="text-[11px] font-mono text-slate-400">
+            {Object.values(checklist).filter(Boolean).length} / 4 Selesai
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+          {[
+            { id: 'step1', label: '1. Hubungkan Model AI (Google/Claude)' },
+            { id: 'step2', label: '2. Pasang Profil Risiko Aman (Konservatif)' },
+            { id: 'step3', label: '3. Uji minimal 7 hari di Mode Paper' },
+            { id: 'step4', label: '4. Buat cadangan database berkala' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => toggleChecklistItem(item.id)}
+              className={`p-2.5 rounded-lg border text-left flex items-center gap-2 transition-all ${
+                checklist[item.id]
+                  ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-300'
+                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700'
+              }`}
+            >
+              {checklist[item.id] ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <Square className="w-4 h-4 text-slate-600 shrink-0" />
+              )}
+              <span className={`text-[11px] leading-snug ${checklist[item.id] ? 'line-through text-slate-400' : ''}`}>
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI Cards Row (Clean, Human-Readable) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Balance */}
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-xs font-medium uppercase tracking-wider">
+                {status?.mode === 'paper' ? 'Saldo Virtual (Paper)' : 'Saldo Riil Indodax'}
+              </span>
+              <DollarSign className="h-4 w-4 text-blue-400" />
+            </div>
+            <div className="text-2xl font-bold font-mono text-slate-100">
+              Rp {balance.toLocaleString('id-ID')}
+            </div>
+            <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full ${status?.mode === 'live' ? 'bg-emerald-400' : 'bg-blue-400'}`} />
+              Mode: <span className="font-semibold text-slate-300 uppercase">{status?.mode} Trading</span>
+            </div>
+          </div>
+          <div className="mt-2.5">
+            {status?.mode === 'paper' ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-300 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                <span>Mode Simulasi: Saldo Virtual (100% Bebas Risiko Rugi)</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-950/40 border border-amber-500/30 text-[10px] text-amber-300 font-medium">
+                <Shield className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                <span>Live Riil: Pengaman Stop Loss Aktif</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Card 2: Floating PnL */}
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium uppercase tracking-wider">Keuntungan / Rugi Berjalan</span>
+            {totalFloatingPnl >= 0 ? (
+              <TrendingUp className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-rose-400" />
+            )}
+          </div>
+          <div className={`text-2xl font-bold font-mono ${totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {totalFloatingPnl >= 0 ? '+' : ''}Rp {Math.round(totalFloatingPnl).toLocaleString('id-ID')}
+          </div>
+          <div className={`mt-2 text-xs font-mono font-medium flex items-center gap-1 ${totalFloatingPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {totalFloatingPnl >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+            {totalFloatingPnlPercent >= 0 ? '+' : ''}{totalFloatingPnlPercent.toFixed(2)}% dari {openPositions.length} koin aktif
+          </div>
+        </div>
+
+        {/* Card 3: Multi-Agent Sentiment Index */}
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium uppercase tracking-wider">Kondisi Pasar Menurut AI</span>
+            <Layers className="h-4 w-4 text-indigo-400" />
+          </div>
+          <div className="text-2xl font-bold font-mono text-slate-100 flex items-center gap-2">
+            <span>{sentiment > 0 ? `+${sentiment}` : sentiment}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${
+              sentiment >= 0.2
+                ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
+                : sentiment <= -0.2
+                ? 'border-rose-500/30 bg-rose-950/40 text-rose-400'
+                : 'border-slate-700 bg-slate-800 text-slate-300'
+            }`}>
+              {sentiment >= 0.2 ? 'BULLISH (NAIK)' : sentiment <= -0.2 ? 'BEARISH (TURUN)' : 'NETRAL'}
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-slate-400">
+            Dipantau 10 Subagent (Berita &amp; Bursa)
+          </div>
+        </div>
+
+        {/* Card 4: WhatsApp Bot Link */}
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-4 shadow-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium uppercase tracking-wider">WhatsApp Bot Alert</span>
+            <Shield className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${status?.whatsapp?.connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+            <span className="text-base font-bold text-slate-100">
+              {status?.whatsapp?.connected ? 'Terhubung (Online)' : 'Menunggu Pairing QR'}
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-slate-400 truncate">
+            Admin: {status?.whatsapp?.adminNumber || 'Belum diisi di Settings'}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Section: Posisi Koin Aktif */}
+      <div className="rounded-xl border border-slate-800 bg-[#0b101b] overflow-hidden shadow-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 bg-slate-900/30">
+          <div className="flex items-center gap-2.5">
+            <TrendingUp className="h-4 w-4 text-blue-400" />
+            <h2 className="text-sm font-semibold tracking-wide text-slate-200">
+              Posisi Koin yang Sedang Berjalan ({openPositions.length})
+            </h2>
+          </div>
+          <span className="text-xs text-slate-400 font-mono">
+            Pengaman Dinamis: Trailing Stop Loss &amp; Scale-Out TP
+          </span>
+        </div>
+
+        {openPositions.length === 0 ? (
+          <div className="py-12 text-center text-slate-400">
+            <AlertCircle className="h-8 w-8 text-slate-500 mx-auto mb-2 opacity-60" />
+            <p className="text-sm font-medium text-slate-300">Belum ada koin yang sedang di-hold.</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+              Sistem autonomous sedang memindai peluang koin di Indodax. Saat momentum terdeteksi dan aman, koin akan otomatis muncul di sini.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800/60 bg-slate-900/50 text-slate-400 font-mono text-[11px] uppercase">
+                    <th className="py-3 px-4">Koin / Pair</th>
+                    <th className="py-3 px-4">Harga Beli</th>
+                    <th className="py-3 px-4">Harga Sekarang</th>
+                    <th className="py-3 px-4">
+                      <div className="flex items-center gap-1">
+                        <span>Level Pengaman (Stop Loss)</span>
+                        <HelpTooltip content="Trailing Stop Loss: Level harga proteksi yang otomatis naik mengikuti kenaikan harga koin. Bila harga berbalik turun menembus angka ini, bot otomatis menjual untuk mengamankan profit atau membatasi rugi." />
+                      </div>
+                    </th>
+                    <th className="py-3 px-4">Modal Terpakai</th>
+                    <th className="py-3 px-4">
+                      <div className="flex items-center gap-1">
+                        <span>Keuntungan (PnL)</span>
+                        <HelpTooltip content="Floating Profit & Loss: Estimasi keuntungan atau kerugian berjalan saat ini sebelum koin dieksekusi jual." />
+                      </div>
+                    </th>
+                    <th className="py-3 px-4">
+                      <div className="flex items-center gap-1">
+                        <span>Status Pengamanan</span>
+                        <HelpTooltip content="Scale-Out TP: Saat profit capai target awal, bot menjual 50% untuk kunci profit dan memindahkan stop loss ke titik impas (breakeven)." />
+                      </div>
+                    </th>
+                    <th className="py-3 px-4">Lama Hold</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/40 font-mono">
+                  {openPositions.map((pos) => {
+                    const isProfit = (pos.pnl_percent || 0) >= 0;
+                    const holdMin = Math.round((Date.now() - pos.opened_at) / 60000);
+
+                    return (
+                      <tr key={pos.id} className="hover:bg-slate-800/20 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-slate-200 text-sm">
+                          {pos.symbol.toUpperCase()}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-300">
+                          Rp {pos.entry_price.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-100 font-semibold">
+                          Rp {pos.current_price.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3.5 px-4 text-amber-400 font-bold">
+                          Rp {Math.round(pos.trailing_stop_price).toLocaleString('id-ID')}
+                          <span className="block text-[10px] text-slate-500 font-sans font-normal">
+                            (Otomatis jual bila tembus)
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-300">
+                          Rp {Math.round(pos.initial_cost_idr).toLocaleString('id-ID')}
+                        </td>
+                        <td className={`py-3.5 px-4 font-semibold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : ''}{pos.pnl_percent?.toFixed(2)}%
+                          <span className="block text-[11px] opacity-80">
+                            ({isProfit ? '+' : ''}Rp {Math.round(pos.pnl_idr || 0).toLocaleString('id-ID')})
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans border ${
+                            pos.take_profit_step === 1
+                              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30 font-semibold'
+                              : 'bg-blue-950/40 text-blue-300 border-blue-500/30'
+                          }`}>
+                            <Shield className="h-3 w-3" />
+                            {pos.take_profit_step === 1 ? '50% Profit Aman (Breakeven Locked)' : 'Tracking Momentum'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-400 flex items-center gap-1.5 pt-4 font-sans">
+                          <Clock className="h-3.5 w-3.5 text-slate-500" />
+                          {holdMin} menit
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card Layout (< md screens) */}
+            <div className="md:hidden divide-y divide-slate-800/80 p-3 space-y-3">
+              {openPositions.map((pos) => {
+                const isProfit = (pos.pnl_percent || 0) >= 0;
+                const holdMin = Math.round((Date.now() - pos.opened_at) / 60000);
+
+                return (
+                  <div key={pos.id} className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/50 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-slate-100 font-mono">
+                          {pos.symbol.toUpperCase()}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${
+                          pos.take_profit_step === 1
+                            ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
+                            : 'bg-blue-950/60 text-blue-300 border-blue-500/30'
+                        }`}>
+                          <Shield className="w-2.5 h-2.5" />
+                          {pos.take_profit_step === 1 ? 'Profit Aman' : 'Tracking'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        <span>{holdMin}m</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                      <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">
+                        <span className="text-[10px] text-slate-500 block uppercase">Harga Sekarang</span>
+                        <span className="font-semibold text-slate-200">Rp {pos.current_price.toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block">Beli: Rp {pos.entry_price.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">
+                        <span className="text-[10px] text-slate-500 block uppercase">Pengaman (Stop Loss)</span>
+                        <span className="font-bold text-amber-400">Rp {Math.round(pos.trailing_stop_price).toLocaleString('id-ID')}</span>
+                        <span className="text-[10px] text-slate-500 block">Otomatis Cut/TP</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+                      <div className="text-xs">
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Modal Terpakai</span>
+                        <span className="font-mono text-slate-300">Rp {Math.round(pos.initial_cost_idr).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">PnL Berjalan</span>
+                        <span className={`text-sm font-bold font-mono ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : ''}{pos.pnl_percent?.toFixed(2)}%
+                          <span className="text-xs font-normal ml-1">
+                            ({isProfit ? '+' : ''}Rp {Math.round(pos.pnl_idr || 0).toLocaleString('id-ID')})
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Accordion or Full: Candlestick Chart */}
+      {displayMode === 'simple' ? (
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowChartInSimple(!showChartInSimple)}
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-600/15 border border-blue-500/30 text-blue-400">
+                <BarChart2 className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-slate-200 block">
+                  Grafik Lilin Pasar Real-Time (TradingView Candlestick)
+                </span>
+                <span className="text-xs text-slate-400">
+                  {showChartInSimple ? 'Klik untuk menutup chart' : 'Klik untuk melihat grafik teknikal harga langsung dari Indodax'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-blue-400">
+              <span>{showChartInSimple ? 'Tutup Grafik' : 'Tampilkan Grafik'}</span>
+              {showChartInSimple ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </button>
+          {showChartInSimple && (
+            <div className="p-4 pt-0 border-t border-slate-800/80">
+              <CryptoChart
+                selectedSymbol={
+                  openPositions.length > 0
+                    ? `${openPositions[0].symbol.replace('idr', '').toUpperCase()}/IDR`
+                    : 'BTC/IDR'
+                }
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        <CryptoChart
+          selectedSymbol={
+            openPositions.length > 0
+              ? `${openPositions[0].symbol.replace('idr', '').toUpperCase()}/IDR`
+              : 'BTC/IDR'
+          }
+        />
+      )}
+
+      {/* Accordion or Full: A/B Counterfactual Validation Section */}
+      {displayMode === 'simple' ? (
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowAbInSimple(!showAbInSimple)}
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-600/15 border border-indigo-500/30 text-indigo-400">
+                <Activity className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-slate-200 block">
+                  Laboratorium Kuantitatif &amp; Pembuktian Nilai Tambah AI (A/B Alpha Tracker)
+                </span>
+                <span className="text-xs text-slate-400">
+                  {showAbInSimple ? 'Klik untuk menutup analisis kuantitatif' : 'Pelacak koin yang ditolak AI untuk membuktikan efektivitas keputusan AI secara nyata'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400">
+              <span>{showAbInSimple ? 'Tutup Analisis' : 'Buka Analisis Kuantitatif'}</span>
+              {showAbInSimple ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </button>
+          {showAbInSimple && (
+            <div className="p-4 pt-0 border-t border-slate-800/80">
+              <AbValidationSection />
+            </div>
+          )}
+        </div>
+      ) : (
+        <AbValidationSection />
+      )}
+
+      {/* Accordion or Full: Entry Gate Diagnostics Section */}
+      <div data-tour="entry-diagnostics">
+        {displayMode === 'simple' ? (
+          <div className="rounded-xl border border-slate-800 bg-[#0b101b] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowDiagnosticsInSimple(!showDiagnosticsInSimple)}
+              className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-900/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-600/15 border border-blue-500/30 text-blue-400">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-slate-200 block">
+                    Status 9 Gerbang Masuk Pasar &amp; Radar Peluang Koin
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {showDiagnosticsInSimple ? 'Klik untuk menutup diagnostik gerbang' : 'Pelajari alasan transparan mengapa bot belum atau sedang melakukan transaksi'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-blue-400">
+                <span>{showDiagnosticsInSimple ? 'Tutup Diagnostik' : 'Buka Diagnostik Gerbang'}</span>
+                {showDiagnosticsInSimple ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+            {showDiagnosticsInSimple && (
+              <div className="p-4 pt-0 border-t border-slate-800/80">
+                <EntryDiagnosticsSection />
+              </div>
+            )}
+          </div>
+        ) : (
+          <EntryDiagnosticsSection />
+        )}
+      </div>
+
+      {/* Two Columns: Recent Trades & AI Self-Learning Lessons */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column: Recent Trade Executions */}
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+            <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
+              <Clock className="h-4 w-4 text-blue-400" />
+              <span>Aktivitas Transaksi Terakhir</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">Buku Transaksi</span>
+          </div>
+
+          {recentTrades.length === 0 ? (
+            <p className="text-xs text-slate-400 py-6 text-center">Belum ada riwayat transaksi.</p>
+          ) : (
+            <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+              {recentTrades.map((t) => {
+                const isBuy = t.type === 'BUY';
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-800/50 bg-slate-900/40 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                        isBuy ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' : 'bg-rose-950 text-rose-400 border border-rose-500/30'
+                      }`}>
+                        {isBuy ? 'BELI' : 'JUAL'}
+                      </span>
+                      <div>
+                        <span className="font-bold text-slate-200">{t.symbol.toUpperCase()}</span>
+                        <p className="text-[11px] text-slate-400">{t.reason || 'Otomatis oleh Trading Engine'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono">
+                      <div className="text-slate-200 font-medium">Rp {t.total_idr.toLocaleString('id-ID')}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {new Date(t.timestamp).toLocaleTimeString('id-ID')}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: AI Post-Mortem Self-Learning Lessons */}
+        <div className="rounded-xl border border-slate-800 bg-[#0b101b] p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
+            <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
+              <Lightbulb className="h-4 w-4 text-amber-400" />
+              <span>Memori Belajar Mandiri AI (Self-Learning)</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">Closed-Loop Memory</span>
+          </div>
+
+          {lessons.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-xs">
+              <p>Belum ada rekaman evaluasi post-mortem.</p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Setiap posisi koin ditutup, AI Reviewer menganalisa faktor keberhasilan/kegagalan dan mengingatnya untuk trade berikutnya.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              {lessons.map((l) => {
+                const isWin = l.result === 'WIN';
+                return (
+                  <div
+                    key={l.id}
+                    className="p-3 rounded-lg border border-slate-800/60 bg-slate-900/30 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between font-mono">
+                      <div className="flex items-center gap-1.5">
+                        {isWin ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                        )}
+                        <span className="font-bold text-slate-200">{l.symbol.toUpperCase()}</span>
+                        <span className={isWin ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
+                          ({l.pnl_percent >= 0 ? '+' : ''}{l.pnl_percent.toFixed(2)}%)
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(l.timestamp).toLocaleDateString('id-ID')}
+                      </span>
+                    </div>
+                    <p className="text-slate-300 leading-relaxed font-sans text-[11px]">
+                      "{l.lesson}"
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* In-App Financial Risk Disclaimer */}
+      <div className="p-4 rounded-xl border border-slate-800 bg-[#080d17] text-xs text-slate-400 flex items-start gap-3 shadow-sm">
+        <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+        <p className="leading-relaxed">
+          <strong className="text-slate-300">Pernyataan Risiko &amp; Kepatuhan: </strong>
+          Perdagangan aset kripto memiliki tingkat risiko tinggi terhadap modal Anda. AI Trading adalah piranti lunak otomasi kuantitatif mandiri, bukan penasihat keuangan atau pialang berizin. Segala keputusan strategi dan pengoperasian sepenuhnya berada di bawah kendali pengguna. Selalu utamakan simulasi di Mode Paper.
+        </p>
+      </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
+  );
+};
