@@ -55,9 +55,9 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     badge_en: 'MISSION 2: SIMULATION MODE',
     badge_id: 'MISI 2: MODE SIMULASI',
     narrative_en:
-      'Notice the glowing toggle up top! By default, the system boots into MODE: PAPER. In this mode, the trading bot runs on simulated virtual balance. Your real Rupiah is 100% SAFE because zero real exchange orders are transmitted. Never switch to MODE: LIVE before validating strategy performance in simulation!',
+      'Notice the glowing toggle highlighted above! By default, the system boots into MODE: PAPER. In this mode, the trading bot runs on simulated virtual balance. Your real Rupiah is 100% SAFE because zero real exchange orders are transmitted. Never switch to MODE: LIVE before validating strategy performance in simulation!',
     narrative_id:
-      'Lihat tombol yang menyala di atas! Secara default, sistem berada di MODE: PAPER. Di mode ini, bot trading menggunakan uang virtual (simulasi). Uang Rupiah aslimu 100% AMAN karena tidak ada transaksi bursa nyata yang dikirim. Jangan pernah beralih ke MODE: LIVE sebelum kamu benar-benar menguji performa dan strategi bot di mode simulasi!',
+      'Lihat tombol yang disorot di atas! Secara default, sistem berada di MODE: PAPER. Di mode ini, bot trading menggunakan uang virtual (simulasi). Uang Rupiah aslimu 100% AMAN karena tidak ada transaksi bursa nyata yang dikirim. Jangan pernah beralih ke MODE: LIVE sebelum kamu benar-benar menguji performa dan strategi bot di mode simulasi!',
     tip_en: 'Paper mode is ideal to see how the bot reacts to market swings without risking a single penny.',
     tip_id: 'Mode Paper sangat cocok untuk melihat bagaimana bot bereaksi terhadap gejolak pasar tanpa resiko rugi.',
     buttonText_en: 'Understood, Proceed to Master Switch ➜',
@@ -187,7 +187,6 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     return !isNaN(parsed) && parsed >= 0 && parsed < TUTORIAL_STEPS.length ? parsed : 0;
   });
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
   const rawStep = TUTORIAL_STEPS[currentStepIndex];
   const step = useMemo(() => {
@@ -212,55 +211,92 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     }
   }, [isOpen, currentStepIndex, step.tab, activeTab, onSwitchTab]);
 
-  // Measure and track target element bounding rect
+  // Measure and track target element bounding rect with retry
   const updateTargetRect = useCallback(() => {
     if (!step.targetSelector) {
       setTargetRect(null);
       return;
     }
 
-    const el = document.querySelector(step.targetSelector);
+    const el = document.querySelector(step.targetSelector) as HTMLElement | null;
     if (el) {
       const rect = el.getBoundingClientRect();
-      setTargetRect(rect);
-    } else {
-      setTargetRect(null);
+      if (rect.width > 0 && rect.height > 0) {
+        setTargetRect(rect);
+        return;
+      }
     }
+    setTargetRect(null);
   }, [step.targetSelector]);
 
+  // Robust element detection, scrolling, and DOM highlight class attachment
   useEffect(() => {
     if (!isOpen) return;
 
-    const timeout = setTimeout(() => {
-      updateTargetRect();
+    let cancelled = false;
+    let attempts = 0;
 
-      if (step.targetSelector) {
-        const el = document.querySelector(step.targetSelector);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const findAndMeasure = () => {
+      if (cancelled) return;
+
+      if (!step.targetSelector) {
+        setTargetRect(null);
+        return;
+      }
+
+      const el = document.querySelector(step.targetSelector) as HTMLElement | null;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setTargetRect(rect);
+
+          // Add highlighting class to element directly
+          el.classList.add('tutorial-active-target');
+
+          // Smooth scroll only if element is outside comfortable viewport
+          const inView =
+            rect.top >= 40 &&
+            rect.bottom <= window.innerHeight - 40 &&
+            rect.left >= 0 &&
+            rect.right <= window.innerWidth;
+
+          if (!inView) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return;
         }
       }
-    }, 150);
+
+      // Retry up to 10 times (1 second total) in case views or tabs are still mounting
+      if (attempts < 10) {
+        attempts++;
+        setTimeout(findAndMeasure, 100);
+      }
+    };
+
+    findAndMeasure();
 
     const handleResizeOrScroll = () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      animationFrameRef.current = requestAnimationFrame(updateTargetRect);
+      updateTargetRect();
     };
 
     window.addEventListener('resize', handleResizeOrScroll);
     window.addEventListener('scroll', handleResizeOrScroll, true);
 
     return () => {
-      clearTimeout(timeout);
+      cancelled = true;
       window.removeEventListener('resize', handleResizeOrScroll);
       window.removeEventListener('scroll', handleResizeOrScroll, true);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+
+      // Clean up highlighting class
+      if (step.targetSelector) {
+        const el = document.querySelector(step.targetSelector);
+        if (el) {
+          el.classList.remove('tutorial-active-target');
+        }
       }
     };
-  }, [isOpen, currentStepIndex, step.targetSelector, updateTargetRect]);
+  }, [isOpen, currentStepIndex, step.targetSelector, activeTab, updateTargetRect]);
 
   if (!isOpen) return null;
 
@@ -290,6 +326,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
 
   const isFinalStep = currentStepIndex === TUTORIAL_STEPS.length - 1;
 
+  // Calculate intelligent position for the dialog box relative to target rect
   const getDialogStyle = (): React.CSSProperties => {
     if (step.centerModal || !targetRect) {
       return {
@@ -304,17 +341,36 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const dialogWidth = Math.min(480, viewportWidth - 32);
+    const dialogEstimatedHeight = 360;
 
+    // Special case: If target is in the sidebar on large desktop screens
+    if (targetRect.left < 280 && viewportWidth >= 1024) {
+      let top = Math.max(20, targetRect.top - 20);
+      if (top + dialogEstimatedHeight > viewportHeight - 20) {
+        top = Math.max(20, viewportHeight - dialogEstimatedHeight - 20);
+      }
+      return {
+        position: 'fixed',
+        top: `${top}px`,
+        left: `${targetRect.right + 24}px`,
+        width: `${dialogWidth}px`,
+        zIndex: 9999,
+      };
+    }
+
+    // Default: place below the target
     let top = targetRect.bottom + 16;
     let left = targetRect.left + targetRect.width / 2 - dialogWidth / 2;
 
+    // If placing below exceeds screen bottom, place above target
+    if (top + dialogEstimatedHeight > viewportHeight - 16 && targetRect.top > dialogEstimatedHeight + 20) {
+      top = targetRect.top - dialogEstimatedHeight - 16;
+    }
+
+    // Horizontal boundary clamp
     if (left < 16) left = 16;
     if (left + dialogWidth > viewportWidth - 16) {
       left = viewportWidth - dialogWidth - 16;
-    }
-
-    if (top + 280 > viewportHeight && targetRect.top > 300) {
-      top = targetRect.top - 280 - 16;
     }
 
     return {
@@ -326,38 +382,80 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
     };
   };
 
-  return (
-    <div className="fixed inset-0 z-[9990] overflow-hidden select-none pointer-events-auto">
-      {/* 1. Dark Backdrop Overlay */}
-      <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm transition-all duration-300" />
+  const hasCutout = !step.centerModal && targetRect;
 
-      {/* 2. Spotlight Cutout / Glowing Frame over Target Element */}
-      {targetRect && !step.centerModal && (
+  return (
+    <div className="fixed inset-0 z-[9990] overflow-hidden select-none">
+      {/* 1. Backdrop Overlay:
+             If there is a target, use SVG Mask to punch a 100% CRYSTAL-CLEAR TRANSPARENT HOLE directly over the target element.
+             If centerModal or no target, use a smooth dark backdrop. */}
+      {hasCutout ? (
+        <svg
+          className="fixed inset-0 w-full h-full pointer-events-none z-[9991]"
+          style={{ width: '100vw', height: '100vh' }}
+        >
+          <defs>
+            <mask id="tutorial-spotlight-hole">
+              {/* White area = dimmed backdrop */}
+              <rect x="0" y="0" width="100%" height="100%" fill="white" />
+              {/* Black area = 100% PURE TRANSPARENT CUTOUT showing real element underneath */}
+              <rect
+                x={Math.max(0, targetRect.left - 8)}
+                y={Math.max(0, targetRect.top - 8)}
+                width={targetRect.width + 16}
+                height={targetRect.height + 16}
+                rx="14"
+                ry="14"
+                fill="black"
+              />
+            </mask>
+          </defs>
+          <rect
+            x="0"
+            y="0"
+            width="100%"
+            height="100%"
+            fill="rgba(3, 7, 18, 0.72)"
+            mask="url(#tutorial-spotlight-hole)"
+          />
+        </svg>
+      ) : (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs transition-opacity duration-300 z-[9991]" />
+      )}
+
+      {/* 2. Futuristic Neon Frame around the Transparent Cutout */}
+      {hasCutout && (
         <div
           className="fixed pointer-events-none transition-all duration-300 ease-out z-[9995]"
           style={{
-            top: targetRect.top - 6,
-            left: targetRect.left - 6,
-            width: targetRect.width + 12,
-            height: targetRect.height + 12,
-            borderRadius: '16px',
-            boxShadow: '0 0 0 9999px rgba(3, 7, 18, 0.88), 0 0 35px rgba(59, 130, 246, 0.65)',
-            border: '2px solid rgba(96, 165, 250, 0.9)',
+            top: Math.max(0, targetRect.top - 8),
+            left: Math.max(0, targetRect.left - 8),
+            width: targetRect.width + 16,
+            height: targetRect.height + 16,
+            borderRadius: '14px',
+            border: '2px solid #38bdf8',
+            boxShadow: '0 0 25px rgba(56, 189, 248, 0.55), inset 0 0 12px rgba(56, 189, 248, 0.2)',
           }}
         >
-          {/* Pulsating corner beacons */}
+          {/* Tactical Corner Targeting Brackets */}
+          <span className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-cyan-300" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-cyan-300" />
+          <span className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-cyan-300" />
+          <span className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-cyan-300" />
+
+          {/* Pulsating Corner Beacons */}
           <span className="absolute -top-1.5 -left-1.5 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500" />
           </span>
           <span className="absolute -bottom-1.5 -right-1.5 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500" />
           </span>
 
-          {/* Floating animated target pointer tag */}
-          <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 animate-bounce">
-            <Target className="w-3 h-3" />
+          {/* Animated Target Badge */}
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white text-[10px] font-mono font-extrabold px-3 py-0.5 rounded-full shadow-lg shadow-cyan-950/60 flex items-center gap-1.5 animate-bounce whitespace-nowrap">
+            <Target className="w-3 h-3 text-cyan-200" />
             <span>{l('MISSION TARGET', 'TARGET MISI')}</span>
           </div>
         </div>
@@ -366,11 +464,11 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
       {/* 3. Game HUD Quest Dialog Box */}
       <div
         style={getDialogStyle()}
-        className={`w-full max-w-lg rounded-2xl border-2 border-blue-500/50 bg-[#090f1d] shadow-2xl shadow-blue-950/80 p-5 sm:p-6 text-slate-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 ${
+        className={`w-full max-w-lg rounded-2xl border-2 border-blue-500/50 bg-[#090f1d] shadow-2xl shadow-blue-950/90 p-5 sm:p-6 text-slate-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 ${
           step.centerModal ? 'mx-4' : ''
         }`}
       >
-        {/* HUD Top Bar: Mission Badge, Progress, & Unskippable indicator */}
+        {/* HUD Top Bar: Mission Badge, Progress, & Skip button */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/30 text-blue-400 border border-blue-500/40">

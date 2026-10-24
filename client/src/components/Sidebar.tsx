@@ -179,6 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <button
                     key={item.id}
+                    data-tour={`nav-${item.id}`}
                     onClick={() => {
                       setActiveTab(item.id);
                       if (isOpenMobile) onCloseMobile();
