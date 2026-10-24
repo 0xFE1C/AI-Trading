@@ -453,7 +453,7 @@ export function App() {
       />
 
       {/* 2. Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-72">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
         <TopHeader
           activeTab={activeTab}
