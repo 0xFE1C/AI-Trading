@@ -466,8 +466,6 @@ export function App() {
           onToggleTrading={handleToggleTrading}
           onToggleMode={handleToggleMode}
           onPanicSell={handlePanicSell}
-          onStartTutorial={handleStartTutorial}
-          onOpenGlossary={() => setShowGlossaryModal(true)}
           unreadNotificationsCount={notifications.filter((n) => !n.read).length}
           onOpenNotifications={() => setShowNotificationCenter(true)}
         />

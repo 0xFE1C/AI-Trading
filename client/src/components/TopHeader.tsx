@@ -15,9 +15,7 @@ import {
   Sparkles,
   Zap,
   Globe,
-  Gamepad2,
   Bell,
-  BookOpen
 } from 'lucide-react';
 import { SystemStatus } from '../types';
 import { isStaticHost } from '../services/api';
@@ -35,8 +33,6 @@ interface TopHeaderProps {
   onToggleTrading: () => void;
   onToggleMode: () => void;
   onPanicSell: () => void;
-  onStartTutorial?: () => void;
-  onOpenGlossary?: () => void;
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
 }
@@ -52,8 +48,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onToggleTrading,
   onToggleMode,
   onPanicSell,
-  onStartTutorial,
-  onOpenGlossary,
   unreadNotificationsCount = 0,
   onOpenNotifications,
 }) => {
@@ -186,30 +180,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             <span className="sm:hidden">PANIC</span>
             {!isAdmin && <Lock className="h-3 w-3 text-rose-400" />}
           </button>
-
-          {/* Interactive Tutorial Button */}
-          {onStartTutorial && (
-            <button
-              onClick={onStartTutorial}
-              title={t('header.tutorial', 'Tutorial')}
-              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/50 hover:text-indigo-200 text-xs font-medium transition-colors shrink-0"
-            >
-              <Gamepad2 className="h-3.5 w-3.5 text-indigo-400" />
-              <span>{t('header.tutorial', 'Tutorial')}</span>
-            </button>
-          )}
-
-          {/* Educational Glossary & FAQ Button */}
-          {onOpenGlossary && (
-            <button
-              onClick={onOpenGlossary}
-              title={t('header.glossary', 'Glossary & FAQ')}
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors shrink-0"
-            >
-              <BookOpen className="h-3.5 w-3.5 text-blue-400" />
-              <span>{t('header.glossary', 'Glossary & FAQ')}</span>
-            </button>
-          )}
 
           {/* Notification Center Bell Icon */}
           {onOpenNotifications && (
