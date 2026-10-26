@@ -10,6 +10,8 @@ services:
     environment:
       - PORT=3001
       - NODE_ENV=production
+      - AI_TRADING_ENCRYPTION_KEY=${AI_TRADING_ENCRYPTION_KEY:-}
+      - AI_TRADING_EXTRA_RSS_FEEDS=${AI_TRADING_EXTRA_RSS_FEEDS:-}
     volumes:
       - ./data:/app/data
       - ./trading_data.db:/app/trading_data.db

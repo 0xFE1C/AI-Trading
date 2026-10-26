@@ -50,6 +50,12 @@ export const isStaticHost =
   typeof window !== 'undefined' &&
   (window.location.hostname.includes('github.io') || window.location.protocol === 'file:');
 
+function throwUnlessStaticHost(error: unknown): void {
+  if (!isStaticHost) {
+    throw error;
+  }
+}
+
 export interface ApiConnectionState {
   isOnline: boolean;
   isDemoMode: boolean;
@@ -152,7 +158,7 @@ export const api = {
       const res: any = await request('/auth/status');
       return res;
     } catch {
-      return { success: true, requiresAuth: false, isAdmin: true };
+      return { success: false, requiresAuth: true, isAdmin: false };
     }
   },
 
@@ -160,7 +166,8 @@ export const api = {
     try {
       const json: any = await request('/status');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockSystemStatus;
     }
   },
@@ -169,7 +176,8 @@ export const api = {
     try {
       const json: any = await request('/settings');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         TRADING_MODE: 'paper',
         DEFAULT_RISK_PROFILE: 'balanced',
@@ -189,8 +197,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(settings),
       });
-    } catch {
-      // In static demo, succeed silently
+    } catch (err) {
+      throwUnlessStaticHost(err);
     }
   },
 
@@ -198,7 +206,8 @@ export const api = {
     try {
       const json: any = await request('/providers');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAIProviders;
     }
   },
@@ -209,7 +218,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(provider),
       });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { success: true, providerId: 'prov_demo_saved' };
     }
   },
@@ -217,8 +227,8 @@ export const api = {
   async deleteProvider(id: string): Promise<void> {
     try {
       await request(`/providers/${id}`, { method: 'DELETE' });
-    } catch {
-      // In static demo, succeed silently
+    } catch (err) {
+      throwUnlessStaticHost(err);
     }
   },
 
@@ -227,7 +237,8 @@ export const api = {
     try {
       const query = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
       return await request(`/oauth/antigravity/authorize${query}`);
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { success: true, authUrl: '#', state: 'demo_oauth_state', redirectUri: window.location.href };
     }
   },
@@ -245,7 +256,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         success: true,
         email: 'trading.master@antigravity.ai',
@@ -262,7 +274,8 @@ export const api = {
       return await request(`/providers/${providerId}/import-models`, {
         method: 'POST',
       });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { success: true, count: mockAIModels.length, models: mockAIModels, message: '2 model AI berhasil diimpor' };
     }
   },
@@ -271,7 +284,8 @@ export const api = {
     try {
       const json: any = await request('/models');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAIModels;
     }
   },
@@ -280,7 +294,8 @@ export const api = {
     try {
       const json: any = await request('/scanner');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         topGainers: mockTopGainers,
         newCoinAlerts: mockNewCoins,
@@ -302,7 +317,8 @@ export const api = {
     try {
       const json: any = await request(`/chart/${encodeURIComponent(symbol)}?timeframe=${timeframe}`);
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       const basePrice = symbol.toLowerCase().includes('btc')
         ? 1617000000
         : symbol.toLowerCase().includes('sol')
@@ -330,7 +346,8 @@ export const api = {
     try {
       const json: any = await request('/subagents');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         agents: mockSubagentDefs,
         recentLogs: mockSubagentLogs,
@@ -342,15 +359,16 @@ export const api = {
   async runSubagentsCycle(): Promise<void> {
     try {
       await request('/subagents/run', { method: 'POST' });
-    } catch {
-      // Demo mode success
+    } catch (err) {
+      throwUnlessStaticHost(err);
     }
   },
 
   async toggleAutoTrading(): Promise<{ isActive: boolean }> {
     try {
       return await request('/trading/toggle', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       mockSystemStatus.isAutoTradingActive = !mockSystemStatus.isAutoTradingActive;
       return { isActive: mockSystemStatus.isAutoTradingActive };
     }
@@ -359,7 +377,8 @@ export const api = {
   async toggleTradingMode(): Promise<{ mode: 'paper' | 'live' }> {
     try {
       return await request('/trading/mode', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       mockSystemStatus.mode = mockSystemStatus.mode === 'paper' ? 'live' : 'paper';
       return { mode: mockSystemStatus.mode };
     }
@@ -368,7 +387,8 @@ export const api = {
   async panicSell(): Promise<{ message: string }> {
     try {
       return await request('/trading/panic', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       mockSystemStatus.openPositions = [];
       return { message: 'Seluruh posisi aktif berhasil dilikuidasi ke saldo IDR (Demo Mode).' };
     }
@@ -378,7 +398,8 @@ export const api = {
     try {
       const json: any = await request('/whatsapp');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         connected: true,
         active: true,
@@ -392,7 +413,8 @@ export const api = {
   async connectWhatsApp(): Promise<{ success: boolean; message: string }> {
     try {
       return await request('/whatsapp/connect', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { success: true, message: 'WhatsApp session aktif (Demo Mode)' };
     }
   },
@@ -400,7 +422,8 @@ export const api = {
   async disconnectWhatsApp(): Promise<{ success: boolean; message: string }> {
     try {
       return await request('/whatsapp/disconnect', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { success: true, message: 'WhatsApp session diputus (Demo Mode)' };
     }
   },
@@ -409,7 +432,8 @@ export const api = {
     try {
       const json: any = await request('/tunnel');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         active: false,
         type: null,
@@ -424,7 +448,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ type, authtoken }),
       });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         active: true,
         type,
@@ -436,7 +461,8 @@ export const api = {
   async stopTunnel(): Promise<any> {
     try {
       return await request('/tunnel/stop', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { active: false };
     }
   },
@@ -448,7 +474,8 @@ export const api = {
     try {
       const json: any = await request('/settings/profiles');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         currentProfile: 'balanced',
         profiles: mockRiskProfiles,
@@ -462,7 +489,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ profile }),
       });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         success: true,
         message: 'Profil risiko berhasil diubah',
@@ -475,7 +503,8 @@ export const api = {
     try {
       const res: any = await request(`/settings/calculate-capital?capital=${capital}&profile=${profile || 'balanced'}`);
       return res.plan;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       const allocPct = profile === 'conservative' ? 0.2 : profile === 'aggressive' ? 0.45 : 0.3;
       const alloc = Math.max(10000, Math.round(capital * allocPct));
       const maxAllowed = Math.max(1, Math.floor(capital / alloc));
@@ -509,7 +538,8 @@ export const api = {
         body: JSON.stringify(params),
       });
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         ...mockBacktestResult,
         symbol: params.symbol || 'BTCIDR',
@@ -523,7 +553,8 @@ export const api = {
     try {
       const json: any = await request('/trading/ab-metrics');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAbMetrics;
     }
   },
@@ -532,7 +563,8 @@ export const api = {
     try {
       const json: any = await request('/providers/quota/all');
       return json.data || [];
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAntigravityQuotas;
     }
   },
@@ -541,7 +573,8 @@ export const api = {
     try {
       const json: any = await request(`/providers/${providerId}/quota`);
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAntigravityQuotas[0];
     }
   },
@@ -551,22 +584,45 @@ export const api = {
       const query = days ? `?days=${days}` : '';
       const json: any = await request(`/reports/summary${query}`);
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAnalytics;
     }
   },
 
-  getReportCsvUrl(days?: number | 'all'): string {
+  async downloadReportCsv(days?: number | 'all'): Promise<void> {
     const token = authStorage.getToken();
-    const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
-    return `/api/reports/csv?days=${days || 'all'}${tokenQuery}`;
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${BASE_URL}/reports/csv?days=${days || 'all'}`, { headers });
+
+    if (!res.ok) {
+      let message = `Request failed with status ${res.status}`;
+      try {
+        const json = await res.json();
+        message = json.error || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `AI_Trading_Report_${days || 'all'}.csv`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 
   async getBackupList(): Promise<BackupItem[]> {
     try {
       const json: any = await request('/backup/list');
       return json.data || [];
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return [
         {
           filename: 'trading_backup_2026-10-20T04-27-49-451Z.db',
@@ -582,7 +638,8 @@ export const api = {
   async createBackup(): Promise<{ success: boolean; message: string; data: BackupItem }> {
     try {
       return await request('/backup/create', { method: 'POST' });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       const item: BackupItem = {
         filename: `trading_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`,
         sizeBytes: 479232,
@@ -600,7 +657,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ botToken, chatId }),
       });
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return { success: true, message: 'Pesan tes Telegram berhasil dikirim ke Chat ID ' + chatId };
     }
   },
@@ -609,7 +667,8 @@ export const api = {
     try {
       const json: any = await request('/system/health');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockSystemHealth;
     }
   },
@@ -618,7 +677,8 @@ export const api = {
     try {
       const json: any = await request('/auth/rotation-status');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockTokenRotationStatus;
     }
   },
@@ -634,7 +694,8 @@ export const api = {
         body: JSON.stringify(config),
       });
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return {
         ...mockTokenRotationStatus,
         mode: config.mode,
@@ -651,7 +712,8 @@ export const api = {
         body: JSON.stringify({ reason: 'Rotasi Manual dari Web Dashboard' }),
       });
       return { token: json.token, rotatedAt: json.rotatedAt };
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       const newToken = Math.random().toString(36).substring(2, 18);
       return { token: newToken, rotatedAt: Date.now() };
     }
@@ -661,7 +723,8 @@ export const api = {
     try {
       const json: any = await request('/diagnostics/entry-gates');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockEntryGateDiagnostics;
     }
   },
@@ -670,7 +733,8 @@ export const api = {
     try {
       const json: any = await request('/ai/metering');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockAiMeteringStats;
     }
   },
@@ -679,7 +743,8 @@ export const api = {
     try {
       const json: any = await request('/signals/radar');
       return json.data;
-    } catch {
+    } catch (err) {
+      throwUnlessStaticHost(err);
       return mockSignalsRadar;
     }
   },

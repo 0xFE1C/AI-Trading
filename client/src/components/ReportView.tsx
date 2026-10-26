@@ -83,9 +83,15 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
     }
   };
 
-  const handleExportCsv = () => {
-    const url = api.getReportCsvUrl(timeframe);
-    window.open(url, '_blank');
+  const handleExportCsv = async () => {
+    try {
+      await api.downloadReportCsv(timeframe);
+    } catch (err: any) {
+      setToast({
+        message: `${l('Failed to export CSV: ', 'Gagal mengekspor CSV: ')}${err.message}`,
+        type: 'error',
+      });
+    }
   };
 
   const handleCreateBackup = async () => {

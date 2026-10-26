@@ -27,12 +27,16 @@ export function scoreOpportunity(
   }
 
   if (strategy === 'bluechip_pullback') {
+    // Missing indicators must not be imputed into a tradable score.
+    if (f.rsi14 === null || f.ema21 === null) {
+      return { symbol: f.symbol, strategy, score: 0, breakdown: { missing_indicators: 0 } };
+    }
     // Konservatif: beli pullback pada blue-chip sehat
-    const rsi = f.rsi14 ?? 45;
+    const rsi = f.rsi14;
     const rsiScore = rsi < 35 ? 100 : rsi < 48 ? 85 : rsi <= 60 ? 50 : 0;
     // Dip score: drop from high is between -0.5% and -8% (healthy dip, not crashing)
     const dipScore = bandScore(f.dropFromHighPct, -4, -0.5, -9, 0.5);
-    const trendScore = f.ema21 != null ? (f.close >= f.ema21 ? 100 : 40) : 70;
+    const trendScore = f.close >= f.ema21 ? 100 : 40;
     const sentimentScore = clamp((coinSentiment + 1) * 50, 0, 100);
     const qualityScore = clamp(100 - f.spreadPct * 50, 0, 100);
 
@@ -43,12 +47,14 @@ export function scoreOpportunity(
     breakdown.quality = Math.round(qualityScore * 0.10);
     score = Object.values(breakdown).reduce((a, b) => a + b, 0);
   } else if (strategy === 'momentum') {
+    if (f.rsi14 === null) {
+      return { symbol: f.symbol, strategy, score: 0, breakdown: { missing_indicators: 0 } };
+    }
     // Balanced: momentum band (2-12%) dengan konfirmasi volume & depth imbalance
     const gainScore = bandScore(f.gain24hPct, 2, 10, 0, 20);
     const volumeScore = clamp((f.volumeSurgeRatio - 0.8) * 60, 0, 100);
     const depthScore = clamp((f.depthImbalance - 0.8) * 100, 0, 100);
-    const rsi = f.rsi14 ?? 50;
-    const rsiScore = rsi > 70 ? 0 : rsi < 30 ? 70 : 100;
+    const rsiScore = f.rsi14 > 70 ? 0 : f.rsi14 < 30 ? 70 : 100;
     const sentimentScore = clamp((coinSentiment + 1) * 50, 0, 100);
 
     breakdown.gain = Math.round(gainScore * 0.30);

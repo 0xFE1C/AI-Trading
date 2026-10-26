@@ -128,10 +128,13 @@ export interface TunnelStatus {
 export interface SystemStatus {
   isAutoTradingActive: boolean;
   mode: 'paper' | 'live';
-  balanceIdr: number;
+  balanceIdr: number | null;
+  balanceError?: string | null;
   openPositions: Position[];
+  openPositionsCount?: number;
   recentTrades: TradeHistory[];
   lessonsLearned: LessonLearned[];
+  portfolioRedacted?: boolean;
   sentiment: {
     averageSentiment: number;
     threatCount: number;

@@ -246,6 +246,40 @@ describe('Conservative Blue-Chip Pullback Opportunity Scoring', () => {
     assert.strictEqual(result.score, 0);
     assert.strictEqual(result.breakdown.threat_veto, 0);
   });
+
+  test('bluechip pullback fails closed when RSI or EMA21 is missing', () => {
+    const missingRsi = scoreOpportunity(
+      { ...baseBtcFeatures, rsi14: null },
+      0.45,
+      false,
+      'RISK_ON',
+      'bluechip_pullback'
+    );
+    assert.strictEqual(missingRsi.score, 0);
+    assert.strictEqual(missingRsi.breakdown.missing_indicators, 0);
+
+    const missingEma = scoreOpportunity(
+      { ...baseBtcFeatures, ema21: null },
+      0.45,
+      false,
+      'RISK_ON',
+      'bluechip_pullback'
+    );
+    assert.strictEqual(missingEma.score, 0);
+    assert.strictEqual(missingEma.breakdown.missing_indicators, 0);
+  });
+
+  test('momentum score fails closed when RSI is missing', () => {
+    const result = scoreOpportunity(
+      { ...baseBtcFeatures, rsi14: null },
+      0.45,
+      false,
+      'RISK_ON',
+      'momentum'
+    );
+    assert.strictEqual(result.score, 0);
+    assert.strictEqual(result.breakdown.missing_indicators, 0);
+  });
 });
 
 describe('Pure Risk Guard Execution Pipeline (Gates 1-8)', () => {

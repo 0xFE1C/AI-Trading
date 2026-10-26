@@ -55,7 +55,7 @@
   <!-- Equity Curve Graph -->
   <g transform="translate(40, 215)">
     <rect width="1120" height="425" rx="10" fill="#0b101b" stroke="#1e293b" stroke-width="1"/>
-    <text x="25" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">KURVA PERTUMBUHAN EKUITAS (EQUITY CURVE) &bull; BTC/IDR (30 HARI &bull; 720 CANDLES)</text>
+    <text x="25" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">KURVA PERTUMBUHAN EKUITAS (EQUITY CURVE) &#8226; BTC/IDR (30 HARI &#8226; 720 CANDLES)</text>
 
     <!-- Chart SVG Curve -->
     <path d="M 50,340 L 180,310 L 320,280 L 480,240 L 640,190 L 800,160 L 960,110 L 1070,80 L 1070,360 L 50,360 Z" fill="url(#eqGrad)"/>

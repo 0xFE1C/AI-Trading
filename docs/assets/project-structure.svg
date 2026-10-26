@@ -100,7 +100,7 @@
     </text>
 
     <text x="16" y="56" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">tests/</text>
-    <text x="85" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">95 Unit &amp; integration tests covering all critical paths</text>
+    <text x="85" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">131 unit &amp; integration tests covering all critical paths</text>
 
     <text x="16" y="82" font-family="monospace" font-size="11" fill="#fbbf24" font-weight="600">docs/assets/</text>
     <text x="125" y="82" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">High-resolution SVG banners &amp; architecture diagrams</text>

@@ -107,8 +107,8 @@ export const BacktestView: React.FC = () => {
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed">
           {l(
-            'This simulation stress-tests quantitative execution rules (market momentum, trailing stop ratchet, partial scale-out TP to breakeven, 0.2% orderbook slippage, and 0.2% exchange taker fee) on historical Indodax candles.',
-            'Simulasi ini menguji aturan eksekusi kuantitatif (momentum pasar, trailing stop loss ratchet, scale-out partial TP ke breakeven, pemodelan slippage orderbook 0.2%, dan taker fee bursa 0.2%) pada riwayat candlestick bursa Indodax.'
+            'This simulation stress-tests quantitative execution rules (market momentum, trailing stop ratchet, partial scale-out TP to breakeven, 0.2% orderbook slippage, and the configured Indodax all-in taker fee) on historical Indodax candles.',
+            'Simulasi ini menguji aturan eksekusi kuantitatif (momentum pasar, trailing stop loss ratchet, scale-out partial TP ke breakeven, pemodelan slippage orderbook 0.2%, dan taker fee all-in Indodax yang dikonfigurasi) pada riwayat candlestick bursa Indodax.'
           )}
         </p>
         <p className="text-[11px] text-slate-400 leading-relaxed">

@@ -4,15 +4,20 @@
   "description": "Autonomous AI Crypto Trading Platform for Indodax",
   "main": "dist/server.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "start": "tsx src/server.ts",
     "server": "tsx src/server.ts",
     "client": "npm --prefix client run dev",
     "dev": "tsx src/server.ts",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --import ./tests/setup.ts --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "build": "tsc && npm --prefix client run build",
     "optimize": "tsx scripts/optimize_strategy.ts",
-    "db:reset": "tsx scripts/init_fresh_db.ts"
+    "db:reset": "tsx scripts/init_fresh_db.ts",
+    "admin:token": "tsx scripts/show_admin_token.ts"
   },
   "dependencies": {
     "@ngrok/ngrok": "^1.7.0",
@@ -23,6 +28,7 @@
     "express": "^5.2.1",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4",
+    "tsx": "^4.21.0",
     "untun": "^0.2.2",
     "ws": "^8.19.0"
   },
@@ -33,7 +39,6 @@
     "@types/node": "^25.5.0",
     "@types/qrcode": "^1.5.5",
     "@types/ws": "^8.18.1",
-    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }
 }

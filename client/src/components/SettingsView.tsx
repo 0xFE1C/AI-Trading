@@ -1209,7 +1209,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="text-[11px] text-slate-400 leading-relaxed space-y-1">
                   {(settings.ai_mode || 'confirm') === 'confirm' && (
                     <p className="text-blue-300/90">
-                      <strong>Hybrid:</strong> Mesin deterministik (RSI, EMA21, ATR, Order Book, Lexicon Berita) menyaring sinyal. AI hanya dipanggil 1x untuk sanity check ringkas. Jika kuota AI habis/error, sistem otomatis fallback ke sinyal deterministik tanpa membekukan trading.
+                      <strong>Hybrid:</strong> Mesin deterministik (RSI, EMA21, ATR, Order Book, Lexicon Berita) menyaring sinyal. AI dipanggil 1x untuk sanity check ringkas. Di mode <strong>Paper</strong>, kegagalan AI jatuh ke sinyal deterministik. Di mode <strong>Live</strong>, entry baru diblokir (fail-closed) saat AI gagal; posisi terbuka tetap dipantau.
                     </p>
                   )}
                   {settings.ai_mode === 'off' && (
@@ -1245,7 +1245,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="text-[11px] text-slate-400 leading-relaxed">
                   {(settings.swarm_event_driven ?? '1') === '1' ? (
                     <p className="text-emerald-300/90">
-                      <strong>Hemat Token:</strong> Subagent swarm menghitung hash fingerprint judul berita dan harga koin. Jika tidak ada perubahan signifikan, AI call dilewati (skipped) otomatis, memangkas 70%&ndash;90% konsumsi token harian.
+                      <strong>Hemat Token:</strong> Subagent swarm menghitung hash fingerprint judul berita dan harga koin. Jika tidak ada perubahan signifikan, AI call dilewati (skipped) otomatis. Penghematan aktual bergantung pada seberapa sering konteks pasar berubah.
                     </p>
                   ) : (
                     <p className="text-slate-400">
@@ -2226,7 +2226,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     onClick={async () => {
                       try {
                         const status = await api.getStatus();
-                        const bal = status?.balanceIdr || 0;
+                        if (status?.portfolioRedacted) {
+                          setToast({ message: l('Authenticate as admin to read the live balance.', 'Otentikasi sebagai admin untuk membaca saldo.'), type: 'error' });
+                          return;
+                        }
+                        const bal = status?.balanceIdr ?? 0;
                         if (bal >= 10000) {
                           setWizardCapital(Math.round(bal).toString());
                           setToast({ message: `Saldo terdeteksi: Rp ${Math.round(bal).toLocaleString('id-ID')}`, type: 'info' });

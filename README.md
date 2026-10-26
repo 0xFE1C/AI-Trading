@@ -6,9 +6,9 @@
 
 [![Language: English](https://img.shields.io/badge/Language-English-38bdf8?style=for-the-badge)](README.md)
 [![Dokumentasi: Bahasa Indonesia](https://img.shields.io/badge/Dokumentasi-Bahasa%20Indonesia-10b981?style=for-the-badge)](docs/PANDUAN_PENGGUNA.md)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-95%2F95%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x%20Strict-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D%2018.0.0-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-131%2F131%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x%20Strict-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18%20%2B%20Vite%20%2B%20Tailwind-61dafb?style=for-the-badge&logo=react)](client/)
 [![Indodax](https://img.shields.io/badge/Exchange-Indodax%20API%20v2-0284c7?style=for-the-badge)](https://indodax.com)
 [![Bots](https://img.shields.io/badge/Remote%20Bots-WhatsApp%20%2B%20Telegram-25d366?style=for-the-badge&logo=whatsapp)](client/src/components/BotsView.tsx)
@@ -41,7 +41,7 @@
 - [13. Quickstart Guide: 1-Click Launchers](#-quickstart-guide-1-click-launchers)
 - [14. Production Deployment via Docker](#-production-deployment-via-docker)
 - [15. Project Directory Architecture](#-project-directory-architecture)
-- [16. Quality Assurance & Test Suite (95/95 Passing)](#-quality-assurance--test-suite)
+- [16. Quality Assurance & Test Suite (131/131 Passing)](#-quality-assurance--test-suite)
 - [17. Frequently Asked Questions (FAQ) & Troubleshooting](#-frequently-asked-questions-faq--troubleshooting)
 - [18. Financial Risk Disclaimer](#-financial-risk-disclaimer)
 
@@ -58,7 +58,7 @@ Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psy
 ### Why AI Trading Terminal is Different:
 1. **Decoupled Quantitative Architecture:** Large Language Models (LLMs) excel at processing global news and qualitative sentiment, but are far too slow, expensive, and unpredictable for high-frequency price analysis. We decouple these responsibilities:
    - **Deterministic Section 9:** Calculates pure mathematical technical indicators (Wilder's RSI, EMA, True ATR, Depth Imbalance) in **< 2 milliseconds** with **zero token cost** (`0 Token Cost`).
-   - **AI Research Swarm:** Operates in the background analyzing macro narratives, GitHub developer commits, and protocol exploit vectors using SHA-256 context deduplication (**saving > 90% of token costs**).
+   - **AI Research Swarm:** Operates in the background analyzing macro narratives and exploit headlines from CoinDesk/CoinTelegraph/Indodax Blog RSS plus live Indodax tickers, using SHA-256 context deduplication to skip AI calls when the news and market fingerprint is unchanged.
 2. **9 Pure Risk Defense Gates:** Every prospective buy signal **must pass 100% of all 9 sequential safety gates** before any order is submitted to Indodax.
 3. **Mathematical Trailing Stop Ratchet:** As an asset's market price increases, profit protection thresholds are monotonically ratcheted upward and **locked one-way**. If the trend abruptly reverses, the bot immediately locks in accumulated gains.
 4. **Zero-Configuration 1-Click Launchers:** Pre-packaged scripts for Windows (`start.bat`), PowerShell (`start.ps1`), and Linux/macOS (`start.sh`), accompanied by full bidirectional remote control via WhatsApp and Telegram.
@@ -70,7 +70,7 @@ Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psy
 | Category | Highlighted Capability | Architectural Impact & Benefits |
 | :--- | :--- | :--- |
 | **Speed & Efficiency** | **Section 9 Engine** | Pure mathematical signal pipeline, sub-millisecond execution, 0 token expenditure. |
-| **Market Intelligence** | **10 AI Sub-Agents** | Autonomous swarm scanning global crypto news, Twitter/X, Reddit, on-chain whale wallets, and smart contract exploits. |
+| **Market Intelligence** | **10 AI Sub-Agents** | Ten analytical lenses over verified inputs: CoinDesk/CoinTelegraph/Indodax Blog RSS, Indodax tickers, and a deterministic threat scanner. No Twitter/X, Reddit, or on-chain scraping is claimed. |
 | **Capital Defense** | **9 Risk Defense Gates** | Daily circuit breaker, bid-ask spread trap filter, anti-FOMO RSI guard, and BTC flash crash veto. |
 | **Financial Sizing** | **Capital Auto-Set** | Intelligent dynamic position sizing scaled to available balance (from micro IDR 10,000 up to tens of millions). |
 | **Profit Locking** | **Trailing Ratchet** | Dynamic monotonic stop-loss escalation prevents open profits from turning into catastrophic losses. |
@@ -95,12 +95,11 @@ flowchart TD
     subgraph Ingestion [1. Market Data Ingestion Layer]
         IdxREST[Indodax REST API v2] --> InFlightCache[6s In-Flight TTL Cache & Dedup Promise]
         IdxWS[Indodax WebSocket Feed] --> BatchTicker[Batch Ticker & 5-Depth Order Book]
-        BinanceFeed[Global Price Feed Binance/Bybit] --> ArbitrageDelta[Global Arbitrage Delta Engine]
+        IdxBook[Indodax Order Book & Spreads] --> Sec9
     end
 
     InFlightCache --> Sec9
     BatchTicker --> Sec9
-    ArbitrageDelta --> Sec9
 
     subgraph Sec9 [2. Deterministic Section 9 Engine - Zero Token]
         Feat[features.ts: RSI14, EMA21, True ATR, Depth Imbalance]
@@ -112,17 +111,17 @@ flowchart TD
 
     Sec9 --> BlackboardBus
 
-    subgraph AIResearch [3. AI Swarm Research - 10 Specialized Sub-Agents]
+    subgraph AIResearch [3. AI Swarm Research - 10 Analytical Lenses]
         BlackboardBus[Blackboard Event Bus SQLite Outbox]
-        NewsAgent[Global News & Regulatory]
-        SocialAgent[Reddit & Twitter/X Radar]
-        OnChainAgent[Whale Tracker & Protocol Exploit]
+        NewsAgent[Global News & Regulatory RSS]
+        SentimentAgent[News Sentiment & Market Narrative]
+        SecurityAgent[Exploit Headline Scanner & Liquidity Lens]
         ListingAgent[New Indodax Listing Detector]
-        DedupEngine[SHA256 Context Dedup - >90% Token Savings]
+        DedupEngine[SHA256 Context Dedup - Skips Unchanged Calls]
         AntigravityAPI[Antigravity Live Model API: Gemini 3.8 / Claude 4.6]
         
         BlackboardBus --> DedupEngine --> AntigravityAPI
-        AntigravityAPI --> NewsAgent & SocialAgent & OnChainAgent & ListingAgent
+        AntigravityAPI --> NewsAgent & SentimentAgent & SecurityAgent & ListingAgent
     end
 
     Sec9 --> RiskPipeline
@@ -232,27 +231,30 @@ graph TD
 
 ---
 
-## 🤖 Multi-Agent AI Research Swarm (10 Specialized Sub-Agents)
+## 🤖 Multi-Agent AI Research Swarm (10 Analytical Lenses)
 
-Located in the **AI Research** tab, 10 specialized intelligence analysts in [`src/services/agents/`](src/services/agents/) collaborate autonomously via an asynchronous **Blackboard Event Bus**:
+Located in the **AI Research** tab, 10 analytical lenses in [`src/services/agents/`](src/services/agents/) run on the same grounded context:
 
-![AI Swarm Research](docs/assets/ai-swarm-diagram.svg)
+- **News:** CoinDesk RSS, CoinTelegraph RSS, and Indodax Blog RSS (5-minute cache).
+- **Market:** Indodax public tickers, top gainers, 24h volume, top-of-book spreads, and BTC reference prices.
+- **Deterministic context:** headline sentiment lexicon and a threat keyword scanner.
+- **Optional feeds:** set `AI_TRADING_EXTRA_RSS_FEEDS` to add up to 5 public RSS URLs (for example a Reddit RSS feed). No direct Twitter/X, on-chain wallet, CoinGecko, The Fed, Bank Indonesia, or Bappebti feed is integrated by default.
 
-1. **Global News Radar:** Aggregates and synthesizes breaking reports from international outlets (CoinDesk, Cointelegraph, Bloomberg Crypto, Decrypt).
-2. **Tech & Ecosystem Analyst:** Monitors developer momentum, GitHub repository commits, forks, and official mainnet roadmap upgrades.
-3. **Social Community Radar:** Tracks discussions, sentiment polarity, and retail enthusiasm across major crypto subreddits.
-4. **Twitter / X Viral Radar:** Detects discussion volume spikes and influencer sentiment velocity.
-5. **Indodax Listing Radar:** Identifies newly announced or recently listed trading pairs on Indodax within seconds.
-6. **Momentum Hunter:** Isolates sudden volume breakout anomalies and structural liquidity surges.
-7. **Exploit & Security Radar:** Continuously audits smart contract security alerts, vulnerability disclosures, and exploit reports.
-8. **Macro & Regulatory Analyst:** Monitors central bank policy interest rate decisions (The Fed), CPI inflation numbers, and Bappebti regulatory updates.
-9. **Whale On-Chain Tracker:** Detects large-scale exchange inflows, wallet outflows, and institutional accumulation footprints.
-10. **Global Delta Analyst:** Benchmarks Indodax pricing disparities against global exchanges (Binance, Bybit) to capture price realignment trends.
+1. **Global News Analyst:** Summarizes breaking crypto headlines from CoinDesk and CoinTelegraph RSS.
+2. **Tech & Ecosystem Analyst:** Screens the same headlines for protocol upgrades, hard forks, and ecosystem news.
+3. **News Sentiment Analyst:** Compares deterministic lexicon scores of headlines with Indodax market moves.
+4. **Market Narrative Radar:** Identifies dominant narratives across headlines, Indodax Blog, and tickers.
+5. **Indodax Listing Radar:** Reads the official Indodax Blog and new-coin alerts; no direct exchange announcement API beyond those sources.
+6. **Momentum Hunter:** Analyzes Indodax top gainers and 24h volume.
+7. **Security Radar:** Screens headlines for hack/exploit/delisting keywords. This is not a smart-contract audit.
+8. **Macro & Regulatory Radar:** Highlights macro/regulatory headlines available in RSS; it does not have direct central-bank or regulator feeds.
+9. **Liquidity & Spread Analyst:** Reviews top-of-book bid/ask spreads and volume on Indodax.
+10. **BTC Correlation Analyst:** Compares BTC direction with top altcoin gainers on Indodax.
 
-### Token Optimization & Degraded Resilience
-- **SHA-256 Fingerprint Deduplication:** Generates cryptographic hashes of news headlines and market state. If the context has not fundamentally changed, AI calls are **automatically skipped** (`skipped_dedup`), reducing token consumption by **> 90%**.
+### Token Optimization & Failure Policy
+- **SHA-256 Fingerprint Deduplication:** Generates cryptographic hashes of news headlines and market state. If the context has not fundamentally changed, AI calls are **automatically skipped** (`skipped_dedup`). Actual token savings depend on how frequently the underlying news and market context changes.
 - **Compact Payload Formatting:** System prompts are minimized into single-line JSON structures with redundant whitespace eliminated.
-- **Fail-Safe Degraded Mode:** If LLM providers experience network outages or quota exhaustion, the engine seamlessly falls back to pure deterministic mode, ensuring trading operations never freeze.
+- **Mode-aware fail-closed policy:** In paper `confirm` mode, a failed AI confirmation can fall back to deterministic signals for simulation. In **live mode** (and every `required` mode), AI failure blocks new entries until the provider recovers; open positions continue to be monitored by the exit engine.
 
 ---
 
@@ -264,10 +266,10 @@ AI Trading Terminal includes a built-in **A/B Counterfactual Testing Engine**:
 - Whenever the AI swarm or risk gates veto a prospective buy signal, a virtual **Ghost Position** is registered in the database table [`ghost_positions`](src/db/index.ts).
 - The system monitors this shadow position against real-time Indodax market prices as if the trade had actually executed.
 - Outcomes are categorized into empirical performance groups:
-  - 🛡️ **`BULLET_DODGED`:** The vetoed trade subsequently collapsed or hit the virtual stop-loss in the real market, proving the AI saved your money!
+  - 🛡️ **`BULLET_DODGED`:** The vetoed trade subsequently collapsed or hit the virtual stop-loss, indicating the veto avoided a loss in that sample.
   - ⚠️ **`MISSED_OPPORTUNITY`:** The vetoed trade subsequently met the take-profit target.
   - ⚖️ **`NEUTRAL`:** The vetoed trade broke even within the tracking window.
-- The dashboard highlights the **Empirical AI Alpha**: the exact net percentage of portfolio capital saved by artificial intelligence.
+- The dashboard reports a counterfactual **AI Alpha** estimate: the simulated net percentage of portfolio capital that vetoed trades would have gained or lost.
 
 ---
 
@@ -312,7 +314,7 @@ Tailor the bot's execution style with a single click in **Settings &rarr; Risk P
 ### 1. Demo Mode (Paper Trading) — Zero Financial Risk
 - Pre-loaded with **IDR 10,000,000** in virtual trading capital.
 - Streams real live market prices directly from the Indodax exchange.
-- Accurately simulates buy orders, exchange maker/taker fees (0.51%), orderbook slippage, and trailing stop exits.
+- Accurately simulates buy orders, exchange taker fees (configurable via `trading_fee_percent`, default 0.3322% all-in for Indodax IDR market orders), orderbook slippage, and trailing stop exits.
 - Recommended for testing and calibration for 3 to 7 days before funding real capital.
 
 ### 2. Live Mode (Real Indodax Funds) — Real Capital Execution
@@ -320,6 +322,13 @@ Tailor the bot's execution style with a single click in **Settings &rarr; Risk P
 - Protected by an interactive **3-Point Safety Confirmation Modal** before activation.
 - Orders are executed live on the official Indodax orderbook.
 - Includes a **Panic Sell Button (< 1 Second)** to immediately liquidate all open crypto assets to IDR in global emergencies.
+
+**Live safety behavior (read before funding):**
+- **Every order is fill-verified.** The engine polls the exchange order status after submission, records the actual executed quantity and average price, and handles partial fills. If a fill cannot be confirmed, the order is cancelled where possible and the position is left for review instead of being marked closed based on an assumption.
+- **Startup reconciliation runs automatically.** Before trading resumes, local open positions are compared against real balances and open exchange orders. Mismatches (missing balance, unexpected open order, stale exit claim) are reported, and auto-trading stays paused until you review them.
+- **Auto-resume is opt-in and fail-safe.** Auto-trading is always paused when the server restarts. It only resumes automatically when `auto_resume_on_startup=1` is set **and** reconciliation reports a safe state; otherwise it remains paused and requires manual activation.
+- **Deadman switch scope is limited.** The Indodax deadman switch (`countdownCancelAll`) can only cancel **open exchange orders** after the process stops pinging. It does **not** liquidate spot holdings and it does **not** place a stop-loss.
+- **No native exchange stop-loss is used.** This client does not place conditional/stop orders on Indodax. Trailing stops, take-profits, and the daily circuit breaker are enforced by the local engine, so they only run while this process is online. If the host, VPS, or network is down, open positions have **no protection on the exchange**. For unattended live trading, run on an always-on VPS and monitor it externally; you may also want to place manual stop orders on Indodax as a last-resort backstop.
 
 ---
 
@@ -356,16 +365,20 @@ Remote control and automated notification feeds are unified inside a **single ce
 1. **Restricted Indodax API Permissions:**
    - The bot strictly requires only `View (Read)` and `Trading (Trade)` permissions.
    - ❌ **NEVER ENABLE WITHDRAW PERMISSIONS!** Without withdrawal privileges, your funds remain securely locked inside Indodax.
-2. **Zero-Trust Admin Access Token:**
-   - Administrative endpoints and web settings are guarded by a 32-character hexadecimal token.
+2. **Zero-Trust Admin Access Token (Fail-Closed):**
+   - Administrative endpoints, dashboard actions, and WebSocket admin channels require a 32-character hexadecimal token.
    - Authentication checks utilize `crypto.timingSafeEqual` to guard against side-channel timing attacks.
-   - Visitors without valid credentials are restricted to View-Only mode.
-3. **Automated Token Rotation Service ([`tokenRotationService.ts`](src/services/auth/tokenRotationService.ts)):**
+   - If no token is configured, admin access is denied rather than opened. Visitors without valid credentials are restricted to View-Only mode, which now hides balances, positions, trade history, WhatsApp QR/identity, and provider quota details.
+   - The token is printed to the console only when the server runs on an interactive TTY. In headless/Docker logs, retrieve it locally with `npm run admin:token` (only someone with access to the server data directory can run this).
+3. **Encryption at Rest ([`secrets.ts`](src/services/security/secrets.ts)):**
+   - Indodax API key/secret, admin token, Telegram/ngrok tokens, WhatsApp/Telegram identifiers, and AI provider `api_keys`/OAuth tokens are encrypted with **AES-256-GCM** before being written to SQLite. Legacy plaintext rows are migrated automatically on startup.
+   - The key lives at `data/.encryption-key` (mode `0600`) or comes from `AI_TRADING_ENCRYPTION_KEY`. **Back up the key separately from the database**; a copied database cannot be decrypted without it.
+4. **Automated Token Rotation Service ([`tokenRotation.ts`](src/services/auth/tokenRotation.ts)):**
    - Configurable rotation policies: *Fixed*, *Rotate on Startup*, or *Periodic Schedules (e.g., every 1h, 24h)*.
-4. **Isolated SQLite Database & Auto-Backup ([`backupService.ts`](src/services/backup/backupService.ts)):**
+5. **Isolated SQLite Database & Auto-Backup ([`backupService.ts`](src/services/backup/backupService.ts)):**
    - Runs in **WAL (Write-Ahead Logging)** mode for crash resilience and concurrency.
    - Automated timestamped database snapshots are preserved in `backups/` and can be downloaded from the Reports UI.
-5. **Official Audit PDF & CSV Export:**
+6. **Official Audit PDF & CSV Export:**
    - Enables one-click exports of trade histories to formatted spreadsheet **CSV** files and audit-ready **PDF Reports**.
 
 ---
@@ -373,7 +386,7 @@ Remote control and automated notification feeds are unified inside a **single ce
 ## 🚀 Quickstart Guide: 1-Click Launchers
 
 ### System Requirements:
-- **Node.js:** Version **18.0.0** or newer ([Download Node.js](https://nodejs.org/)).
+- **Node.js:** Version **22.12.0** or newer ([Download Node.js](https://nodejs.org/)).
 - **Operating System:** Windows 10/11, macOS, or Linux (Ubuntu, Debian, CentOS).
 - **Network:** Stable internet connection for real-time WebSocket and REST feeds.
 
@@ -409,8 +422,11 @@ cp .env.example .env
 # 2. Build and launch the container in detached mode
 docker compose up -d --build
 
-# 3. View live server logs and the initial Admin Token
+# 3. View live server logs (the admin token is intentionally not printed to non-interactive logs)
 docker compose logs -f
+
+# 4. Retrieve the admin token from inside the container
+docker compose exec ai-trading npm run admin:token
 ```
 Access the dashboard through your browser at `http://YOUR-SERVER-IP:3001`.
 
@@ -434,7 +450,7 @@ Access the dashboard through your browser at `http://YOUR-SERVER-IP:3001`.
 | **Security & Auth** | `src/services/auth/` | Token rotation manager & constant-time `timingSafeEqual` authentication verification. |
 | **Database & Snapshots** | `src/db/` & `src/services/backup/` | SQLite WAL engine, relational schemas, migrations, and automated snapshot backup services. |
 | **REST API Server** | `src/api/` & `src/server.ts` | Express REST routes, exchange webhooks, zero-trust token protection middleware, & lifecycle hooks. |
-| **Automated Test Suite** | `tests/` | 95 unit and integration tests covering 100% of critical quantitative algorithms and security barriers. |
+| **Automated Test Suite** | `tests/` | 131 unit and integration tests across 31 suites, covering critical quantitative algorithms, execution safety, API security, and risk barriers. |
 | **1-Click Launchers** | `start.bat`, `start.ps1`, `start.sh` | Automated zero-configuration launchers for Windows, Linux, and macOS. |
 | **Containerization** | `Dockerfile`, `docker-compose.yml` | Multi-stage production Docker container configuration for continuous 24/7 cloud hosting. |
 
@@ -448,7 +464,7 @@ Access the dashboard through your browser at `http://YOUR-SERVER-IP:3001`.
 
 ## 🧪 Quality Assurance & Test Suite
 
-All critical business logic, token security routines, quantitative indicators, and risk defense gates are safeguarded by **95 unit & integration tests** located in [`tests/`](tests/):
+All critical business logic, token security routines, quantitative indicators, and risk defense gates are safeguarded by **131 unit & integration tests** located in [`tests/`](tests/):
 
 ```bash
 # Execute the entire automated test suite:
@@ -457,26 +473,27 @@ npm test
 
 ### Verified Test Suite Breakdown:
 ```
-✔ Capital Allocation & Auto-Set Engine (5 tests passing)
-✔ Quantitative Indicators (RSI, EMA, True ATR) & Spread Mechanics (5 tests passing)
-✔ Performance Reporting Engine & CSV Export (2 tests passing)
-✔ Database Backup Service (1 test passing)
-✔ Telegram Notifier Service (2 tests passing)
-✔ Section 9 Lexicon Sentiment Scoring & Age Decay (4 tests passing)
-✔ P0-A Fix: Scoped Threat Blocker & Benign Word Filtering (4 tests passing)
-✔ BTC Macro Regime Window Returns (1h & 4h) (3 tests passing)
-✔ Conservative Blue-Chip Pullback Opportunity Scoring (2 tests passing)
-✔ Pure Risk Guard Execution Pipeline (Gates 1-8) (6 tests passing)
-✔ Multi-Agent Blackboard Bus & Outbox Persistence (1 test passing)
-✔ Asset-Agnostic MarketAdapter Abstraction (1 test passing)
-✔ A/B Counterfactual Logging & Ghost Position Lifecycle (3 tests passing)
-✔ Antigravity Live Model Discovery, Multi-Account, & Quota Telemetry (7 tests passing)
-✔ WhatsApp Multi-Device LID Authorization & /admin Pairing (4 tests passing)
-✔ Admin Access Token Rotation Service & Zero-Trust Comparison (8 tests passing)
-✔ Circuit Breaker Resilience & Decoupled Ratchet (1 test passing)
-...
+✔ AI failure policy (paper fallback vs. live fail-closed)
+✔ Subagent source honesty & extra RSS feed validation
+✔ API security, observer redaction, admin token rotation & query-token rejection
+✔ Secrets at-rest encryption & fail-closed admin authentication
+✔ Capital Allocation & Auto-Set Engine
+✔ Quantitative indicators (RSI, EMA, True ATR) & spread mechanics
+✔ Live reconciliation, fill handling, stale exit claims & auto-resume safety
+✔ New-coin registry persistence across restarts
+✔ Fee-aware PnL, mode-scoped equity & circuit breaker fail-closed behavior
+✔ Concurrent position exit protection (full exit & partial take-profit)
+✔ Performance reporting, CSV export, database backup & Telegram notifier
+✔ Section 9 lexicon, scoped threat blocker, BTC regime & blue-chip scoring
+✔ Pure Risk Guard execution pipeline (Gates 1–9)
+✔ Swarm deduplication, blackboard outbox & MarketAdapter abstraction
+✔ Signatures, slippage, quantity precision, trailing stops & fail-closed AI parsing
+✔ CORS hardening, RSS sanitization, sell-failure protection & admin middleware
+✔ Risk profiles, self-learning memory, backtest engine & A/B ghost positions
+✔ Model discovery, WhatsApp LID authorization & conversational AI actions
+✔ Circuit breaker resilience & decoupled trailing ratchet
 ---------------------------------------------------------------------------------
-ℹ tests 95 | suites 29 | pass 95 | fail 0 | cancelled 0 | duration ~2.28s
+ℹ tests 131 | suites 31 | pass 131 | fail 0 | cancelled 0
 ---------------------------------------------------------------------------------
 ```
 
@@ -484,6 +501,15 @@ Production Build Verification:
 ```bash
 npm run build
 # Executes TypeScript strict typechecks and Vite client bundle generation (100% clean)
+```
+
+Continuous Integration:
+```bash
+# .github/workflows/ci.yml runs on every push/PR:
+npm ci && npm --prefix client ci
+npm run typecheck
+npm test
+npm --prefix client run build
 ```
 
 ---
@@ -494,13 +520,13 @@ npm run build
 > **A:** This is clear evidence that the **9 Risk Gates** are actively protecting your capital. The bot never enters trades blindly. If the bid-ask spread is excessively wide, Bitcoin is trending downward, or target coins are in extreme overbought territory, entries are purposely withheld. You can view the exact evaluation diagnostics in the **Entry Diagnostics Section** on the dashboard.
 
 #### Q2: Does my computer need to remain powered on 24/7?
-> **A:** Yes. The terminal monitors trailing stops every second. If your host computer is shut down, local stop-loss triggers cannot execute. For uninterrupted 24/7 operation without keeping a home PC running, deploy the bot to a cloud VPS using Docker or `./start.sh`.
+> **A:** Yes for live trading. All exit logic (trailing stop, take-profit, circuit breaker) runs in this process, and the bot does not place native stop orders on Indodax. If the host is shut down or loses network, open positions have no automated protection. The deadman switch only cancels open exchange orders; it does not sell coins. For unattended operation, deploy to an always-on cloud VPS using Docker or `./start.sh`, monitor it externally, and consider placing manual stop orders on the exchange as a backstop. After any restart, auto-trading stays paused until startup reconciliation passes and you (or the opt-in `auto_resume_on_startup` policy) re-enable it.
 
 #### Q3: Is it safe to enter my Indodax API keys?
-> **A:** Yes. API keys are stored exclusively in your local SQLite database on your own machine. They are never transmitted to external cloud servers. Furthermore, you must **only grant View and Trade permissions**—never check the Withdraw permission. Without withdrawal rights, your funds cannot be transferred out of Indodax.
+> **A:** Yes. API keys are stored only in your local SQLite database on your own machine, encrypted with AES-256-GCM (key in `data/.encryption-key` or `AI_TRADING_ENCRYPTION_KEY`), and are never transmitted to external cloud servers. Keep the encryption key backed up separately from the database. Furthermore, you must **only grant View and Trade permissions**—never check the Withdraw permission. Without withdrawal rights, your funds cannot be transferred out of Indodax.
 
 #### Q4: How do I recover my Admin Access Token if the terminal window was closed?
-> **A:** Restart the terminal application using `start.bat` or `./start.sh`. The active access token is automatically displayed in the terminal output upon launch.
+> **A:** On an interactive terminal, restart the app with `start.bat` or `./start.sh`; the token is printed at startup. For headless/Docker runs it is intentionally omitted from logs—run `npm run admin:token` on the server (or `docker compose exec ai-trading npm run admin:token`) to print it locally.
 
 #### Q5: How do I switch the bot's language?
 > **A:** Click the **Language Switcher** pill located in the top-right header (or navigate to **Settings &rarr; Language Preference**) and toggle between **English (default)** and **Bahasa Indonesia**.

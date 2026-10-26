@@ -25,8 +25,14 @@ import { backtestEngine } from '../services/backtest/index.js';
 import { reportingService } from '../services/reports/index.js';
 import { backupService } from '../services/backup/index.js';
 import { telegramService } from '../services/telegram/index.js';
-import { adminTokenService, secureCompareTokens } from '../services/auth/tokenRotation.js';
+import { adminTokenService, isAuthenticatedAdminToken } from '../services/auth/tokenRotation.js';
 import { calculateCapitalAllocation } from '../services/trading/riskGuard.js';
+import {
+  decryptProviderApiKeys,
+  decryptProviderOAuth,
+  encryptProviderApiKeys,
+  encryptProviderOAuth,
+} from '../services/security/secrets.js';
 
 export const apiRouter = Router();
 
@@ -93,10 +99,10 @@ export function checkIsAdmin(req: Request): boolean {
   const authHeader = req.headers?.authorization || '';
   const tokenFromHeader = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
   const tokenFromCustom = ((req.headers?.['x-admin-token'] as string) || '').trim();
-  const tokenFromQuery = ((req.query?.token as string) || '').trim();
 
-  const providedToken = tokenFromHeader || tokenFromCustom || tokenFromQuery;
-  return secureCompareTokens(providedToken, configuredToken);
+  // Query-string tokens are rejected on purpose: URLs leak through logs, history, and referrers.
+  const providedToken = tokenFromHeader || tokenFromCustom;
+  return isAuthenticatedAdminToken(configuredToken, providedToken);
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
@@ -122,7 +128,7 @@ apiRouter.post('/auth/verify', authRateLimiter, (req, res) => {
   const configuredToken = getSetting('admin_access_token', '').trim();
   const { token } = req.body;
 
-  if (configuredToken && secureCompareTokens(token, configuredToken)) {
+  if (isAuthenticatedAdminToken(configuredToken, token)) {
     return res.json({ success: true, message: 'Otentikasi berhasil.' });
   }
 
@@ -175,23 +181,60 @@ apiRouter.post('/auth/rotate-token', authMiddleware, async (req, res) => {
   }
 });
 
-// --- 1. Dashboard System Status (Public View-Only) ---
+// --- 1. Dashboard System Status (Public shell, portfolio details admin-only) ---
 apiRouter.get('/status', async (req, res) => {
   try {
     const settings = getAllSettings();
-    const openPositions = db.prepare("SELECT * FROM positions WHERE status = 'open'").all();
-    const recentTrades = db.prepare('SELECT * FROM trades_history ORDER BY timestamp DESC LIMIT 15').all();
-    const lessons = db.prepare('SELECT * FROM lessons_learned ORDER BY timestamp DESC LIMIT 5').all();
+    const isAdmin = checkIsAdmin(req);
+    const mode = settings.trading_mode === 'live' ? 'live' : 'paper';
     const sentiment = agentSwarm.getAggregatedSentiment();
     const waStatus = whatsappService.getStatus();
+    const openPositionsCount = (
+      db.prepare("SELECT COUNT(*) as count FROM positions WHERE status = 'open' AND mode = ?").get(mode) as { count: number }
+    ).count;
 
-    let balanceIdr = parseFloat(settings.paper_idr_balance || '10000000');
-    if (settings.trading_mode === 'live') {
+    if (!isAdmin) {
+      return res.json({
+        success: true,
+        data: {
+          isAutoTradingActive: settings.is_auto_trading_active === '1',
+          mode,
+          balanceIdr: null,
+          openPositions: [],
+          openPositionsCount,
+          recentTrades: [],
+          lessonsLearned: [],
+          portfolioRedacted: true,
+          sentiment,
+          whatsapp: {
+            connected: waStatus.connected,
+            active: waStatus.active,
+            qrCode: null,
+            adminNumber: '',
+            adminLid: '',
+          },
+          subagentsCount: SUBAGENT_DEFINITIONS.length,
+          isAdmin: false,
+        },
+      });
+    }
+
+    const openPositions = db.prepare("SELECT * FROM positions WHERE status = 'open' AND mode = ?").all(mode);
+    const recentTrades = db.prepare('SELECT * FROM trades_history WHERE mode = ? ORDER BY timestamp DESC LIMIT 15').all(mode);
+    const lessons = db.prepare('SELECT * FROM lessons_learned ORDER BY timestamp DESC LIMIT 5').all();
+
+    let balanceIdr: number | null = parseFloat(settings.paper_idr_balance || '10000000');
+    let balanceError: string | null = null;
+    if (mode === 'live') {
       try {
-        const idrBal = await indodax.getIdrBalance();
-        balanceIdr = idrBal.free;
-      } catch {
-        // Fallback to paper balance if live keys not yet set
+        const account = await indodax.getAccountInfo();
+        if (!Array.isArray(account?.balances)) {
+          throw new Error('Respons saldo Indodax tidak valid.');
+        }
+        balanceIdr = account.data?.balance?.idr ?? 0;
+      } catch (err: any) {
+        balanceIdr = null;
+        balanceError = err?.message || 'Gagal mengambil saldo Indodax live.';
       }
     }
 
@@ -199,15 +242,18 @@ apiRouter.get('/status', async (req, res) => {
       success: true,
       data: {
         isAutoTradingActive: settings.is_auto_trading_active === '1',
-        mode: settings.trading_mode || 'paper',
+        mode,
         balanceIdr,
+        balanceError,
         openPositions,
+        openPositionsCount: openPositions.length,
         recentTrades,
         lessonsLearned: lessons,
+        portfolioRedacted: false,
         sentiment,
         whatsapp: waStatus,
         subagentsCount: SUBAGENT_DEFINITIONS.length,
-        isAdmin: checkIsAdmin(req),
+        isAdmin: true,
       },
     });
   } catch (err: any) {
@@ -235,7 +281,8 @@ apiRouter.get('/settings', (req, res) => {
     ngrok_authtoken: hasNgrok ? '****************' : '',
     has_telegram_token: hasTelegramToken,
     telegram_bot_token: isAdmin ? all.telegram_bot_token : (hasTelegramToken ? '****************' : ''),
-    admin_access_token: isAdmin ? all.admin_access_token : '****************',
+    // Never echo the session credential; authenticated admins can use rotation-status.
+    admin_access_token: '****************',
     whatsapp_admin_number: isAdmin ? all.whatsapp_admin_number : (all.whatsapp_admin_number ? '**********' : ''),
     whatsapp_admin_lid: isAdmin ? all.whatsapp_admin_lid : (all.whatsapp_admin_lid ? '****************@lid' : ''),
     telegram_chat_id: isAdmin ? all.telegram_chat_id : (all.telegram_chat_id ? '*********' : ''),
@@ -274,15 +321,18 @@ apiRouter.post('/settings', authMiddleware, (req, res) => {
 // --- 3. AI Providers Management & "Import Models" (View-Only Masked, Protected Mutations) ---
 apiRouter.get('/providers', (req, res) => {
   try {
+    const isAdmin = checkIsAdmin(req);
     const providers = db.prepare('SELECT * FROM providers ORDER BY created_at DESC').all() as any[];
     const result = providers.map((p) => {
       const models = db.prepare('SELECT * FROM models WHERE provider_id = ?').all(p.id);
-      const rawKeys: string[] = JSON.parse(p.api_keys || '[]');
+      const rawKeys = decryptProviderApiKeys(p.api_keys);
       const maskedKeys = rawKeys.map(k => k.length > 8 ? `${k.substring(0, 4)}...${k.substring(k.length - 4)}` : '****');
 
-      const rawOAuth = p.oauth_data ? JSON.parse(p.oauth_data) : null;
+      const rawOAuth = decryptProviderOAuth<any>(p.oauth_data);
+      const email = typeof rawOAuth?.email === 'string' ? rawOAuth.email : '';
+      const maskedEmail = email.includes('@') ? `${email[0]}***@${email.split('@')[1]}` : undefined;
       const sanitizedOAuth = rawOAuth ? {
-        email: rawOAuth.email,
+        email: isAdmin ? rawOAuth.email : maskedEmail,
         projectId: rawOAuth.projectId,
         has_refresh_token: Boolean(rawOAuth.refreshToken),
         expiresAt: rawOAuth.expiresAt,
@@ -323,10 +373,10 @@ apiRouter.post('/providers', authMiddleware, (req, res) => {
     }
 
     if (existing && finalKeys.some(k => k.includes('...'))) {
-      finalKeys = JSON.parse(existing.api_keys || '[]');
+      finalKeys = decryptProviderApiKeys(existing.api_keys);
     }
 
-    let finalOAuth = oauth_data ? JSON.stringify(oauth_data) : null;
+    let finalOAuth = oauth_data ? encryptProviderOAuth(oauth_data) : null;
     if (existing && (!oauth_data || !oauth_data.refreshToken) && existing.oauth_data) {
       finalOAuth = existing.oauth_data;
     }
@@ -345,7 +395,7 @@ apiRouter.post('/providers', authMiddleware, (req, res) => {
       providerId,
       name,
       base_url,
-      JSON.stringify(finalKeys),
+      encryptProviderApiKeys(finalKeys),
       alias,
       protocol || 'chat_completions',
       finalOAuth,
@@ -397,12 +447,8 @@ apiRouter.post('/oauth/antigravity/exchange', authMiddleware, async (req, res) =
     const existingProviders = db.prepare('SELECT * FROM providers').all() as any[];
     const existingAgy = existingProviders.find((p) => {
       if (p.protocol !== 'antigravity') return false;
-      try {
-        const o = JSON.parse(p.oauth_data || '{}');
-        return o.email && oauthData.email && o.email.toLowerCase() === oauthData.email.toLowerCase();
-      } catch {
-        return false;
-      }
+      const o = decryptProviderOAuth<any>(p.oauth_data);
+      return Boolean(o?.email && oauthData.email && o.email.toLowerCase() === oauthData.email.toLowerCase());
     });
 
     let providerId: string;
@@ -449,10 +495,10 @@ apiRouter.post('/oauth/antigravity/exchange', authMiddleware, async (req, res) =
       providerId,
       name,
       baseUrl,
-      JSON.stringify([]),
+      encryptProviderApiKeys([]),
       alias,
       'antigravity',
-      JSON.stringify(oauthData),
+      encryptProviderOAuth(oauthData),
       Date.now()
     );
 
@@ -476,7 +522,7 @@ apiRouter.post('/oauth/antigravity/exchange', authMiddleware, async (req, res) =
 
 // --- Antigravity Quota Endpoints (Public View-Only, matches OmniRoute /dashboard/quota) ---
 
-apiRouter.get('/providers/quota/all', async (req, res) => {
+apiRouter.get('/providers/quota/all', authMiddleware, async (req, res) => {
   try {
     const reports = await aiClient.getAllAntigravityQuotas();
     res.json({ success: true, data: reports });
@@ -485,7 +531,7 @@ apiRouter.get('/providers/quota/all', async (req, res) => {
   }
 });
 
-apiRouter.get('/providers/:id/quota', async (req, res) => {
+apiRouter.get('/providers/:id/quota', authMiddleware, async (req, res) => {
   try {
     const providerId = req.params.id as string;
     const report = await aiClient.getProviderQuota(providerId);
@@ -634,10 +680,11 @@ apiRouter.post('/subagents/run', authMiddleware, async (req, res) => {
 });
 
 // --- 7. Positions & Trade History (Public View-Only) ---
-apiRouter.get('/positions', (req, res) => {
+apiRouter.get('/positions', authMiddleware, (req, res) => {
   try {
-    const open = db.prepare("SELECT * FROM positions WHERE status = 'open'").all();
-    const history = db.prepare("SELECT * FROM positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 30").all();
+    const mode = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
+    const open = db.prepare("SELECT * FROM positions WHERE status = 'open' AND mode = ?").all(mode);
+    const history = db.prepare("SELECT * FROM positions WHERE status = 'closed' AND mode = ? ORDER BY closed_at DESC LIMIT 30").all(mode);
     res.json({ success: true, data: { open, history } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -646,7 +693,20 @@ apiRouter.get('/positions', (req, res) => {
 
 // --- 8. WhatsApp Status & Controls ---
 apiRouter.get('/whatsapp', (req, res) => {
-  res.json({ success: true, data: whatsappService.getStatus() });
+  const status = whatsappService.getStatus();
+  const isAdmin = checkIsAdmin(req);
+  res.json({
+    success: true,
+    data: isAdmin
+      ? status
+      : {
+          connected: status.connected,
+          active: status.active,
+          qrCode: null,
+          adminNumber: '',
+          adminLid: '',
+        },
+  });
 });
 
 apiRouter.post('/whatsapp/connect', authMiddleware, async (req, res) => {
@@ -851,7 +911,6 @@ apiRouter.post('/settings/auto-set-capital', authMiddleware, (req, res) => {
       success: true,
       message: `Parameter berhasil dihitung otomatis untuk modal Rp ${plan.capitalIdr.toLocaleString('id-ID')} (${plan.profile.toUpperCase()}).`,
       plan,
-      settings: getAllSettings(),
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -893,8 +952,8 @@ apiRouter.post('/backtest/run', authMiddleware, async (req, res) => {
   }
 });
 
-// --- 13. A/B Counterfactual AI Validation & Alpha Metrics (Public View-Only) ---
-apiRouter.get('/trading/ab-metrics', (req, res) => {
+// --- 13. A/B Counterfactual AI Validation & Alpha Metrics (Admin Only) ---
+apiRouter.get('/trading/ab-metrics', authMiddleware, (req, res) => {
   try {
     const metrics = tradingEngine.getAbValidationMetrics();
     res.json({ success: true, data: metrics });
@@ -903,8 +962,8 @@ apiRouter.get('/trading/ab-metrics', (req, res) => {
   }
 });
 
-// --- 14. Performance Reporting & Export (Public View-Only) ---
-apiRouter.get('/reports/summary', (req, res) => {
+// --- 14. Performance Reporting & Export (Admin Only) ---
+apiRouter.get('/reports/summary', authMiddleware, (req, res) => {
   try {
     const daysRaw = req.query.days as string;
     const daysFilter = daysRaw === 'all' || !daysRaw ? 'all' : parseInt(daysRaw, 10);
@@ -915,7 +974,7 @@ apiRouter.get('/reports/summary', (req, res) => {
   }
 });
 
-apiRouter.get('/reports/csv', (req, res) => {
+apiRouter.get('/reports/csv', authMiddleware, (req, res) => {
   try {
     const daysRaw = req.query.days as string;
     const daysFilter = daysRaw === 'all' || !daysRaw ? 'all' : parseInt(daysRaw, 10);
@@ -964,7 +1023,7 @@ apiRouter.post('/telegram/test', authMiddleware, async (req, res) => {
 apiRouter.get('/system/health', (req, res) => {
   try {
     const mem = process.memoryUsage();
-    const dbPath = path.resolve(process.cwd(), 'data', 'trading.db');
+    const dbPath = db.name;
     let dbSizeBytes = 0;
     if (fs.existsSync(dbPath)) {
       dbSizeBytes = fs.statSync(dbPath).size;
@@ -992,7 +1051,7 @@ apiRouter.get('/system/health', (req, res) => {
 
 // --- 18. Entry Gate Diagnostics & AI Token Metering ---
 
-apiRouter.get('/diagnostics/entry-gates', (req, res) => {
+apiRouter.get('/diagnostics/entry-gates', authMiddleware, (req, res) => {
   try {
     const data = getEntryGateDiagnostics24h();
     res.json({ success: true, data });
@@ -1068,7 +1127,7 @@ apiRouter.get('/signals/radar', (req, res) => {
   }
 });
 
-apiRouter.get('/agent-bus/messages', (req, res) => {
+apiRouter.get('/agent-bus/messages', authMiddleware, (req, res) => {
   try {
     const topic = req.query.topic as any;
     const messages = agentBus.getRecentMessages(topic, 50);

@@ -5,6 +5,7 @@ import { indodax } from '../indodax/index.js';
 import { scoreHeadline } from '../signals/lexicon.js';
 import { detectThreats } from '../signals/threat.js';
 import type { ThreatSignal } from '../signals/types.js';
+import { feedSourceName, getExtraFeedUrls } from './extraFeeds.js';
 
 export interface RssItem {
   title: string;
@@ -95,6 +96,18 @@ export class RssNewsService {
 
 export const rssNewsService = new RssNewsService();
 
+export interface NewsFeedContext {
+  source: string;
+  items: RssItem[];
+}
+
+export interface SwarmNewsContext {
+  coinDesk: RssItem[];
+  coinTelegraph: RssItem[];
+  indodaxBlog: RssItem[];
+  extra: NewsFeedContext[];
+}
+
 export interface SubagentTask {
   id: string;
   name: string;
@@ -118,62 +131,62 @@ export const SUBAGENT_DEFINITIONS: SubagentTask[] = [
   {
     id: 'subagent-1',
     name: 'Analis Berita Global',
-    role: 'Memantau breaking news makro & pasar crypto internasional (CoinDesk, CoinTelegraph)',
-    sources: ['CoinDesk Live RSS', 'CoinTelegraph RSS', 'Crypto Breaking Wire'],
+    role: 'Merangkum breaking news kripto global dari feed RSS CoinDesk & CoinTelegraph',
+    sources: ['CoinDesk RSS', 'CoinTelegraph RSS'],
   },
   {
     id: 'subagent-2',
     name: 'Analis Teknologi & Ekosistem',
-    role: 'Melacak hard fork, upgrade protokol, dan peluncuran mainnet L1/L2',
-    sources: ['CoinDesk Research', 'CoinTelegraph News', 'Ecosystem Updates'],
+    role: 'Menyaring berita upgrade protokol, hard fork, dan ekosistem dari judul RSS terkini',
+    sources: ['CoinDesk RSS', 'CoinTelegraph RSS'],
   },
   {
     id: 'subagent-3',
-    name: 'Radar Media Sosial',
-    role: 'Mengukur sentimen komunitas ritel di forum dan media sosial terbesar',
-    sources: ['Reddit r/CryptoCurrency', 'Reddit r/Altcoin', 'Bitcointalk Discussion'],
+    name: 'Analis Sentimen Berita',
+    role: 'Membandingkan sentimen judul berita (lexicon deterministik) dengan pergerakan pasar Indodax',
+    sources: ['CoinDesk RSS', 'CoinTelegraph RSS', 'Lexicon Sentimen Deterministik'],
   },
   {
     id: 'subagent-4',
-    name: 'Radar Twitter/X',
-    role: 'Mendeteksi narasi viral dan ticker yang sedang trending di Twitter/X',
-    sources: ['Crypto Twitter Whale Radar', 'LunarCrush Trending Feeds', 'X Trending #Crypto'],
+    name: 'Radar Narasi Pasar',
+    role: 'Mendeteksi tema narasi dominan dari headline terbaru dan data ticker Indodax',
+    sources: ['CoinDesk RSS', 'CoinTelegraph RSS', 'Indodax Blog RSS', 'Indodax Market Tickers'],
   },
   {
     id: 'subagent-5',
     name: 'Radar Listing Indodax',
-    role: 'Melacak pengumuman koin baru masuk bursa & status order book Indodax',
-    sources: ['Indodax Public Pairs API', 'Indodax Summaries Engine', 'Indodax Order Book Depth'],
+    role: 'Memantau pengumuman blog resmi Indodax dan alert koin baru',
+    sources: ['Indodax Blog RSS', 'Indodax New-Coin Alerts', 'Indodax Pairs API'],
   },
   {
     id: 'subagent-6',
-    name: 'Pemburu Koin Naik',
-    role: 'Menganalisa pergerakan koin top gainer dan momentum koin bervolume tinggi',
-    sources: ['Indodax 24h Top Gainers', 'Volume Surges Detector', 'CoinGecko Trending'],
+    name: 'Pemburu Momentum',
+    role: 'Menganalisa top gainer dan lonjakan volume 24 jam di bursa Indodax',
+    sources: ['Indodax Market Tickers'],
   },
   {
     id: 'subagent-7',
-    name: 'Radar Keamanan & Hack',
-    role: 'Memindai celah kontrak, hack bridge, exploit, dan tindakan regulasi/delisting',
-    sources: ['CoinDesk Security Reports', 'CoinTelegraph Alert Desk', 'PeckShield / CertiK Radar'],
+    name: 'Radar Keamanan',
+    role: 'Memindai judul berita untuk hack, exploit, delisting, dan bahaya regulasi',
+    sources: ['CoinDesk RSS', 'CoinTelegraph RSS', 'Threat Scanner Deterministik'],
   },
   {
     id: 'subagent-8',
     name: 'Radar Makro & Regulasi',
-    role: 'Memantau suku bunga The Fed, inflasi global, dan kepatuhan bursa kripto RI (Bappebti)',
-    sources: ['Global Macro Telemetry', 'Bank Indonesia Policy Notes', 'Bappebti Registered Updates'],
+    role: 'Menyorot berita makro dan regulasi yang tersedia di feed (bukan feed resmi The Fed/BI/Bappebti)',
+    sources: ['CoinDesk RSS', 'CoinTelegraph RSS', 'Indodax Blog RSS'],
   },
   {
     id: 'subagent-9',
-    name: 'Pelacak Whale On-Chain',
-    role: 'Melacak perpindahan wallet besar (whale) ke dan dari bursa',
-    sources: ['Whale Alert Feed', 'Exchange Netflow Telemetry', 'CryptoQuant Exchange Reserve'],
+    name: 'Analis Likuiditas & Spread',
+    role: 'Menilai spread bid/ask dan volume pair paling likuid di Indodax',
+    sources: ['Indodax Market Tickers', 'Indodax Top-of-Book Data'],
   },
   {
     id: 'subagent-10',
-    name: 'Analis Selisih Bursa Global',
-    role: 'Membandingkan harga dan lonjakan volume bursa global sebelum merambat ke Indodax',
-    sources: ['Global Ticker Spikes', 'CoinMarketCap Volume Surges', 'Perp Funding Rate Spikes'],
+    name: 'Analis Korelasi BTC',
+    role: 'Membandingkan arah BTC dengan top gainer altcoin di Indodax',
+    sources: ['Indodax Market Tickers', 'CoinDesk RSS'],
   },
 ];
 
@@ -197,7 +210,7 @@ export class MultiAgentSwarm {
     this.isRunning = true;
     this.runCycle();
     this.intervalTimer = setInterval(() => this.runCycle(), intervalMs);
-    console.log('[Multi-Agent Swarm] 10 Subagents aktif dengan konteks terisolasi.');
+    console.log('[Multi-Agent Swarm] 10 subagent aktif dengan konteks terisolasi (RSS + data bursa Indodax).');
   }
 
   public stop() {
@@ -235,11 +248,18 @@ export class MultiAgentSwarm {
         rssNewsService.getFeed('https://cointelegraph.com/rss', 5),
         rssNewsService.getFeed('https://blog.indodax.com/feed/', 5),
       ]);
+      const extraFeeds: NewsFeedContext[] = await Promise.all(
+        getExtraFeedUrls().map(async (url) => ({
+          source: feedSourceName(url),
+          items: await rssNewsService.getFeed(url, 5),
+        }))
+      );
 
-      const newsContext = {
+      const newsContext: SwarmNewsContext = {
         coinDesk: coinDeskFeed,
         coinTelegraph: coinTelegraphFeed,
         indodaxBlog: indodaxBlogFeed,
+        extra: extraFeeds,
       };
 
       // Ingest news into news_items table with deterministic lexicon & threat analysis
@@ -247,6 +267,7 @@ export class MultiAgentSwarm {
         ...coinDeskFeed.map((n) => ({ ...n, source: 'CoinDesk' })),
         ...coinTelegraphFeed.map((n) => ({ ...n, source: 'CoinTelegraph' })),
         ...indodaxBlogFeed.map((n) => ({ ...n, source: 'Indodax Blog' })),
+        ...extraFeeds.flatMap((feed) => feed.items.map((n) => ({ ...n, source: feed.source }))),
       ];
 
       for (const item of allNews) {
@@ -296,6 +317,7 @@ export class MultiAgentSwarm {
             d: coinDeskFeed.map((f) => f.title).slice(0, 5),
             t: coinTelegraphFeed.map((f) => f.title).slice(0, 5),
             b: indodaxBlogFeed.map((f) => f.title).slice(0, 3),
+            x: extraFeeds.flatMap((feed) => feed.items.map((item) => item.title)).slice(0, 5),
             top: liveSummaries?.tickers
               ? Object.entries(liveSummaries.tickers)
                   .filter(([k]) => k.endsWith('_idr'))
@@ -349,18 +371,19 @@ export class MultiAgentSwarm {
     task: SubagentTask,
     model: string,
     liveSummaries: any,
-    newsContext: { coinDesk: RssItem[]; coinTelegraph: RssItem[]; indodaxBlog?: RssItem[] }
+    newsContext: SwarmNewsContext
   ): Promise<SubagentOutput | null> {
     const realContext = this.buildContextForAgent(task, liveSummaries, newsContext);
 
     const prompt = `Anda adalah sub-agent khusus: "${task.name}".
 Tugas: ${task.role}
-Sumber Pengamatan: ${task.sources.join(', ')}
+Sumber Data Aktual: ${realContext.source}
+Sumber yang Tersedia untuk Tim: ${task.sources.join(', ')}
 
 Konteks Data Pasar Terkini:
 ${JSON.stringify(realContext)}
 
-Analisa secara objektif dan jujur. Jangan membuat berita palsu (hallucination).
+Analisa secara objektif dan jujur. Gunakan HANYA data pada konteks di atas. Jangan mengklaim akses ke Twitter/X, Reddit, on-chain, atau sumber lain yang tidak ada di konteks. Jika data tidak tersedia, tulis "data tidak tersedia". Jangan membuat berita atau angka palsu.
 Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
 {
   "title": "Judul ringkas temuan utama",
@@ -393,7 +416,7 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
       return {
         agentId: task.id,
         agentName: task.name,
-        sourceName: task.sources[Math.floor(Math.random() * task.sources.length)],
+        sourceName: typeof realContext.source === 'string' ? realContext.source : task.sources[0],
         title: parsed.title || `${task.name} Market Analysis`,
         summary: parsed.summary || 'Kondisi pasar normal tanpa anomali kritis.',
         sentimentScore: typeof parsed.sentimentScore === 'number' ? Math.max(-1, Math.min(1, parsed.sentimentScore)) : 0.0,
@@ -450,7 +473,7 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
   private buildContextForAgent(
     task: SubagentTask,
     summaries: any,
-    newsContext: { coinDesk: RssItem[]; coinTelegraph: RssItem[]; indodaxBlog?: RssItem[] }
+    newsContext: SwarmNewsContext
   ): any {
     const time = new Date().toLocaleTimeString('id-ID');
     const tickers = summaries?.tickers || {};
@@ -475,6 +498,25 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
     gainers.sort((a, b) => b.gainPercent - a.gainPercent);
     const topGainers = gainers.slice(0, 5);
 
+    // Top-of-book spreads from the public Indodax summaries feed
+    const topLiquidity = (Object.entries(tickers) as [string, any][])
+      .filter(([key]) => key.endsWith('_idr'))
+      .map(([key, t]) => {
+        const buy = parseFloat(t.buy);
+        const sell = parseFloat(t.sell);
+        const volIdr = parseFloat(t.vol_idr);
+        return {
+          pair: key.replace('_idr', '').toUpperCase(),
+          bid: t.buy,
+          ask: t.sell,
+          spreadPercent: sell > 0 ? parseFloat((((sell - buy) / sell) * 100).toFixed(3)) : null,
+          volIdr,
+        };
+      })
+      .filter((row) => Number.isFinite(row.volIdr) && row.volIdr > 0)
+      .sort((a, b) => b.volIdr - a.volIdr)
+      .slice(0, 5);
+
     // Get recently detected new coin alerts
     let recentAlerts: any[] = [];
     try {
@@ -484,24 +526,46 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
     const allNewsHeadlines = [
       ...newsContext.coinDesk.map((i) => ({ source: 'CoinDesk', title: i.title })),
       ...newsContext.coinTelegraph.map((i) => ({ source: 'CoinTelegraph', title: i.title })),
-      ...(newsContext.indodaxBlog || []).map((i) => ({ source: 'Indodax Blog', title: i.title })),
+      ...newsContext.indodaxBlog.map((i) => ({ source: 'Indodax Blog', title: i.title })),
+      ...newsContext.extra.flatMap((feed) => feed.items.map((i) => ({ source: feed.source, title: i.title }))),
     ];
+    const btcTicker = tickers.btc_idr;
 
     switch (task.id) {
       case 'subagent-1': // Global Crypto Breaking Wire
         return {
-          source: 'Live CoinDesk & CoinTelegraph RSS Feeds',
+          source: 'CoinDesk RSS + CoinTelegraph RSS',
           time,
-          realLiveHeadlines: allNewsHeadlines.slice(0, 6),
-          btcPrice: tickers.btc_idr?.last || 'Market Live',
+          realLiveHeadlines: allNewsHeadlines.slice(0, 8),
+          btcPrice: btcTicker?.last || 'data tidak tersedia',
         };
 
       case 'subagent-2': // Tech & Ecosystem Analyst
         return {
-          source: 'CoinDesk Research & CoinTelegraph Tech Feeds',
+          source: 'CoinDesk RSS + CoinTelegraph RSS',
           time,
-          recentTechDevelopments: newsContext.coinDesk.slice(0, 5).map((n) => n.title),
+          recentHeadlines: allNewsHeadlines.slice(0, 8),
           topMovers: topGainers.slice(0, 3),
+        };
+
+      case 'subagent-3': // News Sentiment Analyst
+        return {
+          source: 'CoinDesk/CoinTelegraph RSS + Lexicon Sentimen Deterministik + Indodax Tickers',
+          time,
+          headlineSentiments: allNewsHeadlines.slice(0, 6).map((news) => ({
+            source: news.source,
+            title: news.title,
+            lexiconScore: scoreHeadline(news.title).score,
+          })),
+          btcPrice: btcTicker?.last || 'data tidak tersedia',
+        };
+
+      case 'subagent-4': // Market Narrative Radar
+        return {
+          source: 'CoinDesk/CoinTelegraph/Indodax Blog RSS + Indodax Market Tickers',
+          time,
+          latestHeadlines: allNewsHeadlines.slice(0, 10),
+          topMovers: topGainers.slice(0, 5),
         };
 
       case 'subagent-7': {
@@ -510,39 +574,56 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
           /\b(hack|exploit|scam|stolen|drain|sec charges?|bappebti (block|ban|suspend)|arrest|lawsuit filed|attack|vulnerability|fraud)\b/i.test(n.title)
         );
         return {
-          source: 'Security Telemetry & Live Incident Feeds',
+          source: 'CoinDesk/CoinTelegraph RSS + Threat Scanner Deterministik',
           time,
           detectedIncidents:
             securityNews.length > 0
               ? securityNews
-              : ['Tidak ada laporan exploit atau ancaman regulasi dalam breaking news saat ini (kondisi aman).'],
-          marketHealth: 'Order book Indodax normal',
+              : ['Tidak ada kata kunci hack/exploit/delisting pada headline RSS saat ini.'],
+          note: 'Pemindaian ini hanya berbasis judul berita, bukan audit smart contract.',
         };
       }
 
       case 'subagent-5': // Indodax Listing Radar
         return {
-          source: 'Indodax Official Data & Blog',
+          source: 'Indodax Blog RSS + Indodax New-Coin Alerts + Indodax Pairs API',
           time,
-          officialAnnouncements: (newsContext.indodaxBlog || []).map((n) => n.title),
+          officialAnnouncements: newsContext.indodaxBlog.map((n) => n.title),
           newListingAlerts: recentAlerts,
           activePairsCount: Object.keys(tickers).length,
         };
 
-      case 'subagent-8': // Macro Economics & Bappebti Radar
+      case 'subagent-8': // Macro & Regulatory Radar
         return {
-          source: 'Indodax Market Blog & Bappebti/BI Macro',
+          source: 'CoinDesk/CoinTelegraph RSS + Indodax Blog RSS',
           time,
-          domesticCryptoHeadlines: (newsContext.indodaxBlog || []).map((n) => n.title),
-          globalMacroHeadlines: newsContext.coinDesk.slice(0, 3).map((n) => n.title),
-          btcPrice: tickers.btc_idr?.last || 'Market Live',
+          domesticCryptoHeadlines: newsContext.indodaxBlog.map((n) => n.title),
+          globalMacroHeadlines: [...newsContext.coinDesk, ...newsContext.coinTelegraph].slice(0, 6).map((n) => n.title),
+          note: 'Tidak ada feed resmi The Fed, Bank Indonesia, atau Bappebti di konteks ini.',
         };
 
-      case 'subagent-6': // Memecoin & Top Gainers
+      case 'subagent-6': // Top Gainers & Momentum
         return {
-          source: 'Live Indodax Market Tickers',
+          source: 'Indodax Market Tickers',
           time,
           topGainersToday: topGainers,
+        };
+
+      case 'subagent-9': // Liquidity & Spread Analyst
+        return {
+          source: 'Indodax Market Tickers (Top-of-Book)',
+          time,
+          topLiquidity,
+        };
+
+      case 'subagent-10': // BTC Correlation Analyst
+        return {
+          source: 'Indodax Market Tickers (BTC vs Altcoin)',
+          time,
+          btc24h: btcTicker
+            ? { last: btcTicker.last, high: btcTicker.high, low: btcTicker.low, volIdr: btcTicker.vol_idr }
+            : 'data tidak tersedia',
+          topGainers: topGainers.slice(0, 5),
         };
 
       default:
@@ -550,8 +631,8 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
           source: task.sources[0],
           time,
           marketSnapshot: {
-            btcPrice: tickers.btc_idr?.last || 'Market Live',
-            btc24hVolIdr: tickers.btc_idr?.vol_idr || '0',
+            btcPrice: btcTicker?.last || 'data tidak tersedia',
+            btc24hVolIdr: btcTicker?.vol_idr || '0',
             topMovers: topGainers.slice(0, 3),
           },
           latestHeadlines: allNewsHeadlines.slice(0, 3).map((n) => n.title),

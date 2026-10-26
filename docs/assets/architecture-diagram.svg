@@ -44,7 +44,7 @@
       - Order Book Depth (Top 5 Bids &amp; Asks)
     </text>
     <text x="16" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8">
-      - Global Arbitrage Feed (Binance/Bybit Delta)
+      - Top-of-Book Spread &amp; Volume Snapshot
     </text>
     <text x="16" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#38bdf8" font-weight="600">
       Output: Normalized Market Snapshot Event
@@ -83,16 +83,16 @@
     <rect width="330" height="180" rx="12" fill="url(#panelGrad)" stroke="#a855f7" stroke-width="1.5" filter="url(#cardShadow)"/>
     <rect x="0" y="0" width="330" height="36" rx="12" fill="#7e22ce"/>
     <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
-      3. AI Research Swarm (10 Sub-Agents)
+      3. AI Research Swarm (10 Analytical Lenses)
     </text>
     <text x="16" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
-      • Global News, Tech Ecosystem, Social Reddit
+      • Global News &amp; Tech Ecosystem (RSS)
     </text>
     <text x="16" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
-      • Twitter/X Radar, New Indodax Listing Detector
+      • News Sentiment, Market Narrative, New Listings
     </text>
     <text x="16" y="98" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
-      • Protocol Exploit Radar, Whale On-Chain Tracker
+      • Exploit Headline Scanner, Liquidity &amp; Spread Lens
     </text>
     <text x="16" y="118" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#e2e8f0">
       • Multi-Account Engine (Gemini 3.8 / Claude 4.6)
@@ -101,7 +101,7 @@
       • SHA256 Context Dedup (&gt;90% Token Savings)
     </text>
     <text x="16" y="164" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#a855f7" font-weight="600">
-      Fail-Safe: Automatic Degraded Mode when AI is down
+      Live mode: AI failure blocks new entries (fail-closed)
     </text>
   </g>
 

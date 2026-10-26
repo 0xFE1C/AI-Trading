@@ -25,7 +25,7 @@
     <circle cx="35" cy="30" r="16" fill="#10b981"/>
     <text x="35" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#ffffff" text-anchor="middle">AI</text>
     <text x="60" y="27" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ffffff">AI-Trading Remote Bot</text>
-    <text x="60" y="43" font-family="system-ui, sans-serif" font-size="10" fill="#a7f3d0">online &bull; Baileys Multi-Device</text>
+    <text x="60" y="43" font-family="system-ui, sans-serif" font-size="10" fill="#a7f3d0">online &#8226; Baileys Multi-Device</text>
 
     <!-- Chat Messages -->
     <!-- User Msg 1 -->
@@ -49,8 +49,8 @@
     <rect x="20" y="295" width="300" height="120" rx="10" fill="#1e293b"/>
     <text x="35" y="315" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a855f7">🧠 AI Financial Assistant:</text>
     <text x="35" y="335" font-family="system-ui, sans-serif" font-size="10" fill="#cbd5e1">Berdasarkan analisa 10 Subagent Swarm saat ini:</text>
-    <text x="35" y="355" font-family="system-ui, sans-serif" font-size="10" fill="#e2e8f0">&bull; PEPE/IDR (+18.4%): Volume buyer wall 3.2x</text>
-    <text x="35" y="370" font-family="system-ui, sans-serif" font-size="10" fill="#e2e8f0">&bull; BERA/IDR (+24.8%): Listing radar mendeteksi early pump</text>
+    <text x="35" y="355" font-family="system-ui, sans-serif" font-size="10" fill="#e2e8f0">&#8226; PEPE/IDR (+18.4%): Volume buyer wall 3.2x</text>
+    <text x="35" y="370" font-family="system-ui, sans-serif" font-size="10" fill="#e2e8f0">&#8226; BERA/IDR (+24.8%): Listing radar mendeteksi early pump</text>
     <text x="35" y="390" font-family="system-ui, sans-serif" font-size="10" fill="#38bdf8">Gunakan /buy &lt;symbol&gt; &lt;nominal&gt; untuk beli.</text>
 
     <!-- User Msg 3 -->
@@ -82,6 +82,6 @@
     <rect x="30" y="380" width="620" height="110" rx="10" fill="#1e1b4b" stroke="#4338ca"/>
     <text x="50" y="410" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#c7d2fe">4. AI Natural Language Action Detection</text>
     <text x="50" y="435" font-family="system-ui, sans-serif" font-size="11" fill="#e0e7ff">Selain perintah slash (`/`), bot dapat memahami bahasa manusia biasa seperti "tolong jeda trading dulu ya" atau "cek berapa saldo saya sekarang".</text>
-    <text x="50" y="465" font-family="monospace" font-size="11" fill="#a5b4fc">Didukung Claude Sonnet 4.6 &bull; Respons rata-rata &lt; 800ms</text>
+    <text x="50" y="465" font-family="monospace" font-size="11" fill="#a5b4fc">Didukung Claude Sonnet 4.6 &#8226; Respons rata-rata &lt; 800ms</text>
   </g>
 </svg>

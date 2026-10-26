@@ -12,7 +12,7 @@ echo.
 where node >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Node.js tidak ditemukan!
-    echo Silakan download dan install Node.js (v18+) dari https://nodejs.org
+    echo Silakan download dan install Node.js (v22.12+) dari https://nodejs.org
     echo Setelah terpasang, jalankan kembali launcher ini.
     echo.
     pause

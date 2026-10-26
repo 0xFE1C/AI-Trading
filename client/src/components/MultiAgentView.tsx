@@ -74,13 +74,13 @@ export const MultiAgentView: React.FC = () => {
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
               <span>{l('AI Research Team (10 Analysts 24/7)', 'Tim Riset AI (10 Analis Bekerja 24 Jam)')}</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full border border-indigo-500/30 bg-indigo-950/40 text-indigo-300 font-mono">
-                {l('100+ Real-Time Sources', '100+ Sumber Real-Time')}
+                {l('Verified: RSS + Exchange Data', 'Terverifikasi: RSS + Data Bursa')}
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               {l(
-                '10 autonomous AI analysts continuously monitor global news, crypto tech stacks, on-chain whales, social sentiment, and exchange order books.',
-                '10 Analis AI mandiri memantau berita global, ekosistem teknologi, whale on-chain, media sosial, dan sinyal bursa secara terus-menerus.'
+                '10 AI analysts review the same verified inputs through different lenses: CoinDesk/CoinTelegraph/Indodax Blog RSS, Indodax tickers, and a deterministic threat scanner.',
+                '10 Analis AI meninjau input terverifikasi yang sama dari sudut pandang berbeda: RSS CoinDesk/CoinTelegraph/Indodax Blog, ticker Indodax, dan pemindai ancaman deterministik.'
               )}
             </p>
           </div>
@@ -105,8 +105,8 @@ export const MultiAgentView: React.FC = () => {
           <strong className="text-indigo-300 font-semibold">{l('How to Read Sentiment Scores: ', 'Cara Membaca Skor Sentimen: ')}</strong>
           <span>
             {l(
-              'Scores range from -1.0 (High Caution / Risk Potential) to +1.0 (Highly Bullish / Opportunity). The bot only approves trades if sentiment is favorable and security checks report zero exploits or hacks.',
-              'Skor berkisar dari -1.0 (Sangat Waspada / Potensi Risiko) sampai +1.0 (Sangat Bullish / Peluang). Bot hanya menyetujui transaksi jika sentimen berita mendukung dan Analis Keamanan memastikan nol indikasi exploit/hack.'
+              'Scores range from -1.0 (High Caution / Risk Potential) to +1.0 (Highly Bullish / Opportunity). Sentiment is context for the AI risk review, not a standalone buy signal; every entry must also pass the deterministic risk gates.',
+              'Skor berkisar dari -1.0 (Sangat Waspada / Potensi Risiko) sampai +1.0 (Sangat Bullish / Peluang). Sentimen adalah konteks untuk evaluasi risiko AI, bukan sinyal beli tunggal; setiap entry tetap harus lolos gerbang risiko deterministik.'
             )}
           </span>
         </div>
@@ -131,7 +131,7 @@ export const MultiAgentView: React.FC = () => {
             </span>
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
-            {l('Calculated from 30 latest AI analyst reports (-1.0 to +1.0)', 'Dihitung dari 30 laporan analis AI terbaru (-1.0 s/d +1.0)')}
+            {l('Calculated from 50 latest AI analyst reports (-1.0 to +1.0)', 'Dihitung dari 50 laporan analis AI terbaru (-1.0 s/d +1.0)')}
           </p>
         </div>
 
@@ -142,16 +142,19 @@ export const MultiAgentView: React.FC = () => {
           <div className="text-2xl font-bold font-mono text-slate-100 flex items-center gap-2">
             {(sentiment?.threatCount ?? 0) === 0 ? (
               <span className="text-emerald-400 flex items-center gap-1.5 text-base font-semibold">
-                <ShieldCheck className="h-5 w-5" /> {l('Safe (0 Threats)', 'Aman (0 Ancaman)')}
+                <ShieldCheck className="h-5 w-5" /> {l('No Active Threat Flags', 'Tidak Ada Flag Ancaman')}
               </span>
             ) : (
               <span className="text-rose-400 flex items-center gap-1.5 text-base font-semibold">
-                <ShieldAlert className="h-5 w-5" /> {sentiment?.threatCount} {l('Hack/FUD Warnings', 'Peringatan Hack/FUD')}
+                <ShieldAlert className="h-5 w-5" /> {sentiment?.threatCount} {l('Threat Flags', 'Flag Ancaman')}
               </span>
             )}
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
-            {l('Security analysts screen hacks, exploits, and delisting risks', 'Analis Keamanan memfilter hack, exploit, dan isu delisting')}
+            {l(
+              'Keyword scanner over RSS headlines and AI reports; not a smart-contract audit',
+              'Pemindai kata kunci pada headline RSS dan laporan AI; bukan audit smart contract'
+            )}
           </p>
         </div>
 

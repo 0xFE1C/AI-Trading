@@ -63,7 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t, formatCurrency } = useLanguage();
   const isAuto = status?.isAutoTradingActive ?? false;
   const mode = status?.mode ?? 'paper';
-  const balance = status?.balanceIdr ?? 0;
+  const balance = status?.balanceIdr ?? null;
+  const hidePortfolio = status?.portfolioRedacted === true;
 
   const navSections = [
     {
@@ -223,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] text-blue-400 font-mono">IDR</span>
             </div>
             <div className="text-sm font-bold text-slate-100 truncate">
-              {formatCurrency(balance)}
+              {hidePortfolio ? '••••••' : balance === null ? '—' : formatCurrency(balance)}
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db, getSetting } from '../../db/index.js';
+import { db, getSetting, setSetting } from '../../db/index.js';
 
 export interface IndodaxPair {
   id: string; // e.g. 'btcidr'
@@ -47,6 +47,20 @@ export interface IndodaxOrderResponse {
   fullOrderId?: string;
 }
 
+export interface IndodaxFillInfo {
+  orderId: string;
+  status: string;
+  executedQty: number;
+  quoteQty: number;
+  averagePrice: number;
+  verified: boolean;
+  isFinal: boolean;
+}
+
+const FINAL_ORDER_STATUSES = new Set(['FILLED', 'CANCELED', 'CANCELLED', 'REJECTED', 'EXPIRED']);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export class IndodaxClient {
   private publicBaseUrl = 'https://indodax.com';
   private tradeBaseUrl = 'https://api.indodax.com';
@@ -54,6 +68,7 @@ export class IndodaxClient {
   private knownPairIds: Set<string> = new Set();
   private pairsCache: Map<string, IndodaxPair> = new Map();
   private pairsCacheTime = 0;
+  private pairsInFlight: Promise<IndodaxPair[]> | null = null;
   private summariesCache: { tickers: Record<string, IndodaxSummaryTicker>; prices_24h: Record<string, string> } | null = null;
   private summariesCacheTime = 0;
   private summariesInFlight: Promise<{ tickers: Record<string, IndodaxSummaryTicker>; prices_24h: Record<string, string> }> | null = null;
@@ -74,12 +89,17 @@ export class IndodaxClient {
 
   private loadKnownPairs() {
     try {
-      const rows = db.prepare('SELECT symbol FROM new_coin_alerts').all() as Array<{ symbol: string }>;
+      // Migrate legacy alert rows so an upgrade never re-announces old listings
+      db.prepare(
+        'INSERT OR IGNORE INTO known_pairs (pair_id, first_seen_at) SELECT LOWER(symbol), detected_at FROM new_coin_alerts'
+      ).run();
+
+      const rows = db.prepare('SELECT pair_id FROM known_pairs').all() as Array<{ pair_id: string }>;
       for (const row of rows) {
-        this.knownPairIds.add(row.symbol.toLowerCase());
+        this.knownPairIds.add(row.pair_id.toLowerCase());
       }
-    } catch {
-      // Table may not yet be initialized
+    } catch (err) {
+      console.warn('[Indodax] Gagal memuat known pairs registry:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -107,7 +127,19 @@ export class IndodaxClient {
     if (!forceRefresh && this.pairsCache.size > 0 && now - this.pairsCacheTime < 10 * 60 * 1000) {
       return Array.from(this.pairsCache.values());
     }
+    if (this.pairsInFlight) {
+      return this.pairsInFlight;
+    }
 
+    this.pairsInFlight = this.fetchAndTrackPairs();
+    try {
+      return await this.pairsInFlight;
+    } finally {
+      this.pairsInFlight = null;
+    }
+  }
+
+  private async fetchAndTrackPairs(): Promise<IndodaxPair[]> {
     const res = await fetch(`${this.publicBaseUrl}/api/pairs`);
     const pairs = await this.safeParseResponse<IndodaxPair[]>(res, 'getPairs');
 
@@ -119,24 +151,55 @@ export class IndodaxClient {
       this.pairsCache.set(p.id.toLowerCase(), p);
       this.pairsCache.set(p.symbol.toUpperCase(), p);
     }
-    this.pairsCacheTime = now;
+    this.pairsCacheTime = Date.now();
 
-    // Check for new coin listings
-    if (this.knownPairIds.size > 0) {
+    await this.trackPairUniverse(idrPairs);
+    return idrPairs;
+  }
+
+  /**
+   * Persists the full pair universe. The first run after install/upgrade seeds the
+   * registry silently; later runs only raise alerts for pairs never seen before.
+   */
+  private async trackPairUniverse(idrPairs: IndodaxPair[]) {
+    try {
+      const seeded = getSetting('known_pairs_seeded', '0') === '1';
+      const insertKnown = db.prepare(
+        'INSERT OR IGNORE INTO known_pairs (pair_id, first_seen_at) VALUES (?, ?)'
+      );
+      const newPairs: IndodaxPair[] = [];
+      const now = Date.now();
+
       for (const pair of idrPairs) {
         const id = pair.id.toLowerCase();
-        if (!this.knownPairIds.has(id)) {
-          this.knownPairIds.add(id);
-          this.recordNewCoinListing(pair);
+        insertKnown.run(id, now);
+        if (seeded && !this.knownPairIds.has(id)) {
+          newPairs.push(pair);
         }
+        this.knownPairIds.add(id);
       }
-    } else {
-      for (const pair of idrPairs) {
-        this.knownPairIds.add(pair.id.toLowerCase());
-      }
-    }
 
-    return idrPairs;
+      if (!seeded) {
+        setSetting('known_pairs_seeded', '1');
+        console.log(`[Indodax] Registry pair awal disimpan (${idrPairs.length} pair), tanpa alert massal.`);
+        return;
+      }
+
+      for (const pair of newPairs) {
+        let lastPrice = 0;
+        let volume24h = 0;
+        try {
+          const { ticker } = await this.getTicker(pair.id);
+          lastPrice = parseFloat(ticker?.last || '0') || 0;
+          volume24h = parseFloat(ticker?.vol_idr || '0') || 0;
+        } catch {
+          // Alert still matters; price will be shown as unavailable
+        }
+        this.recordNewCoinListing(pair, lastPrice, volume24h);
+      }
+    } catch (err) {
+      console.warn('[Indodax] Gagal memperbarui registry pair:', err instanceof Error ? err.message : err);
+    }
   }
 
   public getPairRules(symbol: string): IndodaxPair | undefined {
@@ -497,6 +560,97 @@ export class IndodaxClient {
     });
   }
 
+  /**
+   * Normalizes fill data across possible v2 response shapes. Never guesses a
+   * fill quantity unless the order is explicitly FILLED and a fallback is known.
+   */
+  public extractOrderFill(
+    raw: any,
+    fallback: { requestedQty?: number; expectedPrice?: number } = {}
+  ): IndodaxFillInfo {
+    const src = raw?.data?.order ?? raw?.data ?? raw?.order ?? raw?.return ?? raw ?? {};
+    const num = (value: any): number => {
+      const parsed = parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const status = String(src.status ?? src.orderStatus ?? src.order_status ?? src.state ?? '').toUpperCase();
+    let executedQty = num(
+      src.executedQty ?? src.executed_qty ?? src.filledQty ?? src.filled_qty ?? src.executed ?? 0
+    );
+    let quoteQty = num(
+      src.cummulativeQuoteQty ??
+        src.cummulative_quote_qty ??
+        src.quoteQty ??
+        src.quote_qty ??
+        src.total ??
+        0
+    );
+    let averagePrice = num(src.avgPrice ?? src.averagePrice ?? src.avg_price ?? src.average ?? 0);
+
+    if (status === 'FILLED' && executedQty <= 0) {
+      if (fallback.requestedQty && fallback.requestedQty > 0) {
+        executedQty = fallback.requestedQty;
+      } else if (quoteQty > 0 && fallback.expectedPrice && fallback.expectedPrice > 0) {
+        executedQty = quoteQty / fallback.expectedPrice;
+      }
+    }
+    if (averagePrice <= 0 && executedQty > 0 && quoteQty > 0) {
+      averagePrice = quoteQty / executedQty;
+    }
+    if (averagePrice <= 0 && executedQty > 0 && fallback.expectedPrice && fallback.expectedPrice > 0) {
+      averagePrice = fallback.expectedPrice;
+    }
+    if (quoteQty <= 0 && executedQty > 0 && averagePrice > 0) {
+      quoteQty = executedQty * averagePrice;
+    }
+
+    const explicitlyFilled = executedQty > 0 && num(
+      src.executedQty ?? src.executed_qty ?? src.filledQty ?? src.filled_qty ?? src.executed ?? 0
+    ) > 0;
+    const verified = explicitlyFilled || (status === 'FILLED' && executedQty > 0);
+
+    const isFinal =
+      FINAL_ORDER_STATUSES.has(status) ||
+      (!status &&
+        fallback.requestedQty !== undefined &&
+        executedQty >= fallback.requestedQty * 0.999999);
+
+    return {
+      orderId: String(src.orderId ?? src.order_id ?? src.id ?? raw?.orderId ?? raw?.order_id ?? ''),
+      status: status || 'UNKNOWN',
+      executedQty,
+      quoteQty,
+      averagePrice,
+      verified,
+      isFinal,
+    };
+  }
+
+  public async waitForOrderFill(
+    symbol: string,
+    orderId: string | number,
+    rawResponse?: any,
+    fallback: { requestedQty?: number; expectedPrice?: number } = {},
+    timeoutMs = 5000
+  ): Promise<IndodaxFillInfo> {
+    let fill = this.extractOrderFill(rawResponse ?? { orderId }, fallback);
+    if (fill.isFinal) return fill;
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await sleep(400);
+      try {
+        const order = await this.getOrder(symbol, orderId);
+        fill = this.extractOrderFill(order, fallback);
+        if (fill.isFinal) return fill;
+      } catch {
+        // Transient network/API issue: retry until the deadline
+      }
+    }
+    return fill;
+  }
+
   // --- Official Deadman Switch Heartbeat (Deadman-switch.md) ---
   // Protocol: POST https://indodax.com/tapi/countdownCancelAll
   // Authentication: HMAC-SHA512 with Header 'Key' and 'Sign'
@@ -581,21 +735,31 @@ export class IndodaxClient {
 
   // --- New Coin Detector Helper ---
 
-  private recordNewCoinListing(pair: IndodaxPair) {
+  private recordNewCoinListing(pair: IndodaxPair, lastPrice: number, volume24h: number) {
     try {
-      const initialPrice = pair.trade_min_base_currency || 1000;
-      const stmt = db.prepare(`
+      const result = db.prepare(`
         INSERT OR IGNORE INTO new_coin_alerts (id, symbol, name, initial_price, current_price, volume_24h, surge_percent, detected_at, status)
-        VALUES (?, ?, ?, ?, ?, 0, 0, ?, 'monitoring')
-      `);
-      stmt.run(`alert_${pair.id}_${Date.now()}`, pair.id, pair.description, initialPrice, initialPrice, Date.now());
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'monitoring')
+      `).run(
+        `alert_${pair.id}_${Date.now()}`,
+        pair.id.toLowerCase(),
+        pair.description,
+        lastPrice,
+        lastPrice,
+        volume24h,
+        Date.now()
+      );
+
+      if (result.changes === 0) return;
+
+      console.log(`[Indodax] Listing baru terdeteksi: ${pair.description} (${pair.id.toUpperCase()}) @ ${lastPrice}`);
 
       if (this.onNewCoinCallback) {
         this.onNewCoinCallback({
           symbol: pair.id,
           name: pair.description,
-          price: initialPrice,
-          volume: 0,
+          price: lastPrice,
+          volume: volume24h,
         });
       }
     } catch (err) {

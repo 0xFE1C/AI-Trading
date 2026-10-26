@@ -45,7 +45,8 @@ test('Database Backup Service', async (t) => {
     assert.ok(list.some((b) => b.filename === backup.filename));
 
     // Verify backup file physically exists on disk
-    const backupPath = path.resolve(process.cwd(), 'data', 'backups', backup.filename);
+    const dataDir = process.env.AI_TRADING_DATA_DIR || path.resolve(process.cwd(), 'data');
+    const backupPath = path.join(dataDir, 'backups', backup.filename);
     assert.ok(fs.existsSync(backupPath));
   });
 });

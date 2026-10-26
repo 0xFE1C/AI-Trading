@@ -1,4 +1,5 @@
 import { indodax } from '../indodax/index.js';
+import { getTakerFeePercent } from '../trading/fees.js';
 
 export interface BacktestParams {
   symbol: string; // e.g. 'btcidr', 'ethidr', 'solidr', 'pepeidr'
@@ -10,6 +11,7 @@ export interface BacktestParams {
   takeProfitStep1Percent?: number; // default 5.0%
   minGainThresholdPercent?: number; // default 1.5% for live_momentum / auto-scaled for candle_breakout
   slippagePercent?: number; // default 0.2%
+  feePercent?: number; // default: configured Indodax taker fee
   strategyType?: 'live_momentum' | 'candle_breakout'; // default 'live_momentum'
 }
 
@@ -165,6 +167,7 @@ export class BacktestEngine {
     const trailingStopPercent = params.trailingStopPercent || 2.5;
     const takeProfitStep1Percent = params.takeProfitStep1Percent || 5.0;
     const slippagePercent = params.slippagePercent !== undefined ? params.slippagePercent : 0.2;
+    const feePercent = params.feePercent !== undefined ? params.feePercent : getTakerFeePercent();
     const strategyType = params.strategyType || 'live_momentum';
 
     // Effective days & truncation tracking
@@ -189,7 +192,7 @@ export class BacktestEngine {
 
     // Cost rates
     const slippageRate = slippagePercent / 100;
-    const takerFeeRate = 0.002; // 0.2% Indodax taker fee
+    const takerFeeRate = feePercent / 100;
 
     // Simulation State
     let cash = initialBalance;
@@ -436,7 +439,7 @@ export class BacktestEngine {
       maxDrawdownPercent: parseFloat(maxDrawdownPercent.toFixed(2)),
       averageTradePnlPercent: avgPnlPercent,
       slippagePercent,
-      feePercent: 0.2,
+      feePercent,
       strategyUsed: strategyType === 'live_momentum' ? '24h Rolling Momentum (Live Engine Replay)' : 'Single Candlestick Momentum Breakout',
       trades: trades.reverse(), // most recent first
       equityCurve,

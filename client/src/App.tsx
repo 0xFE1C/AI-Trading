@@ -224,14 +224,18 @@ export function App() {
 
     const connectWs = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const token = authStorage.getToken();
-      const wsUrl = `${protocol}//${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
 
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         setIsWsConnected(true);
         setIsApiOnline(true);
+        // Authenticate over the socket itself so the token never appears in a URL.
+        const token = authStorage.getToken();
+        if (token) {
+          ws?.send(JSON.stringify({ type: 'AUTH', token }));
+        }
       };
 
       ws.onmessage = (event) => {

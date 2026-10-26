@@ -2,13 +2,24 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import {
+  decryptSecret,
+  encryptSecret,
+  isEncrypted,
+  isSensitiveSettingKey,
+} from '../services/security/secrets.js';
 
-const DB_DIR = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+const dbPathEnv = process.env.AI_TRADING_DB_PATH;
+export const DATA_DIR = process.env.AI_TRADING_DATA_DIR
+  ? path.resolve(process.env.AI_TRADING_DATA_DIR)
+  : path.resolve(process.cwd(), 'data');
+const DB_PATH = dbPathEnv ? path.resolve(dbPathEnv) : path.join(DATA_DIR, 'trading.db');
+
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const DB_PATH = path.join(DB_DIR, 'trading.db');
 export const db = new Database(DB_PATH);
 
 // Enable WAL mode and production performance PRAGMAs for concurrent reliability
@@ -19,7 +30,12 @@ db.pragma('foreign_keys = ON');
 db.pragma('cache_size = -64000');
 db.pragma('temp_store = MEMORY');
 
+let isDatabaseInitialized = false;
+
 export function initDatabase() {
+  if (isDatabaseInitialized) return;
+  isDatabaseInitialized = true;
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
@@ -67,6 +83,7 @@ export function initDatabase() {
       closed_at INTEGER,
       pnl_idr REAL DEFAULT 0,
       pnl_percent REAL DEFAULT 0,
+      realized_pnl_idr REAL NOT NULL DEFAULT 0, -- net PnL already banked from partial exits
       exit_reason TEXT,
       mode TEXT NOT NULL DEFAULT 'paper' -- 'paper' | 'live'
     );
@@ -120,6 +137,13 @@ export function initDatabase() {
       surge_percent REAL NOT NULL DEFAULT 0,
       detected_at INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'monitoring' -- 'monitoring' | 'entered' | 'ignored'
+    );
+
+    -- Persistent registry of every Indodax IDR pair ever observed.
+    -- New-listing detection must compare against this, not against alert rows.
+    CREATE TABLE IF NOT EXISTS known_pairs (
+      pair_id TEXT PRIMARY KEY,
+      first_seen_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS ai_ab_evaluations (
@@ -254,6 +278,20 @@ export function initDatabase() {
     // Column already exists
   }
 
+  // Exit claim prevents two concurrent flows (realtime tick, polling, panic sell)
+  // from selling the same position twice.
+  try {
+    db.exec('ALTER TABLE positions ADD COLUMN exit_claimed_at INTEGER;');
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    db.exec('ALTER TABLE positions ADD COLUMN realized_pnl_idr REAL NOT NULL DEFAULT 0;');
+  } catch {
+    // Column already exists
+  }
+
   // Default configuration settings
   const defaultSettings: Record<string, string> = {
     trading_mode: 'paper', // default safe paper trading mode
@@ -266,6 +304,10 @@ export function initDatabase() {
     max_allocation_per_trade_idr: '100000', // Rp 100.000 per trade default
     max_active_trades: '3',
     daily_loss_limit_percent: '5', // 5% daily circuit breaker
+    // Indodax market orders are taker orders. Default is the published all-in
+    // taker rate (trading fee + VAT + CFX) for IDR pairs; verify your own tier
+    // via Indodax -> Account Settings -> Trading Fee and adjust if different.
+    trading_fee_percent: '0.3322',
     slippage_tolerance_percent: '0.8',
     trailing_stop_percent: '2.5',
     take_profit_target_1_percent: '5.0',
@@ -280,7 +322,10 @@ export function initDatabase() {
     whatsapp_admin_lid: '',
     paper_idr_balance: '10000000', // Rp 10.000.000 initial paper trading balance
     deadman_switch_enabled: '1',
+    auto_resume_on_startup: '0', // '1' resumes auto-trading after a clean restart/reconciliation
+    auto_trading_was_active_before_restart: '0',
     ngrok_authtoken: '',
+    known_pairs_seeded: '0', // '1' after the initial pair universe has been recorded without alerts
     admin_token_rotation_mode: 'fixed', // 'fixed' (default) | 'on_startup' | 'interval'
     admin_token_rotation_interval_value: '1',
     admin_token_rotation_interval_unit: 'days', // 'minutes' | 'hours' | 'days'
@@ -296,21 +341,24 @@ export function initDatabase() {
     }
   }
 
+  // Encrypt legacy plaintext secrets/providers before any of them are read.
+  migrateSecretsAtRest();
+
   // Ensure random secure admin_access_token exists for security
   const currentToken = getStmt.get('admin_access_token') as { value: string } | undefined;
   if (!currentToken || !currentToken.value) {
     const generatedToken = crypto.randomBytes(16).toString('hex');
-    setStmt.run('admin_access_token', generatedToken);
+    setSetting('admin_access_token', generatedToken);
   }
 
-  // Auto-pair LID if user configured admin number matches known user LID
-  const currentAdminNum = (getStmt.get('whatsapp_admin_number') as { value: string } | undefined)?.value || '';
-  const currentAdminLid = (getStmt.get('whatsapp_admin_lid') as { value: string } | undefined)?.value || '';
-  if (currentAdminNum.includes('6282223616154') && !currentAdminLid) {
-    db.prepare("UPDATE settings SET value = '111893192687716@lid' WHERE key = 'whatsapp_admin_lid'").run();
-  }
+  // Remember whether auto-trading was active, then always start paused. The
+  // server may re-enable it only if auto_resume_on_startup=1 AND reconciliation passes.
+  const wasAutoActive = (getStmt.get('is_auto_trading_active') as { value: string } | undefined)?.value || '0';
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES ('auto_trading_was_active_before_restart', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(wasAutoActive);
 
-  // Ensure is_auto_trading_active is reset to paused on fresh init per user requirement
+  // Ensure is_auto_trading_active is reset to paused on every boot (fail-safe default)
   db.prepare("UPDATE settings SET value = '0' WHERE key = 'is_auto_trading_active'").run();
 }
 
@@ -388,20 +436,49 @@ export function applyRiskProfile(profileKey: 'conservative' | 'balanced' | 'aggr
   return true;
 }
 
+export function migrateSecretsAtRest() {
+  const migrate = db.transaction(() => {
+    const settingRows = db.prepare('SELECT key, value FROM settings').all() as Array<{ key: string; value: string }>;
+    const updateSetting = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
+    for (const row of settingRows) {
+      if (!row.value || isEncrypted(row.value) || !isSensitiveSettingKey(row.key)) continue;
+      updateSetting.run(encryptSecret(row.value), row.key);
+    }
+
+    const providers = db
+      .prepare('SELECT id, api_keys, oauth_data FROM providers')
+      .all() as Array<{ id: string; api_keys: string | null; oauth_data: string | null }>;
+    const updateProvider = db.prepare('UPDATE providers SET api_keys = ?, oauth_data = ? WHERE id = ?');
+    for (const provider of providers) {
+      const apiKeys = provider.api_keys || '[]';
+      const oauth = provider.oauth_data;
+      const nextKeys = isEncrypted(apiKeys) ? apiKeys : encryptSecret(apiKeys);
+      const nextOAuth = !oauth || isEncrypted(oauth) ? oauth : encryptSecret(oauth);
+      if (nextKeys !== provider.api_keys || nextOAuth !== provider.oauth_data) {
+        updateProvider.run(nextKeys, nextOAuth, provider.id);
+      }
+    }
+  });
+
+  migrate();
+}
+
 export function getSetting(key: string, defaultValue = ''): string {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
-  return row ? row.value : defaultValue;
+  if (!row) return defaultValue;
+  return isSensitiveSettingKey(key) ? decryptSecret(row.value) : row.value;
 }
 
 export function setSetting(key: string, value: string) {
-  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').run(key, value, value);
+  const stored = isSensitiveSettingKey(key) ? encryptSecret(value) : value;
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').run(key, stored, stored);
 }
 
 export function getAllSettings(): Record<string, string> {
   const rows = db.prepare('SELECT key, value FROM settings').all() as Array<{ key: string; value: string }>;
   const result: Record<string, string> = {};
   for (const row of rows) {
-    result[row.key] = row.value;
+    result[row.key] = isSensitiveSettingKey(row.key) ? decryptSecret(row.value) : row.value;
   }
   return result;
 }
@@ -590,4 +667,7 @@ export function getAiCallStats24h(): {
     byStatus,
   };
 }
+
+// Schema must exist before any module creates prepared statements at import time.
+initDatabase();
 

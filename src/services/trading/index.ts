@@ -24,6 +24,8 @@ import {
   checkRsiGuard,
 } from './riskGuard.js';
 import { agentBus } from '../agents/bus.js';
+import { getTakerFeeRate } from './fees.js';
+import { allowsDeterministicFallback } from './aiPolicy.js';
 
 export interface AbValidationMetrics {
   totalEvaluations: number;
@@ -106,8 +108,62 @@ export interface PositionRecord {
   closed_at: number | null;
   pnl_idr: number;
   pnl_percent: number;
+  realized_pnl_idr?: number;
   exit_reason: string | null;
   mode: 'paper' | 'live';
+  exit_claimed_at?: number | null;
+}
+
+export interface EquitySnapshot {
+  mode: 'paper' | 'live';
+  cashIdr: number;
+  cashFreeIdr: number;
+  cashLockedIdr: number;
+  holdingsValueIdr: number;
+  equityIdr: number;
+  floatingPnlIdr: number;
+  openPositions: number;
+}
+
+const POSITION_BUSY = Symbol('position-busy');
+const ENTRY_LOCK_KEY = '__entry__';
+
+interface SellExecutionResult {
+  ok: boolean;
+  filledAmount: number;
+  proceedsIdr: number;
+  averagePrice: number;
+  fullyFilled: boolean;
+  pendingReview: boolean;
+  historyRecorded: boolean;
+}
+
+const failedSell = (pendingReview = false): SellExecutionResult => ({
+  ok: false,
+  filledAmount: 0,
+  proceedsIdr: 0,
+  averagePrice: 0,
+  fullyFilled: false,
+  pendingReview,
+  historyRecorded: false,
+});
+
+/**
+ * Net unrealized PnL on the remaining position: exit fee is deducted and the
+ * entry fee is allocated to the remaining cost basis. Realized partial-exit
+ * PnL lives in positions.realized_pnl_idr and is added separately.
+ */
+function markToMarket(
+  pos: Pick<PositionRecord, 'entry_price' | 'amount' | 'initial_cost_idr'>,
+  currentPrice: number,
+  feeRate: number
+): { pnlIdr: number; pnlPercent: number } {
+  const remainingCost = pos.initial_cost_idr > 0 ? pos.initial_cost_idr : pos.entry_price * pos.amount;
+  const costWithFee = remainingCost * (1 + feeRate);
+  const liquidationValue = currentPrice * pos.amount * (1 - feeRate);
+  const pnlIdr = liquidationValue - costWithFee;
+  const pnlPercent = costWithFee > 0 ? (pnlIdr / costWithFee) * 100 : 0;
+  return { pnlIdr, pnlPercent };
 }
 
 export class TradingEngine {
@@ -115,14 +171,16 @@ export class TradingEngine {
   private isProcessing = false; // In-flight guard
   private loopTimer: NodeJS.Timeout | null = null;
   private onTradeEventCallback?: (event: { type: 'BUY' | 'SELL' | 'ALERT'; data: any }) => void;
-  private exitInProgress = new Set<string>();
+  private positionLocks = new Map<string, Promise<void>>();
   private openSymbolsSet = new Set<string>();
   private lastPruneTimestamp = 0;
+  private lastEquityFailureAlertAt = 0;
 
   // Hoisted prepared statements to avoid SQL parsing overhead per realtime tick
   private stmtGetOpenPosByPair = db.prepare(`
     SELECT * FROM positions
-    WHERE status = 'open' AND LOWER(REPLACE(REPLACE(symbol, '/', ''), '_', '')) = ?
+    WHERE status = 'open' AND exit_claimed_at IS NULL
+      AND LOWER(REPLACE(REPLACE(symbol, '/', ''), '_', '')) = ?
   `);
   private stmtUpdatePosTick = db.prepare(`
     UPDATE positions SET
@@ -131,20 +189,23 @@ export class TradingEngine {
       trailing_stop_price = ?,
       pnl_idr = ?,
       pnl_percent = ?
-    WHERE id = ?
+    WHERE id = ? AND status = 'open' AND exit_claimed_at IS NULL
   `);
   private stmtUpdatePosTp1 = db.prepare(`
     UPDATE positions SET
       amount = ?,
+      initial_cost_idr = ?,
       current_price = ?,
       highest_price = ?,
       trailing_stop_price = ?,
       take_profit_step = 1,
       pnl_idr = ?,
-      pnl_percent = ?
-    WHERE id = ?
+      pnl_percent = ?,
+      realized_pnl_idr = COALESCE(realized_pnl_idr, 0) + ?,
+      exit_claimed_at = NULL
+    WHERE id = ? AND status = 'open'
   `);
-  private stmtCountOpenPositions = db.prepare("SELECT COUNT(*) as count FROM positions WHERE status = 'open'");
+  private stmtCountOpenPositionsByMode = db.prepare("SELECT COUNT(*) as count FROM positions WHERE status = 'open' AND mode = ?");
 
   constructor() {
     // Initial consumer on Agent Bus: listens for opportunity signals from scouts/scanners
@@ -186,6 +247,159 @@ export class TradingEngine {
   }
 
   /**
+   * Startup safety check. Live mode compares database positions against the
+   * exchange account/balances and blocks auto-resume when state is ambiguous.
+   */
+  public async reconcileOnStartup(): Promise<{ safeToResume: boolean; issues: string[] }> {
+    const issues: string[] = [];
+    const mode = getSetting('trading_mode', 'paper');
+
+    if (mode !== 'live') {
+      // Paper exits are synchronous; a leftover claim can only be a crash artifact.
+      db.prepare("UPDATE positions SET exit_claimed_at = NULL WHERE status = 'open' AND mode = 'paper'").run();
+      const liveOpen = db.prepare("SELECT COUNT(*) AS c FROM positions WHERE status = 'open' AND mode = 'live'").get() as { c: number };
+      if (liveOpen.c > 0) {
+        issues.push(`${liveOpen.c} posisi LIVE masih terbuka meskipun mode saat ini paper. Posisi tetap dipantau oleh engine.`);
+      }
+      return { safeToResume: true, issues };
+    }
+
+    const apiKey = getSetting('indodax_api_key', '');
+    const secretKey = getSetting('indodax_secret_key', '');
+    if (!apiKey || !secretKey) {
+      return { safeToResume: false, issues: ['Mode live aktif tetapi Indodax API key/secret belum dikonfigurasi.'] };
+    }
+
+    try {
+      const account = await indodax.getAccountInfo();
+      const balanceMap = new Map<string, number>();
+      for (const balance of account.balances || []) {
+        const asset = String(balance.asset || '').toUpperCase();
+        if (!asset) continue;
+        const amount = (parseFloat(balance.free) || 0) + (parseFloat(balance.locked) || 0);
+        balanceMap.set(asset, (balanceMap.get(asset) || 0) + amount);
+      }
+
+      const openOrders = await indodax.getOpenOrders();
+      if (Array.isArray(openOrders) && openOrders.length > 0) {
+        issues.push(`${openOrders.length} open order masih aktif di bursa. Auto-resume diblokir sampai order ditinjau.`);
+      }
+
+      // Resolve stale exit claims created by a crash mid-exit
+      const claimed = db.prepare("SELECT * FROM positions WHERE status = 'open' AND exit_claimed_at IS NOT NULL").all() as PositionRecord[];
+      for (const pos of claimed) {
+        const available = this.getExchangeBaseBalance(balanceMap, pos);
+        if (available >= pos.amount * 0.98) {
+          db.prepare("UPDATE positions SET exit_claimed_at = NULL WHERE id = ? AND status = 'open'").run(pos.id);
+          console.log(`[Reconciliation] Claim keluar basi dilepas untuk ${pos.symbol.toUpperCase()} (koin masih ada di bursa).`);
+        } else {
+          issues.push(`Posisi ${pos.symbol.toUpperCase()} memiliki claim keluar basi dan saldo bursa (${available}) < jumlah DB (${pos.amount}). Periksa manual.`);
+        }
+      }
+
+      // Align live position amounts with the actual exchange balance
+      const livePositions = db.prepare("SELECT * FROM positions WHERE status = 'open' AND mode = 'live'").all() as PositionRecord[];
+      for (const pos of livePositions) {
+        if (pos.exit_claimed_at) continue;
+        const available = this.getExchangeBaseBalance(balanceMap, pos);
+
+        if (available <= 0) {
+          issues.push(`Saldo ${pos.traded_currency.toUpperCase()} tidak ditemukan di bursa untuk posisi ${pos.symbol.toUpperCase()}. Mungkin sudah dijual manual atau tertahan order pending.`);
+          continue;
+        }
+
+        if (available < pos.amount * 0.98) {
+          const correctedCost = pos.initial_cost_idr * (available / pos.amount);
+          db.prepare("UPDATE positions SET amount = ?, initial_cost_idr = ? WHERE id = ? AND status = 'open'").run(
+            available,
+            correctedCost,
+            pos.id
+          );
+          issues.push(`Jumlah posisi ${pos.symbol.toUpperCase()} dikoreksi dari ${pos.amount} ke ${available} mengikuti saldo bursa.`);
+        } else if (available > pos.amount * 1.02) {
+          console.warn(`[Reconciliation] Saldo ${pos.symbol.toUpperCase()} di bursa (${available}) lebih besar dari catatan posisi (${pos.amount}). Mungkin ada pembelian manual yang belum tercatat.`);
+        }
+      }
+
+      if (issues.length > 0) {
+        setSetting('is_auto_trading_active', '0');
+        return { safeToResume: false, issues };
+      }
+
+      console.log('[Reconciliation] State bursa dan database konsisten.');
+      return { safeToResume: true, issues };
+    } catch (err: any) {
+      setSetting('is_auto_trading_active', '0');
+      return { safeToResume: false, issues: [`Rekonsiliasi bursa gagal: ${err?.message || err}`] };
+    }
+  }
+
+  private getExchangeBaseBalance(balanceMap: Map<string, number>, pos: PositionRecord): number {
+    const candidates = [
+      pos.traded_currency?.toUpperCase(),
+      pos.symbol.toUpperCase().replace(/(IDR|USDT)$/, ''),
+    ].filter(Boolean) as string[];
+
+    for (const candidate of candidates) {
+      if (balanceMap.has(candidate)) return balanceMap.get(candidate) || 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Serializes every mutation of a position (realtime tick, polling, panic/manual sell).
+   * Realtime ticks use the non-blocking variant so a slow exit never queues stale ticks.
+   */
+  private async withPositionLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.positionLocks.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => current);
+    this.positionLocks.set(id, tail);
+
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.positionLocks.get(id) === tail) {
+        this.positionLocks.delete(id);
+      }
+    }
+  }
+
+  private async tryWithPositionLock<T>(id: string, fn: () => Promise<T>): Promise<T | typeof POSITION_BUSY> {
+    if (this.positionLocks.has(id)) return POSITION_BUSY;
+    return this.withPositionLock(id, fn);
+  }
+
+  private getOpenPosition(id: string): PositionRecord | undefined {
+    return db.prepare("SELECT * FROM positions WHERE id = ? AND status = 'open'").get(id) as
+      | PositionRecord
+      | undefined;
+  }
+
+  /**
+   * Atomically reserves a position for an exit/partial-exit. Returns null when another
+   * flow already owns it or it is no longer open.
+   */
+  private claimPositionForExit(id: string): PositionRecord | null {
+    const result = db
+      .prepare(
+        "UPDATE positions SET exit_claimed_at = ? WHERE id = ? AND status = 'open' AND exit_claimed_at IS NULL"
+      )
+      .run(Date.now(), id);
+    if (result.changes !== 1) return null;
+    return db.prepare('SELECT * FROM positions WHERE id = ?').get(id) as PositionRecord;
+  }
+
+  private releasePositionClaim(id: string) {
+    db.prepare("UPDATE positions SET exit_claimed_at = NULL WHERE id = ? AND status = 'open'").run(id);
+  }
+
+  /**
    * Pemrosesan Tick Real-Time Sub-Detik dari Indodax WebSocket:
    * Menggeser trailing stop naik seketika saat harga melonjak,
    * dan mengeksekusi trailing stop keluar dalam milidetik tanpa menunggu polling timer 15 detik!
@@ -204,58 +418,51 @@ export class TradingEngine {
         this.openSymbolsSet.delete(cleanPair);
         return;
       }
-      if (this.exitInProgress.has(openPos.id)) return;
 
-      const currentPrice = tick.price;
-      const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
-      const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
-
-      let highestPrice = Math.max(openPos.highest_price, currentPrice);
-      let trailingStopPrice = openPos.trailing_stop_price;
-      let takeProfitStep = openPos.take_profit_step;
-
-      // Ratchet Trailing Stop up (with post-TP1 decoupling)
-      const computedTrailingStop = highestPrice * (1 - trailingStopPercent / 100);
-      if (takeProfitStep >= 1) {
-        const postTpFloor = Math.max(openPos.entry_price, computedTrailingStop);
-        if (postTpFloor > trailingStopPrice) {
-          trailingStopPrice = postTpFloor;
+      await this.tryWithPositionLock(openPos.id, async () => {
+        const pos = this.getOpenPosition(openPos.id);
+        if (!pos || pos.exit_claimed_at) {
+          if (!pos) this.openSymbolsSet.delete(cleanPair);
+          return;
         }
-      } else if (computedTrailingStop > trailingStopPrice) {
-        trailingStopPrice = computedTrailingStop;
-      }
 
-      const pnlIdr = (currentPrice - openPos.entry_price) * openPos.amount;
-      const pnlPercent = ((currentPrice - openPos.entry_price) / openPos.entry_price) * 100;
+        const currentPrice = tick.price;
+        const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
+        const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
 
-      // Sub-second Partial TP check
-      if (pnlPercent >= targetTp1 && takeProfitStep === 0) {
-        this.exitInProgress.add(openPos.id);
-        try {
-          const halfAmount = openPos.amount * 0.5;
-          const sellOk = await this.executeSell(openPos, halfAmount, currentPrice, `Realtime Partial Take-Profit (+${targetTp1}% Target 1)`);
-          if (sellOk) {
-            trailingStopPrice = openPos.entry_price;
-            highestPrice = currentPrice; // Decouple from pre-TP1 surge peak
-            this.stmtUpdatePosTp1.run(halfAmount, currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, openPos.id);
+        const highestPrice = Math.max(pos.highest_price, currentPrice);
+        let trailingStopPrice = pos.trailing_stop_price;
+
+        // Ratchet Trailing Stop up (with post-TP1 decoupling)
+        const computedTrailingStop = highestPrice * (1 - trailingStopPercent / 100);
+        if (pos.take_profit_step >= 1) {
+          const postTpFloor = Math.max(pos.entry_price, computedTrailingStop);
+          if (postTpFloor > trailingStopPrice) {
+            trailingStopPrice = postTpFloor;
           }
-        } finally {
-          this.exitInProgress.delete(openPos.id);
+        } else if (computedTrailingStop > trailingStopPrice) {
+          trailingStopPrice = computedTrailingStop;
         }
-        return;
-      }
 
-      // Sub-second Trailing Stop Loss check
-      if (currentPrice <= trailingStopPrice) {
-        this.exitInProgress.add(openPos.id);
-        try {
+        const feeRate = getTakerFeeRate();
+        const grossPnlPercent = ((currentPrice - pos.entry_price) / pos.entry_price) * 100;
+        const { pnlIdr, pnlPercent } = markToMarket(pos, currentPrice, feeRate);
+
+        // Sub-second Partial TP check (threshold is a gross price move)
+        if (grossPnlPercent >= targetTp1 && pos.take_profit_step === 0) {
+          await this.executePartialTakeProfit(pos, currentPrice, targetTp1);
+          return;
+        }
+
+        // Sub-second Trailing Stop Loss check
+        if (currentPrice <= trailingStopPrice) {
           // Mark Price / Orderbook Confirmation Filter to prevent flash wick manipulation
           let confirmedExit = true;
           try {
-            const depth = await indodax.getDepth(openPos.symbol);
+            const depth = await indodax.getDepth(pos.symbol);
             const bestBid = depth.buy && depth.buy[0] ? parseFloat(depth.buy[0][0]) : 0;
             if (bestBid > trailingStopPrice * 1.015) {
-              console.log(`[Flash Wick Guard] Mengabaikan tick wick ${openPos.symbol} (Tick: Rp ${currentPrice.toLocaleString('id-ID')}, Best Bid: Rp ${bestBid.toLocaleString('id-ID')}). Trailing stop ditahan.`);
+              console.log(`[Flash Wick Guard] Mengabaikan tick wick ${pos.symbol} (Tick: Rp ${currentPrice.toLocaleString('id-ID')}, Best Bid: Rp ${bestBid.toLocaleString('id-ID')}). Trailing stop ditahan.`);
               confirmedExit = false;
             }
           } catch {
@@ -264,18 +471,16 @@ export class TradingEngine {
 
           if (confirmedExit) {
             const exitReason = `⚡ Realtime Trailing Stop Loss tersentuh di Rp ${trailingStopPrice.toLocaleString('id-ID')} (PnL: ${pnlPercent.toFixed(2)}%)`;
-            await this.closePosition(openPos, currentPrice, exitReason);
+            await this.closePositionUnlocked(pos, currentPrice, exitReason);
           }
-        } finally {
-          this.exitInProgress.delete(openPos.id);
+          return;
         }
-        return;
-      }
 
-      // Update highest price & trailing stop in database if price advanced
-      if (highestPrice > openPos.highest_price || trailingStopPrice > openPos.trailing_stop_price) {
-        this.stmtUpdatePosTick.run(currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, openPos.id);
-      }
+        // Update highest price & trailing stop in database if price advanced
+        if (highestPrice > pos.highest_price || trailingStopPrice > pos.trailing_stop_price) {
+          this.stmtUpdatePosTick.run(currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, pos.id);
+        }
+      });
     } catch (err: any) {
       console.warn(`[handleRealtimeTick Error] ${tick.pair}:`, err.message);
     }
@@ -334,15 +539,14 @@ export class TradingEngine {
     if (positions.length === 0) return;
 
     const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
+    const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
     const { coinSentiments } = agentSwarm.getAggregatedSentiment();
 
-    for (const pos of positions) {
-      if (this.exitInProgress.has(pos.id)) continue;
-
+    for (const snapshot of positions) {
       try {
         let currentPrice = 0;
         try {
-          const tickerData = await indodax.getTicker(pos.symbol);
+          const tickerData = await indodax.getTicker(snapshot.symbol);
           if (tickerData?.ticker?.last) {
             currentPrice = parseFloat(tickerData.ticker.last);
           }
@@ -352,98 +556,66 @@ export class TradingEngine {
 
         if (!currentPrice || currentPrice <= 0) continue;
 
-        let highestPrice = Math.max(pos.highest_price, currentPrice);
-        let trailingStopPrice = pos.trailing_stop_price;
-        let takeProfitStep = pos.take_profit_step;
+        await this.withPositionLock(snapshot.id, async () => {
+          // Re-read inside the lock: a realtime tick or manual sell may have closed it
+          // while the ticker request was in flight.
+          const pos = this.getOpenPosition(snapshot.id);
+          if (!pos || pos.exit_claimed_at) return;
 
-        // Recalculate dynamic trailing stop level (with post-TP1 decoupling)
-        const computedTrailingStop = highestPrice * (1 - trailingStopPercent / 100);
-        if (takeProfitStep >= 1) {
-          const postTpFloor = Math.max(pos.entry_price, computedTrailingStop);
-          if (postTpFloor > trailingStopPrice) {
-            trailingStopPrice = postTpFloor;
-          }
-        } else if (computedTrailingStop > trailingStopPrice) {
-          trailingStopPrice = computedTrailingStop;
-        }
+          const highestPrice = Math.max(pos.highest_price, currentPrice);
+          let trailingStopPrice = pos.trailing_stop_price;
 
-        const pnlIdr = (currentPrice - pos.entry_price) * pos.amount;
-        const pnlPercent = ((currentPrice - pos.entry_price) / pos.entry_price) * 100;
-
-        // Scale-Out Partial Take-Profit (Target 1 threshold reached)
-        const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
-        if (pnlPercent >= targetTp1 && takeProfitStep === 0) {
-          this.exitInProgress.add(pos.id);
-          try {
-            const halfAmount = pos.amount * 0.5;
-            const sellOk = await this.executeSell(pos, halfAmount, currentPrice, `Partial Take-Profit (+${targetTp1}% Target 1)`);
-
-            if (!sellOk) {
-              console.warn(`[Partial TP Aborted] Order jual parsial gagal di bursa untuk ${pos.symbol}. Posisi tidak diubah.`);
-              continue;
+          // Recalculate dynamic trailing stop level (with post-TP1 decoupling)
+          const computedTrailingStop = highestPrice * (1 - trailingStopPercent / 100);
+          if (pos.take_profit_step >= 1) {
+            const postTpFloor = Math.max(pos.entry_price, computedTrailingStop);
+            if (postTpFloor > trailingStopPrice) {
+              trailingStopPrice = postTpFloor;
             }
-
-            // Move Stop Loss to breakeven (entry price) to ensure zero risk for remaining 50%
-            trailingStopPrice = pos.entry_price;
-            takeProfitStep = 1;
-            highestPrice = currentPrice; // Decouple from pre-TP1 surge peak
-
-            db.prepare(`
-              UPDATE positions SET
-                amount = ?,
-                current_price = ?,
-                highest_price = ?,
-                trailing_stop_price = ?,
-                take_profit_step = 1,
-                pnl_idr = ?,
-                pnl_percent = ?
-              WHERE id = ?
-            `).run(halfAmount, currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, pos.id);
-            continue;
-          } finally {
-            this.exitInProgress.delete(pos.id);
+          } else if (computedTrailingStop > trailingStopPrice) {
+            trailingStopPrice = computedTrailingStop;
           }
-        }
 
-        // Check Dynamic Exit Conditions
-        let shouldExit = false;
-        let exitReason = '';
+          const feeRate = getTakerFeeRate();
+          const grossPnlPercent = ((currentPrice - pos.entry_price) / pos.entry_price) * 100;
+          const { pnlIdr, pnlPercent } = markToMarket(pos, currentPrice, feeRate);
 
-        // 1. Trailing Stop Loss hit
-        if (currentPrice <= trailingStopPrice) {
-          shouldExit = true;
-          exitReason = `Trailing Stop Loss tersentuh di Rp ${trailingStopPrice.toLocaleString('id-ID')} (PnL: ${pnlPercent.toFixed(2)}%)`;
-        }
-
-        // 2. Sudden negative sentiment or security threat detected by subagents
-        const tokenSymbol = pos.traded_currency.toUpperCase();
-        const tokenSentiment = coinSentiments[tokenSymbol];
-        if (tokenSentiment !== undefined && tokenSentiment < -0.35) {
-          shouldExit = true;
-          exitReason = `Pembalikan sentimen negatif terdeteksi oleh Subagents (${tokenSentiment})`;
-        }
-
-        if (shouldExit) {
-          this.exitInProgress.add(pos.id);
-          try {
-            await this.closePosition(pos, currentPrice, exitReason);
-          } finally {
-            this.exitInProgress.delete(pos.id);
+          // Scale-Out Partial Take-Profit (Target 1 threshold reached)
+          if (grossPnlPercent >= targetTp1 && pos.take_profit_step === 0) {
+            const sellOk = await this.executePartialTakeProfit(pos, currentPrice, targetTp1);
+            if (!sellOk) {
+              console.warn(`[Partial TP Aborted] Order jual parsial gagal atau posisi sudah diproses untuk ${pos.symbol}.`);
+            }
+            return;
           }
-        } else {
-          // Update position telemetry
-          db.prepare(`
-            UPDATE positions SET
-              current_price = ?,
-              highest_price = ?,
-              trailing_stop_price = ?,
-              pnl_idr = ?,
-              pnl_percent = ?
-            WHERE id = ?
-          `).run(currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, pos.id);
-        }
+
+          // Check Dynamic Exit Conditions
+          let shouldExit = false;
+          let exitReason = '';
+
+          // 1. Trailing Stop Loss hit
+          if (currentPrice <= trailingStopPrice) {
+            shouldExit = true;
+            exitReason = `Trailing Stop Loss tersentuh di Rp ${trailingStopPrice.toLocaleString('id-ID')} (PnL: ${pnlPercent.toFixed(2)}%)`;
+          }
+
+          // 2. Sudden negative sentiment or security threat detected by subagents
+          const tokenSymbol = pos.traded_currency.toUpperCase();
+          const tokenSentiment = coinSentiments[tokenSymbol];
+          if (tokenSentiment !== undefined && tokenSentiment < -0.35) {
+            shouldExit = true;
+            exitReason = `Pembalikan sentimen negatif terdeteksi oleh Subagents (${tokenSentiment})`;
+          }
+
+          if (shouldExit) {
+            await this.closePositionUnlocked(pos, currentPrice, exitReason);
+          } else {
+            // Update position telemetry
+            this.stmtUpdatePosTick.run(currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, pos.id);
+          }
+        });
       } catch (err: any) {
-        console.warn(`[Position Manager] Gagal memantau posisi ${pos.symbol}:`, err.message);
+        console.warn(`[Position Manager] Gagal memantau posisi ${snapshot.symbol}:`, err.message);
       }
     }
   }
@@ -508,9 +680,10 @@ export class TradingEngine {
           takeProfitStep = 1;
         }
 
-        // Account for realistic 0.4% round-trip taker fees (0.2% buy + 0.2% sell)
+        // Entry + exit taker fees at the configured exchange rate
+        const feeRate = getTakerFeeRate();
         const grossPnlIdr = (currentPrice - ghost.entry_price) * ghost.amount;
-        const totalFeeIdr = (ghost.initial_cost_idr + (currentPrice * ghost.amount)) * 0.002;
+        const totalFeeIdr = (ghost.initial_cost_idr + (currentPrice * ghost.amount)) * feeRate;
         const netPnlIdr = grossPnlIdr - totalFeeIdr;
         const netPnlPercent = (netPnlIdr / ghost.initial_cost_idr) * 100;
 
@@ -638,9 +811,10 @@ export class TradingEngine {
     }
     logEntryGate('*', 'circuit_breaker', true, { limitPercent: dailyLimit });
 
-    // 2. Open Position Slots
+    // 2. Open Position Slots (active mode only; paper and live exposure never mix)
+    const mode: 'paper' | 'live' = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
     const maxActive = parseInt(getSetting('max_active_trades', '3'), 10);
-    const openCount = (this.stmtCountOpenPositions.get() as { count: number }).count;
+    const openCount = (this.stmtCountOpenPositionsByMode.get(mode) as { count: number }).count;
     const exposureCheck = checkExposure(
       {
         openPositions: openCount,
@@ -729,7 +903,6 @@ export class TradingEngine {
     const allowedCoins = allowedCoinsRaw
       ? allowedCoinsRaw.split(',').map((s) => s.trim().replace('_idr', ''))
       : [];
-    const mode = (getSetting('trading_mode', 'paper') as 'paper' | 'live');
     const riskProfile = (getSetting('risk_profile', 'balanced') as 'conservative' | 'balanced' | 'aggressive');
 
     let candidateSymbol: string | null = null;
@@ -811,6 +984,18 @@ export class TradingEngine {
           };
 
           const features = extractFeatures(summaryItem, candles15m);
+          const rsi14 = features.rsi14;
+          const ema21 = features.ema21;
+          if (rsi14 === null || ema21 === null) {
+            logEntryGate(symbol, 'candidate_filter', false, {
+              strategy: 'bluechip_pullback',
+              reason: 'Indikator 15m belum lengkap',
+              candles: candles15m.length,
+              rsi: rsi14,
+              ema21,
+            });
+            continue;
+          }
           const sentiment = coinSentiments[symbol.toUpperCase()] ?? 0.0;
           const scoreRes = scoreOpportunity(features, sentiment, false, btcRegimeVerdict.regime, 'bluechip_pullback');
 
@@ -822,13 +1007,13 @@ export class TradingEngine {
           agentBus.publish('opportunity.signal', 'scanner', { symbol, strategy: 'bluechip_pullback', score: scoreRes.score, features });
 
           const threshold = SCORE_THRESHOLDS.conservative;
-          const passed = scoreRes.score >= threshold && (features.rsi14 === null || features.rsi14 <= 65);
+          const passed = scoreRes.score >= threshold && rsi14 <= 65;
           logEntryGate(symbol, 'candidate_filter', passed, {
             strategy: 'bluechip_pullback',
             score: scoreRes.score,
             threshold,
             breakdown: scoreRes.breakdown,
-            rsi: features.rsi14,
+            rsi: rsi14,
           });
 
           if (passed) {
@@ -836,7 +1021,7 @@ export class TradingEngine {
               bestCandidate = {
                 symbol,
                 score: scoreRes.score,
-                reason: `Blue-Chip Pullback Konservatif (Skor: ${scoreRes.score}/100, RSI: ${features.rsi14 ?? 'N/A'}, Dip: ${features.dropFromHighPct}%)`,
+                reason: `Blue-Chip Pullback Konservatif (Skor: ${scoreRes.score}/100, RSI: ${rsi14}, Dip: ${features.dropFromHighPct}%)`,
                 scoreRes,
               };
             }
@@ -962,36 +1147,46 @@ export class TradingEngine {
 
     const depthImbalance = indodax.calculateDepthImbalance(depth, 10);
 
-    // Intraday Candlestick Indicators (15m Timeframe)
+    // Intraday Candlestick Indicators (15m Timeframe) — mandatory for every entry.
     let rsi15m: number | null = null;
-    let ema20: number | null = null;
+    let candles15m: Array<{ open: number; high: number; low: number; close: number; volume: number }> = [];
     try {
-      const candles15m = await indodaxMarketStream.getRealCandles(candidateSymbol, '15m');
-      if (candles15m && candles15m.length >= 15) {
-        const closes = candles15m.map((c) => c.close);
-        rsi15m = calculateRSI(closes, 14);
-        ema20 = calculateEMA(closes, 20);
+      candles15m = (await indodaxMarketStream.getRealCandles(candidateSymbol, '15m')) || [];
+    } catch {}
+    if (candles15m.length < 15) {
+      logEntryGate(candidateSymbol, 'indicators', false, {
+        reason: 'Data candle 15m tidak cukup',
+        candles: candles15m.length,
+        required: 15,
+      });
+      console.log(`[Entry Ignored] Data candle 15m ${candidateSymbol} tidak cukup (${candles15m.length}/15). Entry diblokir.`);
+      return;
+    }
+    rsi15m = calculateRSI(candles15m.map((c) => c.close), 14);
+    if (rsi15m === null) {
+      logEntryGate(candidateSymbol, 'indicators', false, { reason: 'RSI 15m tidak tersedia' });
+      console.log(`[Entry Ignored] RSI 15m ${candidateSymbol} tidak tersedia. Entry diblokir.`);
+      return;
+    }
 
-        const rsiGate = checkRsiGuard(rsi15m, 70);
-        logEntryGate(candidateSymbol, 'rsi', rsiGate.passed, rsiGate.values);
-        if (!rsiGate.passed) {
-          console.log(`[Entry Ignored] ${candidateSymbol} overbought pada 15m (RSI ${rsi15m} > 70). Menghindari beli di pucuk.`);
-          return;
-        }
+    const rsiGate = checkRsiGuard(rsi15m, 70);
+    logEntryGate(candidateSymbol, 'rsi', rsiGate.passed, rsiGate.values);
+    if (!rsiGate.passed) {
+      console.log(`[Entry Ignored] ${candidateSymbol} overbought pada 15m (RSI ${rsi15m} > 70). Menghindari beli di pucuk.`);
+      return;
+    }
 
-        if (volatilitySizing) {
-          const trueAtr = calculateTrueATR(candles15m, 14);
-          if (trueAtr !== null && trueAtr > 0) {
-            const atrPct = (trueAtr / slippageCheck.averageFillPrice) * 100;
-            if (atrPct > 4.0) {
-              maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.6));
-            } else if (atrPct > 2.5) {
-              maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.8));
-            }
-          }
+    if (volatilitySizing) {
+      const trueAtr = calculateTrueATR(candles15m, 14);
+      if (trueAtr !== null && trueAtr > 0) {
+        const atrPct = (trueAtr / slippageCheck.averageFillPrice) * 100;
+        if (atrPct > 4.0) {
+          maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.6));
+        } else if (atrPct > 2.5) {
+          maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.8));
         }
       }
-    } catch {}
+    }
 
     // AI Master Evaluation (Hybrid: 'off' | 'confirm' | 'required')
     const masterModel = getSetting('master_model', '');
@@ -1019,7 +1214,8 @@ export class TradingEngine {
           dropFromHigh: candidateDrop,
           depthImbalance,
           spreadPercent: spreadCheck.spreadPercent,
-        }
+        },
+        mode
       );
       logEntryGate(candidateSymbol, 'ai_gate', evalResult.approved, {
         mode: aiMode,
@@ -1077,6 +1273,11 @@ export class TradingEngine {
     }
 
     // Execute Buy Order!
+    if (getSetting('is_auto_trading_active', '0') !== '1') {
+      console.log(`[Entry Aborted] Auto-trading dinonaktifkan sebelum order ${candidateSymbol.toUpperCase()} dikirim.`);
+      return;
+    }
+
     const buyPrice = slippageCheck.averageFillPrice;
     const amount = maxAllocationIdr / buyPrice;
 
@@ -1094,7 +1295,8 @@ export class TradingEngine {
 
   /**
    * AI Confirmation Gate:
-   * Structured JSON evaluation with risk budget context and graceful deterministic degradation.
+   * Structured JSON evaluation with risk budget context. Paper simulations may
+   * fall back to deterministic signals in 'confirm' mode; live mode fails closed.
    */
   public async evaluateAiEntryConfluence(
     symbol: string,
@@ -1107,7 +1309,8 @@ export class TradingEngine {
       dropFromHigh?: number | null;
       depthImbalance?: number | null;
       spreadPercent?: number | null;
-    }
+    },
+    executionMode: 'paper' | 'live' = 'live'
   ): Promise<{ approved: boolean; reasoning: string }> {
     const aiMode = getSetting('ai_mode', 'confirm');
     if (aiMode === 'off') {
@@ -1116,14 +1319,15 @@ export class TradingEngine {
         reasoning: 'Mode Deterministik (AI Off): Setup lolos seluruh konfirmasi kuantitatif deterministik.',
       };
     }
+    const deterministicFallback = allowsDeterministicFallback(aiMode, executionMode);
 
     try {
       if (!model) {
-        if (aiMode === 'confirm') {
-          console.log(`[AI Confirmation] Master Model AI belum dipilih di Settings, beralih ke deterministik (ai_mode: confirm).`);
-          return { approved: true, reasoning: 'Master Model AI belum dipilih; setup dieksekusi secara deterministik.' };
+        if (deterministicFallback) {
+          console.log(`[AI Confirmation] Master Model AI belum dipilih; mode paper memakai sinyal deterministik.`);
+          return { approved: true, reasoning: 'Paper mode: Master Model AI belum dipilih; simulasi entry memakai sinyal deterministik.' };
         }
-        return { approved: false, reasoning: 'Fail-closed: Master Model AI belum dipilih di Settings.' };
+        return { approved: false, reasoning: `Fail-closed (${executionMode}): Master Model AI belum dipilih di Settings.` };
       }
 
       // Lessons learned context
@@ -1195,17 +1399,17 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
         reasoning: response.trim() || (approved ? 'AI Approved setup' : 'AI Rejected setup'),
       };
     } catch (err: any) {
-      if (aiMode === 'confirm') {
-        console.warn(`[AI Confirmation Fallback] Error provider AI: ${err.message}. ai_mode: confirm beralih ke deterministik.`);
+      if (deterministicFallback) {
+        console.warn(`[AI Confirmation Fallback] Error provider AI: ${err.message}. Mode paper + ai_mode confirm memakai sinyal deterministik.`);
         return {
           approved: true,
-          reasoning: `AI Offline fallback (ai_mode: confirm): ${err.message}`,
+          reasoning: `Paper fallback deterministik (ai_mode: confirm): ${err.message}`,
         };
       }
-      console.warn(`[AI Confirmation Failed] Fail-closed diaktifkan, membatalkan entry ${symbol}:`, err.message);
+      console.warn(`[AI Confirmation Failed] Fail-closed (${executionMode}), entry ${symbol} dibatalkan:`, err.message);
       return {
         approved: false,
-        reasoning: `Fail-closed trigger: ${err.message}`,
+        reasoning: `Fail-closed (${executionMode}): ${err.message}`,
       };
     }
   }
@@ -1215,9 +1419,10 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     price: number,
     sentiment: number,
     reason: string,
-    model: string
+    model: string,
+    executionMode: 'paper' | 'live' = 'live'
   ): Promise<boolean> {
-    const result = await this.evaluateAiEntryConfluence(symbol, price, sentiment, reason, model);
+    const result = await this.evaluateAiEntryConfluence(symbol, price, sentiment, reason, model, undefined, executionMode);
     return result.approved;
   }
 
@@ -1280,6 +1485,21 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     mode: 'paper' | 'live',
     reason: string
   ): Promise<boolean> {
+    // Serialize entries so concurrent manual/AI buys cannot race the balance
+    // read-modify-write or both pass the same exposure snapshot.
+    return this.withPositionLock(ENTRY_LOCK_KEY, () =>
+      this.executeBuyUnlocked(symbol, price, amount, totalIdr, mode, reason)
+    );
+  }
+
+  private async executeBuyUnlocked(
+    symbol: string,
+    price: number,
+    amount: number,
+    totalIdr: number,
+    mode: 'paper' | 'live',
+    reason: string
+  ): Promise<boolean> {
     // Validate minimum trade amount per pair rules (e.g. min Rp 10.000)
     const minTradeIdr = indodax.getMinTradeIdr(symbol);
     if (totalIdr < minTradeIdr) {
@@ -1287,8 +1507,8 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       return false;
     }
 
-    const feeIdr = totalIdr * 0.002; // 0.2% taker fee
-    const totalRequired = totalIdr + feeIdr;
+    const feeRate = getTakerFeeRate();
+    const totalRequired = totalIdr * (1 + feeRate);
     let orderId = `paper_buy_${Date.now()}`;
     let effectivePrice = price;
     let effectiveAmount = amount;
@@ -1303,7 +1523,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
 
       let effectiveTotalIdr = totalIdr;
       if (paperBal < totalRequired) {
-        effectiveTotalIdr = Math.floor(paperBal / 1.002);
+        effectiveTotalIdr = Math.floor(paperBal / (1 + feeRate));
         if (effectiveTotalIdr < minTradeIdr) {
           console.warn(`[Paper Buy Aborted] Sisa saldo paper Rp ${paperBal.toLocaleString('id-ID')} kurang dari batas minimum Rp ${minTradeIdr.toLocaleString('id-ID')}`);
           return false;
@@ -1312,7 +1532,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
         console.log(`[Dynamic Capital Sizing] Alokasi paper disesuaikan dari Rp ${totalIdr.toLocaleString('id-ID')} ke sisa saldo Rp ${effectiveTotalIdr.toLocaleString('id-ID')}`);
       }
 
-      const effectiveFeeIdr = effectiveTotalIdr * 0.002;
+      const effectiveFeeIdr = effectiveTotalIdr * feeRate;
       const actualDeduction = effectiveTotalIdr + effectiveFeeIdr;
       setSetting('paper_idr_balance', String(Math.max(0, Math.floor(paperBal - actualDeduction))));
       totalIdr = effectiveTotalIdr;
@@ -1327,7 +1547,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
 
         let effectiveTotalIdr = totalIdr;
         if (idrBal.free < totalRequired) {
-          effectiveTotalIdr = Math.floor(idrBal.free / 1.002);
+          effectiveTotalIdr = Math.floor(idrBal.free / (1 + feeRate));
           if (effectiveTotalIdr < minTradeIdr) {
             console.warn(`[Live Buy Aborted] Sisa saldo IDR bursa Rp ${idrBal.free.toLocaleString('id-ID')} kurang dari batas minimum Rp ${minTradeIdr.toLocaleString('id-ID')}`);
             return false;
@@ -1345,16 +1565,60 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
         });
         orderId = String(liveOrder.orderId || liveOrder.order_id || `live_buy_${Date.now()}`);
 
-        // Reconcile actual execution values if returned by exchange
-        if (liveOrder.executedQty && parseFloat(liveOrder.executedQty) > 0) {
-          effectiveAmount = parseFloat(liveOrder.executedQty);
-          effectivePrice = totalIdr / effectiveAmount;
+        let fill = await indodax.waitForOrderFill(
+          symbol,
+          orderId,
+          liveOrder,
+          { expectedPrice: effectivePrice },
+          5000
+        );
+
+        if (fill.executedQty <= 0 && !fill.isFinal) {
+          // Market order still unconfirmed after polling: cancel before giving up.
+          console.warn(`[Live Buy Pending] Order ${orderId} ${symbol.toUpperCase()} belum terkonfirmasi (status ${fill.status}). Mencoba membatalkan.`);
+          try {
+            await indodax.cancelOrder(symbol, orderId);
+          } catch (cancelErr: any) {
+            console.error(`[Live Buy CRITICAL] Order ${orderId} ${symbol.toUpperCase()} tidak dapat dikonfirmasi maupun dibatalkan: ${cancelErr.message}. Auto-trading dihentikan untuk verifikasi manual.`);
+            setSetting('is_auto_trading_active', '0');
+            return false;
+          }
+          fill = await indodax.waitForOrderFill(
+            symbol,
+            orderId,
+            undefined,
+            { expectedPrice: effectivePrice },
+            1500
+          );
+        }
+
+        if (fill.executedQty <= 0) {
+          console.error(`[Live Buy Not Filled] Order ${orderId} ${symbol.toUpperCase()} tidak terisi (status ${fill.status}). Tidak ada posisi yang dibuat.`);
+          return false;
+        }
+
+        // Use actual exchange execution values instead of the requested budget
+        effectiveAmount = fill.executedQty;
+        const actualSpent =
+          fill.quoteQty > 0
+            ? fill.quoteQty
+            : Math.min(totalIdr, fill.executedQty * (fill.averagePrice || effectivePrice));
+        totalIdr = actualSpent;
+        effectivePrice = fill.averagePrice > 0 ? fill.averagePrice : actualSpent / effectiveAmount;
+
+        if (!fill.verified) {
+          console.warn(`[Live Buy Unverified] Order ${orderId} tidak menyertakan executedQty/status final; memakai estimasi fill (${effectiveAmount} @ Rp ${effectivePrice}).`);
+        } else if (fill.executedQty < amount * 0.999) {
+          console.warn(`[Live Buy Partial] Permintaan ${amount.toFixed(8)} ${symbol.toUpperCase()}, terisi ${fill.executedQty.toFixed(8)}. Posisi dicatat sesuai fill aktual.`);
         }
       } catch (err: any) {
         console.error(`[Live Order Failed] Gagal mengirim order beli ke Indodax: ${err.message}`);
         return false;
       }
     }
+
+    // Fee is computed on the actual spend (live fills may differ from the request).
+    const feeIdr = totalIdr * feeRate;
 
     const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
     const initialTrailingStop = effectivePrice * (1 - trailingStopPercent / 100);
@@ -1419,16 +1683,25 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     amountToSell: number,
     price: number,
     reason: string
-  ): Promise<boolean> {
+  ): Promise<SellExecutionResult> {
+    if (!(amountToSell > 0) || !(price > 0)) {
+      console.warn(`[Sell Aborted] Jumlah/harga tidak valid untuk ${pos.symbol}: amount=${amountToSell}, price=${price}`);
+      return failedSell();
+    }
+
     let orderId = `paper_sell_${Date.now()}`;
-    const totalIdr = amountToSell * price;
-    const feeIdr = totalIdr * 0.002;
-    const netProceeds = totalIdr - feeIdr;
+    let filledAmount = amountToSell;
+    let proceedsIdr = amountToSell * price;
+    let averagePrice = price;
+    let pendingReview = false;
+    let historyRecorded = false;
+    const feeRate = getTakerFeeRate();
 
     if (pos.mode === 'paper') {
-      // Credit paper balance
+      // Credit paper balance net of the configured taker fee
+      const feeIdr = proceedsIdr * feeRate;
       const paperBal = parseFloat(getSetting('paper_idr_balance', '10000000'));
-      setSetting('paper_idr_balance', String(Math.floor(paperBal + netProceeds)));
+      setSetting('paper_idr_balance', String(Math.floor(paperBal + proceedsIdr - feeIdr)));
     } else {
       // Live Trading: Kirim order jual ke Indodax
       try {
@@ -1439,65 +1712,320 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
           quantity: amountToSell,
         });
         orderId = String(liveOrder.orderId || liveOrder.order_id || `live_sell_${Date.now()}`);
+
+        let fill = await indodax.waitForOrderFill(
+          pos.symbol,
+          orderId,
+          liveOrder,
+          { requestedQty: amountToSell, expectedPrice: price },
+          5000
+        );
+
+        if (fill.executedQty <= 0 && !fill.isFinal) {
+          console.warn(`[Live Sell Pending] Order ${orderId} ${pos.symbol.toUpperCase()} belum terkonfirmasi (status ${fill.status}). Mencoba membatalkan.`);
+          try {
+            await indodax.cancelOrder(pos.symbol, orderId);
+          } catch (cancelErr: any) {
+            console.error(`[Live Sell CRITICAL] Order ${orderId} ${pos.symbol.toUpperCase()} tidak dapat dikonfirmasi maupun dibatalkan: ${cancelErr.message}. Posisi dikunci untuk verifikasi manual.`);
+            setSetting('is_auto_trading_active', '0');
+            return failedSell(true);
+          }
+          fill = await indodax.waitForOrderFill(
+            pos.symbol,
+            orderId,
+            undefined,
+            { requestedQty: amountToSell, expectedPrice: price },
+            1500
+          );
+        }
+
+        if (fill.executedQty <= 0) {
+          console.error(`[Live Sell Not Filled] Order ${orderId} ${pos.symbol.toUpperCase()} tidak terisi (status ${fill.status}). Posisi tetap terbuka.`);
+          return failedSell(!fill.isFinal);
+        }
+
+        filledAmount = Math.min(fill.executedQty, amountToSell);
+        averagePrice = fill.averagePrice > 0 ? fill.averagePrice : price;
+        proceedsIdr = fill.quoteQty > 0 ? fill.quoteQty : filledAmount * averagePrice;
+
+        if (!fill.verified) {
+          console.warn(`[Live Sell Unverified] Order ${orderId} tidak menyertakan executedQty/status final; memakai estimasi fill (${filledAmount} @ Rp ${averagePrice}).`);
+        } else if (filledAmount < amountToSell * 0.999) {
+          console.warn(`[Live Sell Partial] Diminta ${amountToSell.toFixed(8)} ${pos.symbol.toUpperCase()}, terisi ${filledAmount.toFixed(8)}.`);
+        }
       } catch (err: any) {
-        // STRICT CRITICAL FIX: Jika order jual gagal di bursa, STOP!
-        // Jangan catat database dan jangan tutup posisi agar koin tidak hilang kendali!
+        // STRICT: Jika order jual gagal di bursa, jangan tutup posisi.
         console.error(`[Live Sell Failed] Gagal mengirim order jual ke Indodax untuk ${pos.symbol}: ${err.message}`);
-        return false;
+        return failedSell();
       }
     }
 
-    db.prepare(`
-      INSERT INTO trades_history (id, position_id, symbol, type, price, amount, total_idr, fee_idr, mode, order_id, reason, timestamp)
-      VALUES (?, ?, ?, 'SELL', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      `trade_${Date.now()}`,
-      pos.id,
-      pos.symbol,
-      price,
-      amountToSell,
-      totalIdr,
-      feeIdr,
-      pos.mode,
-      orderId,
-      reason,
-      Date.now()
-    );
+    const feeIdr = proceedsIdr * feeRate;
+    try {
+      db.prepare(`
+        INSERT INTO trades_history (id, position_id, symbol, type, price, amount, total_idr, fee_idr, mode, order_id, reason, timestamp)
+        VALUES (?, ?, ?, 'SELL', ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        `trade_${Date.now()}`,
+        pos.id,
+        pos.symbol,
+        averagePrice,
+        filledAmount,
+        proceedsIdr,
+        feeIdr,
+        pos.mode,
+        orderId,
+        reason,
+        Date.now()
+      );
+      historyRecorded = true;
+    } catch (err: any) {
+      // The exchange order already executed; failing to persist history must never
+      // trigger a second sell attempt on the next tick.
+      console.error(`[CRITICAL] Order jual ${pos.symbol} sudah dieksekusi tetapi gagal dicatat di trades_history:`, err?.message);
+    }
 
     if (this.onTradeEventCallback) {
       this.onTradeEventCallback({
         type: 'SELL',
-        data: { symbol: pos.symbol, price, amount: amountToSell, totalIdr, mode: pos.mode, reason },
+        data: { symbol: pos.symbol, price: averagePrice, amount: filledAmount, totalIdr: proceedsIdr, mode: pos.mode, reason },
       });
     }
 
-    return true;
+    return {
+      ok: true,
+      filledAmount,
+      proceedsIdr,
+      averagePrice,
+      fullyFilled: filledAmount >= amountToSell * 0.999999,
+      pendingReview,
+      historyRecorded,
+    };
+  }
+
+  /**
+   * Partial take-profit. The exit claim guarantees only one flow can scale out.
+   * The claim is retained if the post-sell DB update fails, so a retry cannot
+   * double-sell; startup reconciliation resolves any leftover claim.
+   */
+  private async executePartialTakeProfit(
+    pos: PositionRecord,
+    currentPrice: number,
+    targetTp1: number
+  ): Promise<boolean> {
+    const claimed = this.claimPositionForExit(pos.id);
+    if (!claimed) return false;
+
+    let sold = false;
+    let keepClaim = false;
+    try {
+      const halfAmount = claimed.amount * 0.5;
+
+      // A half-sized order below the exchange minimum would fail forever and
+      // leave TP1 unhandled; exit the whole position instead.
+      if (halfAmount * currentPrice < indodax.getMinTradeIdr(claimed.symbol)) {
+        this.releasePositionClaim(claimed.id);
+        console.warn(`[Partial TP] Setengah posisi ${claimed.symbol.toUpperCase()} di bawah minimum bursa. Menutup seluruh posisi.`);
+        return this.closePositionUnlocked(
+          claimed,
+          currentPrice,
+          `Take-Profit penuh (nilai parsial di bawah minimum bursa)`
+        );
+      }
+
+      const sell = await this.executeSell(
+        claimed,
+        halfAmount,
+        currentPrice,
+        `Partial Take-Profit (+${targetTp1}% Target 1)`
+      );
+
+      if (!sell.ok) {
+        keepClaim = sell.pendingReview;
+        if (keepClaim) {
+          console.error(`[Partial TP CRITICAL] Order parsial ${claimed.symbol.toUpperCase()} belum final. Claim dipertahankan agar tidak terjadi jual ganda.`);
+        }
+        return false;
+      }
+      sold = true;
+
+      const remainingAmount = claimed.amount - sell.filledAmount;
+      const epsilon = claimed.amount * 1e-8;
+
+      if (remainingAmount <= epsilon) {
+        return this.finalizeClosedPosition(
+          claimed,
+          sell.averagePrice || currentPrice,
+          `Take-Profit penuh saat partial exit`,
+          sell.proceedsIdr,
+          sell.historyRecorded
+        );
+      }
+
+      const feeRate = getTakerFeeRate();
+      const soldFraction = claimed.amount > 0 ? sell.filledAmount / claimed.amount : 0;
+      const soldCost = claimed.initial_cost_idr * soldFraction;
+      const remainingCost = claimed.initial_cost_idr - soldCost;
+      const realizedDelta = Math.round(
+        (sell.proceedsIdr - sell.proceedsIdr * feeRate) - (soldCost * (1 + feeRate))
+      );
+
+      const markPrice = sell.averagePrice || currentPrice;
+      const { pnlIdr, pnlPercent } = markToMarket(
+        { entry_price: claimed.entry_price, amount: remainingAmount, initial_cost_idr: remainingCost },
+        markPrice,
+        feeRate
+      );
+      this.stmtUpdatePosTp1.run(
+        remainingAmount,
+        remainingCost,
+        markPrice,
+        Math.max(currentPrice, markPrice),
+        claimed.entry_price,
+        pnlIdr,
+        pnlPercent,
+        realizedDelta,
+        claimed.id
+      );
+      return true;
+    } finally {
+      if (!sold && !keepClaim) this.releasePositionClaim(claimed.id);
+    }
   }
 
   public async closePosition(pos: PositionRecord, exitPrice: number, exitReason: string): Promise<boolean> {
-    const sellOk = await this.executeSell(pos, pos.amount, exitPrice, exitReason);
-    if (!sellOk) {
-      console.error(`[Close Position Aborted] Order jual gagal dieksekusi di bursa. Posisi ${pos.symbol.toUpperCase()} tetap 'open' untuk dicoba kembali.`);
+    return this.withPositionLock(pos.id, () => this.closePositionUnlocked(pos, exitPrice, exitReason));
+  }
+
+  private async closePositionUnlocked(
+    pos: PositionRecord,
+    exitPrice: number,
+    exitReason: string
+  ): Promise<boolean> {
+    const claimed = this.claimPositionForExit(pos.id);
+    if (!claimed) {
+      // Already closed or another flow owns the exit
       return false;
     }
 
-    const pnlIdr = (exitPrice - pos.entry_price) * pos.amount;
-    const pnlPercent = ((exitPrice - pos.entry_price) / pos.entry_price) * 100;
+    let sold = false;
+    let keepClaim = false;
+    try {
+      const sell = await this.executeSell(claimed, claimed.amount, exitPrice, exitReason);
+
+      if (!sell.ok) {
+        keepClaim = sell.pendingReview;
+        if (keepClaim) {
+          console.error(`[Close Position CRITICAL] Order jual ${claimed.symbol.toUpperCase()} belum final. Claim dipertahankan agar tidak terjadi jual ganda.`);
+        } else {
+          console.error(`[Close Position Aborted] Order jual gagal dieksekusi di bursa. Posisi ${claimed.symbol.toUpperCase()} tetap 'open' untuk dicoba kembali.`);
+        }
+        return false;
+      }
+      sold = true;
+
+      if (!sell.fullyFilled) {
+        const remainingAmount = claimed.amount - sell.filledAmount;
+        const epsilon = claimed.amount * 1e-8;
+
+        if (remainingAmount <= epsilon) {
+          return this.finalizeClosedPosition(
+            claimed,
+            sell.averagePrice || exitPrice,
+            exitReason,
+            sell.proceedsIdr,
+            sell.historyRecorded
+          );
+        }
+
+        const feeRate = getTakerFeeRate();
+        const soldFraction = claimed.amount > 0 ? sell.filledAmount / claimed.amount : 0;
+        const soldCost = claimed.initial_cost_idr * soldFraction;
+        const remainingCost = claimed.initial_cost_idr - soldCost;
+        const realizedDelta = Math.round(
+          (sell.proceedsIdr - sell.proceedsIdr * feeRate) - (soldCost * (1 + feeRate))
+        );
+
+        db.prepare(`
+          UPDATE positions SET
+            amount = ?,
+            initial_cost_idr = ?,
+            current_price = ?,
+            realized_pnl_idr = COALESCE(realized_pnl_idr, 0) + ?,
+            exit_claimed_at = NULL
+          WHERE id = ? AND status = 'open'
+        `).run(remainingAmount, remainingCost, sell.averagePrice || exitPrice, realizedDelta, claimed.id);
+
+        console.warn(`[Close Position Partial] ${claimed.symbol.toUpperCase()} hanya terisi ${sell.filledAmount.toFixed(8)} dari ${claimed.amount.toFixed(8)}. Sisa ${remainingAmount.toFixed(8)} tetap dikelola.`);
+        return false;
+      }
+
+      return this.finalizeClosedPosition(
+        claimed,
+        sell.averagePrice || exitPrice,
+        exitReason,
+        sell.proceedsIdr,
+        sell.historyRecorded
+      );
+    } finally {
+      if (!sold && !keepClaim) this.releasePositionClaim(claimed.id);
+    }
+  }
+
+  /**
+   * Marks a position closed using the actual sale proceeds. Net PnL is derived
+   * from all recorded BUY/SELL cash flows (including fees) when available.
+   */
+  private finalizeClosedPosition(
+    pos: PositionRecord,
+    exitPrice: number,
+    exitReason: string,
+    proceedsIdr?: number,
+    historyRecorded = true
+  ): boolean {
+    const flows = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN type = 'SELL' THEN total_idr - fee_idr ELSE 0 END), 0) AS sell_net,
+        COALESCE(SUM(CASE WHEN type = 'BUY' THEN total_idr + fee_idr ELSE 0 END), 0) AS buy_cost
+      FROM trades_history
+      WHERE position_id = ?
+    `).get(pos.id) as { sell_net: number; buy_cost: number };
+
+    let costBasis = flows.buy_cost;
+    let netProceeds = flows.sell_net;
+
+    if (costBasis <= 0) {
+      // Legacy/test positions without a recorded BUY: fall back to position data
+      const feeRate = getTakerFeeRate();
+      costBasis = pos.initial_cost_idr * (1 + feeRate);
+      const gross = proceedsIdr && proceedsIdr > 0 ? proceedsIdr : exitPrice * pos.amount;
+      netProceeds = gross * (1 - feeRate);
+    } else if (!historyRecorded && proceedsIdr && proceedsIdr > 0) {
+      // The final sell executed but its history row failed to persist. Keep PnL
+      // accurate using actual proceeds instead of reporting a phantom loss.
+      netProceeds += proceedsIdr * (1 - getTakerFeeRate());
+    }
+
+    const pnlIdr = Math.round(netProceeds - costBasis);
+    const pnlPercent = costBasis > 0 ? (pnlIdr / costBasis) * 100 : 0;
     const holdDurationMinutes = Math.round((Date.now() - pos.opened_at) / 60000);
 
-    const txClose = db.transaction(() => {
-      db.prepare(`
-        UPDATE positions SET
-          status = 'closed',
-          closed_at = ?,
-          current_price = ?,
-          pnl_idr = ?,
-          pnl_percent = ?,
-          exit_reason = ?
-        WHERE id = ?
-      `).run(Date.now(), exitPrice, pnlIdr, pnlPercent, exitReason, pos.id);
-    });
-    txClose();
+    const result = db.prepare(`
+      UPDATE positions SET
+        status = 'closed',
+        closed_at = ?,
+        current_price = ?,
+        pnl_idr = ?,
+        pnl_percent = ?,
+        exit_reason = ?,
+        exit_claimed_at = NULL
+      WHERE id = ? AND status = 'open'
+    `).run(Date.now(), exitPrice, pnlIdr, pnlPercent, exitReason, pos.id);
+
+    if (result.changes !== 1) {
+      console.error(`[CRITICAL] Posisi ${pos.symbol.toUpperCase()} sudah dijual tetapi gagal difinalisasi di database. Claim dipertahankan untuk rekonsiliasi.`);
+    }
+
     this.refreshOpenSymbols();
 
     console.log(`[POSITION CLOSED] ${pos.symbol.toUpperCase()} | PnL: ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% (Rp ${pnlIdr.toLocaleString('id-ID')}) | Alasan: ${exitReason}`);
@@ -1518,6 +2046,10 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
   // --- Panic Sell All Positions Immediately ---
 
   public async panicSellAll(): Promise<number> {
+    // Stop new entries before liquidating so the scanner cannot open a fresh
+    // position while panic selling is in progress.
+    setSetting('is_auto_trading_active', '0');
+
     const openPositions = db.prepare("SELECT * FROM positions WHERE status = 'open'").all() as PositionRecord[];
     let closedCount = 0;
 
@@ -1532,8 +2064,62 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       }
     }
 
-    setSetting('is_auto_trading_active', '0'); // Pause trading after panic sell
     return closedCount;
+  }
+
+  /**
+   * Mode-scoped equity snapshot. Only positions opened by this engine in the
+   * requested mode are counted; paper and live exposure are never mixed.
+   * Live cash is read from Indodax and any API failure is surfaced so callers
+   * can fail closed instead of silently substituting the paper balance.
+   */
+  public async getEquitySnapshot(mode?: 'paper' | 'live'): Promise<EquitySnapshot> {
+    const activeMode: 'paper' | 'live' =
+      mode ?? (getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper');
+    const feeRate = getTakerFeeRate();
+
+    const positions = db.prepare(
+      "SELECT * FROM positions WHERE status = 'open' AND mode = ?"
+    ).all(activeMode) as PositionRecord[];
+
+    let cashFreeIdr: number;
+    let cashLockedIdr: number;
+    if (activeMode === 'live') {
+      const account = await indodax.getAccountInfo();
+      if (!Array.isArray(account?.balances)) {
+        throw new Error('Indodax account response did not include balances');
+      }
+      const idrEntry = account.balances.find((b: any) => String(b.asset).toUpperCase() === 'IDR');
+      cashFreeIdr = idrEntry ? parseFloat(idrEntry.free) || 0 : 0;
+      cashLockedIdr = idrEntry ? parseFloat(idrEntry.locked) || 0 : 0;
+    } else {
+      cashFreeIdr = parseFloat(getSetting('paper_idr_balance', '10000000'));
+      cashLockedIdr = 0;
+      if (!Number.isFinite(cashFreeIdr)) {
+        throw new Error('Paper balance setting is invalid');
+      }
+    }
+    const cashIdr = cashFreeIdr + cashLockedIdr;
+
+    let holdingsValueIdr = 0;
+    let floatingPnlIdr = 0;
+    for (const pos of positions) {
+      const markPrice = pos.current_price > 0 ? pos.current_price : pos.entry_price;
+      holdingsValueIdr += markPrice * pos.amount * (1 - feeRate);
+      const { pnlIdr } = markToMarket(pos, markPrice, feeRate);
+      floatingPnlIdr += pnlIdr + (pos.realized_pnl_idr || 0);
+    }
+
+    return {
+      mode: activeMode,
+      cashIdr,
+      cashFreeIdr,
+      cashLockedIdr,
+      holdingsValueIdr,
+      equityIdr: cashIdr + holdingsValueIdr,
+      floatingPnlIdr,
+      openPositions: positions.length,
+    };
   }
 
   // --- Mathematically Sound Circuit Breaker Protection ---
@@ -1557,49 +2143,51 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       }
     }
 
+    const mode: 'paper' | 'live' = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    // 1. Realized Net PnL in IDR from closed trades today
+    let snapshot: EquitySnapshot;
+    try {
+      snapshot = await this.getEquitySnapshot(mode);
+    } catch (err: any) {
+      // Fail closed: without a trustworthy live equity reading, new entries
+      // must not proceed. Never substitute the paper balance for live funds.
+      console.error(`[Circuit Breaker] Gagal membaca equity ${mode.toUpperCase()}: ${err?.message}. Pembukaan posisi baru diblokir (fail-closed).`);
+      if (now - this.lastEquityFailureAlertAt > 15 * 60 * 1000) {
+        this.lastEquityFailureAlertAt = now;
+        if (this.onTradeEventCallback) {
+          this.onTradeEventCallback({
+            type: 'ALERT',
+            data: {
+              title: 'Circuit Breaker Check Failed (Fail-Closed)',
+              message: `Equity ${mode.toUpperCase()} tidak dapat diverifikasi (${err?.message}). Bot menahan semua entry baru sampai saldo dapat dibaca kembali.`,
+            },
+          });
+        }
+      }
+      return true;
+    }
+
+    // 1. Realized net PnL from positions closed today in THIS mode
     const realized = db.prepare(`
       SELECT COALESCE(SUM(pnl_idr), 0) as total_pnl_idr
       FROM positions
-      WHERE status = 'closed' AND closed_at >= ?
-    `).get(startOfDay.getTime()) as { total_pnl_idr: number };
+      WHERE status = 'closed' AND closed_at >= ? AND mode = ?
+    `).get(startOfDay.getTime(), mode) as { total_pnl_idr: number };
 
-    // 2. Floating Net PnL in IDR from active open positions
-    const floating = db.prepare(`
-      SELECT COALESCE(SUM(pnl_idr), 0) as floating_pnl_idr, COALESCE(SUM(initial_cost_idr), 0) as total_cost_idr
-      FROM positions
-      WHERE status = 'open'
-    `).get() as { floating_pnl_idr: number; total_cost_idr: number };
+    // 2. Floating net PnL (including already-banked partial TP profits) is
+    // computed from current marks in getEquitySnapshot, not from stale rows.
+    const totalPnlIdrToday = (realized.total_pnl_idr || 0) + snapshot.floatingPnlIdr;
 
-    const totalPnlIdrToday = (realized.total_pnl_idr || 0) + (floating.floating_pnl_idr || 0);
+    // 3. Day-start equity is today's equity minus all PnL accrued today.
+    const dayStartEquity = Math.max(snapshot.equityIdr - totalPnlIdrToday, 1);
 
-    // 3. Compute baseline total equity using REAL live Indodax IDR balance in live mode
-    const mode = getSetting('trading_mode', 'paper');
-    let baselineBalance = parseFloat(getSetting('paper_idr_balance', '10000000'));
-
-    if (mode === 'live') {
-      try {
-        const idrBal = await indodax.getIdrBalance();
-        const liveTotalIdr = idrBal.free + idrBal.locked;
-        if (liveTotalIdr > 0) {
-          baselineBalance = liveTotalIdr;
-        }
-      } catch {
-        // Fallback to paper balance if balance fetch failed
-      }
-    }
-
-    const totalEquity = baselineBalance + (floating.total_cost_idr || 0);
-
-    // If total net loss exceeds the configured percentage of portfolio
     if (totalPnlIdrToday < 0) {
-      const lossPercent = (Math.abs(totalPnlIdrToday) / Math.max(totalEquity, 1000000)) * 100;
+      const lossPercent = (Math.abs(totalPnlIdrToday) / dayStartEquity) * 100;
 
       if (lossPercent >= dailyLimitPercent) {
-        console.warn(`[CIRCUIT BREAKER TRIGGERED] Akumulasi rugi hari ini: Rp ${Math.abs(totalPnlIdrToday).toLocaleString('id-ID')} (${lossPercent.toFixed(2)}% >= limit ${dailyLimitPercent}%). Menahan pembukaan posisi baru selama 24 jam.`);
+        console.warn(`[CIRCUIT BREAKER TRIGGERED] Akumulasi rugi hari ini (${mode}): Rp ${Math.abs(totalPnlIdrToday).toLocaleString('id-ID')} (${lossPercent.toFixed(2)}% >= limit ${dailyLimitPercent}%). Menahan pembukaan posisi baru selama 24 jam.`);
         setSetting('circuit_breaker_triggered_at', String(now));
 
         if (this.onTradeEventCallback) {
@@ -1607,7 +2195,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
             type: 'ALERT',
             data: {
               title: 'Daily Circuit Breaker Triggered (24h Cooldown)',
-              message: `Trading otomatis dihentikan selama 24 jam karena akumulasi kerugian hari ini mencapai ${lossPercent.toFixed(2)}% (Rp ${Math.abs(totalPnlIdrToday).toLocaleString('id-ID')}). Modal Anda terlindungi.`,
+              message: `Trading otomatis (${mode.toUpperCase()}) dihentikan selama 24 jam karena akumulasi kerugian hari ini mencapai ${lossPercent.toFixed(2)}% (Rp ${Math.abs(totalPnlIdrToday).toLocaleString('id-ID')}). Modal Anda terlindungi.`,
             },
           });
         }

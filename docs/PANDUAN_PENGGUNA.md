@@ -41,17 +41,18 @@ Anda tidak perlu mengetikkan perintah terminal rumit. Cukup gunakan launcher baw
 2. Jalankan perintah: `./start.sh`
 3. Buka browser Anda ke `http://localhost:3001`.
 
-> 💡 **Persyaratan Sistem:** Komputer telah terpasang **Node.js** (versi 18 ke atas) dan memiliki koneksi internet aktif.
+> 💡 **Persyaratan Sistem:** Komputer telah terpasang **Node.js** (versi 22.12 ke atas) dan memiliki koneksi internet aktif.
 
 ---
 
 ## 3. LANGKAH 2: TOKEN AKSES & KEAMANAN DASHBOARD
 
-Saat server pertama kali menyala, sistem akan menghasilkan sebuah **Admin Access Token** unik di jendela terminal (misalnya: `a7f9b1c2...`).
+Saat server pertama kali menyala, sistem akan menghasilkan sebuah **Admin Access Token** unik. Token ini disimpan terenkripsi di database dan hanya ditampilkan di terminal bila server berjalan secara interaktif (TTY). Pada server headless/Docker, tampilkan token secara lokal di server dengan perintah `npm run admin:token`.
 
 1. Saat Anda membuka dashboard untuk pertama kali, sebuah jendela login otentikasi akan meminta **Admin Access Token**.
-2. Salin token dari terminal, lalu tempelkan ke kolom input dashboard dan klik **Simpan & Masuk**.
-3. Token Anda tersimpan dengan aman di browser lokal Anda. Tanpa token ini, pengunjung lain di jaringan Anda hanya dapat melihat dashboard dalam mode pantau (*View-Only*) tanpa bisa mengubah pengaturan atau menjalankan transaksi.
+2. Salin token dari terminal (atau hasil `npm run admin:token`), lalu tempelkan ke kolom input dashboard dan klik **Simpan & Masuk**.
+3. Token Anda tersimpan di browser lokal Anda. Tanpa token ini, pengunjung lain di jaringan Anda hanya dapat melihat dashboard dalam mode pantau (*View-Only*): saldo, posisi, riwayat transaksi, QR WhatsApp, dan detail kuota provider **disembunyikan**, dan mereka tidak bisa mengubah pengaturan atau menjalankan transaksi.
+4. Jika lupa token, jangan cari di log server (token sengaja tidak dicetak di log non-interaktif). Jalankan `npm run admin:token` di mesin server. Rotasi token juga tidak lagi mengirim token mentah melalui WhatsApp/Telegram.
 
 ---
 
@@ -117,23 +118,26 @@ Setelah Anda merasa puas dengan performa bot di Mode Demo dan memahami karaktern
 4. Klik **Konfirmasi & Aktifkan Mode Live**.
 5. Badge status akan berubah menjadi warna merah/oranye menyala: **Mode Live (Uang Nyata)**.
 6. Kini bot akan mengeksekusi order riil langsung ke buku order Indodax sesuai saldo IDR Anda.
+7. Jika AI dikonfigurasi pada mode *Hybrid* atau *Wajib AI*, kegagalan provider AI di Mode Live akan memblokir entry baru (fail-closed) sampai AI pulih. Posisi yang sudah terbuka tetap dipantau dan trailing stop tetap berjalan.
 
 ---
 
 ## 8. FITUR UNGGULAN: TIM RISET AI 24 JAM
 
-Di tab **Riset AI**, Anda memiliki tim yang terdiri dari **10 Analis Khusus** yang bekerja secara otomatis:
+Di tab **Riset AI**, Anda memiliki tim yang terdiri dari **10 Analis Khusus** yang bekerja secara otomatis di atas sumber data yang sama:
 
-1. **Analis Berita Global:** Membaca berita kripto dunia dari CoinDesk, CoinTelegraph, Bloomberg.
-2. **Analis Teknologi & Ekosistem:** Memeriksa update software, roadmap, dan perkembangan developer koin.
-3. **Radar Media Sosial:** Mengukur euforia komunitas di Reddit, Telegram, dan forum publik.
-4. **Radar Twitter/X:** Mendeteksi tweet viral dari figur kripto berpengaruh.
-5. **Radar Listing Indodax:** Mendeteksi koin baru yang baru saja masuk ke bursa Indodax dalam hitungan detik.
-6. **Pemburu Koin Naik:** Menganalisa koin yang mengalami lonjakan volume dan momentum mendadak.
-7. **Radar Keamanan & Hack:** Memantau ancaman eksploitasi smart contract, hack protokol, atau sengketa regulasi.
-8. **Radar Makro & Regulasi:** Mengawasi kebijakan The Fed, inflasi suku bunga, dan regulasi pemerintah.
-9. **Pelacak Whale On-Chain:** Mendeteksi perpindahan modal besar oleh para investor paus (*whale*).
-10. **Analis Selisih Bursa Global:** Membandingkan selisih harga koin di Indodax dengan harga bursa global (Binance, Bybit).
+1. **Analis Berita Global:** Merangkum berita kripto dunia dari RSS CoinDesk dan CoinTelegraph.
+2. **Analis Teknologi & Ekosistem:** Menyaring judul berita untuk upgrade protokol, hard fork, dan perkembangan ekosistem.
+3. **Analis Sentimen Berita:** Membandingkan skor lexicon deterministik pada headline dengan pergerakan pasar Indodax.
+4. **Radar Narasi Pasar:** Mendeteksi tema narasi dominan dari headline, blog Indodax, dan data ticker.
+5. **Radar Listing Indodax:** Memantau blog resmi Indodax dan alert koin baru.
+6. **Pemburu Momentum:** Menganalisa top gainer dan lonjakan volume 24 jam di Indodax.
+7. **Radar Keamanan:** Memindai kata kunci hack/exploit/delisting pada judul berita. Ini bukan audit smart contract.
+8. **Radar Makro & Regulasi:** Menyorot berita makro/regulasi yang tersedia di RSS; tidak ada feed resmi The Fed, Bank Indonesia, atau Bappebti secara langsung.
+9. **Analis Likuiditas & Spread:** Menilai spread bid/ask dan volume pair paling likuid di Indodax.
+10. **Analis Korelasi BTC:** Membandingkan arah BTC dengan top gainer altcoin di Indodax.
+
+> **Catatan sumber data:** Secara default bot tidak melakukan scraping Twitter/X, Reddit, atau dompet on-chain. Anda dapat menambahkan hingga 5 feed RSS publik melalui variabel lingkungan `AI_TRADING_EXTRA_RSS_FEEDS`.
 
 Jika ada ancaman serius terdeteksi oleh salah satu analis (misalnya indikasi koin di-hack atau regulasi darurat), bot akan **segera membatalkan rencana beli** demi menyelamatkan uang Anda.
 
@@ -202,7 +206,7 @@ Seluruh riwayat trading, pengaturan, dan log analisa tersimpan di database lokal
 > **A:** Begitu bot menyala kembali dan internet pulih, bot akan langsung mensinkronkan status dengan bursa Indodax dan melanjutkan pengawalan trailing stop pada posisi yang ada.
 
 #### Q: Bagaimana cara mengganti token admin jika lupa?
-> **A:** Cukup restart program. Terminal akan menampilkan Admin Access Token Anda yang aktif. Anda juga dapat mengatur rotasi token otomatis berkala di tab **Pengaturan &rarr; Keamanan & Hak Akses**.
+> **A:** Jika server berjalan di terminal interaktif, restart program akan menampilkan token aktif. Untuk server headless/Docker, jalankan `npm run admin:token` di dalam server/container (mis. `docker compose exec ai-trading npm run admin:token`). Anda juga dapat mengatur rotasi token otomatis berkala di tab **Pengaturan &rarr; Keamanan & Hak Akses**; token baru harus diambil dari server, bukan dari pesan chat.
 
 ---
 

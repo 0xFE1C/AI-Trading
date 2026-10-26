@@ -31,6 +31,7 @@ import {
   Square,
   BookOpen,
   Calculator,
+  Lock,
 } from 'lucide-react';
 import { SystemStatus, RiskProfileKey } from '../types';
 import { CryptoChart } from './CryptoChart';
@@ -99,7 +100,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const recentTrades = status?.recentTrades || [];
   const lessons = status?.lessonsLearned || [];
   const sentiment = status?.sentiment?.averageSentiment ?? 0;
-  const balance = status?.balanceIdr ?? 0;
+  const balance = status?.balanceIdr ?? null;
+  const hidePortfolio = status?.portfolioRedacted === true;
   const isAuto = status?.isAutoTradingActive ?? false;
 
   // Calculate total unrealized floating PnL
@@ -176,6 +178,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-5 sm:space-y-6">
+      {hidePortfolio && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-xs text-amber-200">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <span>
+            {l(
+              'Observer mode: balances, positions and trade history are hidden. Authenticate as admin to view portfolio details.',
+              'Mode observer: saldo, posisi, dan riwayat transaksi disembunyikan. Otentikasi sebagai admin untuk melihat detail portofolio.'
+            )}
+          </span>
+        </div>
+      )}
       {/* 1. Executive Telemetry & Financial KPI Cards (Priority Top Row) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Balance & Capital */}
@@ -192,7 +205,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-100 tracking-tight">
-              {formatCurrency(balance)}
+              {hidePortfolio ? '••••••' : balance === null ? l('Unavailable', 'Tidak tersedia') : formatCurrency(balance)}
             </div>
             <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${status?.mode === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
@@ -676,7 +689,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="text-[11px] text-slate-400">
                     {l('Current mode: ', 'Mode saat ini: ')}
                     <strong className="text-slate-300 font-mono">{status?.mode?.toUpperCase()} TRADING</strong>{' '}
-                    ({l('Virtual simulation: ', 'Simulasi modal virtual ')}{formatCurrency(balance)}).
+                    ({status?.mode === 'paper'
+                      ? l('Virtual simulation: ', 'Simulasi modal virtual ')
+                      : l('Real balance: ', 'Saldo riil: ')}
+                    {hidePortfolio ? '••••••' : balance === null ? '—' : formatCurrency(balance)}).
                   </div>
                 </div>
               </div>

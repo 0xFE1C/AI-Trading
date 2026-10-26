@@ -81,7 +81,7 @@
   <!-- Main Chart Panel -->
   <g transform="translate(40, 240)">
     <rect width="760" height="400" rx="12" fill="url(#cardGrad)" stroke="#1e293b" stroke-width="1.5"/>
-    <text x="25" y="35" font-family="monospace" font-size="14" font-weight="700" fill="#f8fafc">BTC/IDR &bull; 15m &bull; Real-time Indodax Candlestick</text>
+    <text x="25" y="35" font-family="monospace" font-size="14" font-weight="700" fill="#f8fafc">BTC/IDR &#8226; 15m &#8226; Real-time Indodax Candlestick</text>
     <text x="620" y="35" font-family="monospace" font-size="15" font-weight="800" fill="#10b981">Rp 1.617.000.000</text>
     
     <!-- Render Chart Curve and Candlestick Mockup -->

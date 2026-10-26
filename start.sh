@@ -9,7 +9,7 @@ echo ""
 # 1. Periksa Node.js
 if ! command -v node &> /dev/null; then
     echo "[ERROR] Node.js tidak ditemukan!"
-    echo "Silakan install Node.js (v18+) terlebih dahulu."
+    echo "Silakan install Node.js (v22.12+) terlebih dahulu."
     exit 1
 fi
 

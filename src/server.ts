@@ -5,7 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { db, initDatabase, getSetting } from './db/index.js';
+import { db, initDatabase, getSetting, setSetting } from './db/index.js';
 import { apiRouter } from './api/routes.js';
 import { indodax } from './services/indodax/index.js';
 import { aiClient } from './services/ai/index.js';
@@ -16,7 +16,7 @@ import { telegramService } from './services/telegram/index.js';
 import { backupService } from './services/backup/index.js';
 import { tunnelService } from './services/tunnel/index.js';
 import { indodaxMarketStream } from './services/indodax/marketStream.js';
-import { adminTokenService, secureCompareTokens } from './services/auth/tokenRotation.js';
+import { adminTokenService, isAuthenticatedAdminToken } from './services/auth/tokenRotation.js';
 
 import dns from 'dns';
 try {
@@ -114,11 +114,14 @@ function broadcastAdmin(type: string, data: any) {
 aiClient.setEmergencyCallback(async (providerName, errorSummary) => {
   broadcast('EMERGENCY_AI_FAILURE', { providerName, errorSummary });
   const currentAiMode = getSetting('ai_mode', 'confirm');
+  const tradingMode = getSetting('trading_mode', 'paper');
   let msg = '';
-  if (currentAiMode === 'confirm') {
-    msg = `⚠️ *[PERINGATAN - AI PROVIDER OFFLINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau error!\n\n${errorSummary}\n\n🛡️ *Mode Otomatis Aktif*: Sistem beralih sementara ke Engine Deterministik (Tanpa AI). Pemindaian pasar & trading tetap berjalan normal dan aman berbasis indikator & risk guard.`;
+  if (currentAiMode === 'off') {
+    msg = `⚠️ *[AI PROVIDER OFFLINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau error!\n\n${errorSummary}\n\n🛡️ Mode trading saat ini *Deterministik Penuh*; entry dan exit tidak bergantung pada provider AI. Riset subagent AI berhenti sampai API Key diperbarui.`;
+  } else if (currentAiMode === 'confirm' && tradingMode === 'paper') {
+    msg = `⚠️ *[PERINGATAN - AI PROVIDER OFFLINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau error!\n\n${errorSummary}\n\nMode *Paper + Hybrid*: simulasi entry tetap berjalan dengan sinyal deterministik. Di mode Live, entry baru akan diblokir selama AI gagal.`;
   } else {
-    msg = `🚨 *[EMERGENCY - AI ENGINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau gagal!\n\n${errorSummary}\n\nAuto-trading di-pause demi keamanan modal. Perbarui API Key di Web Settings.`;
+    msg = `🚨 *[EMERGENCY - AI ENGINE]*\nSemua API Key untuk provider *${providerName}* habis kuota atau gagal!\n\n${errorSummary}\n\nFail-closed aktif: entry baru diblokir sampai AI pulih. Posisi terbuka tetap dipantau dan trailing stop tetap berjalan. Perbarui API Key di Web Settings.`;
   }
   await whatsappService.sendAlert(msg);
   await telegramService.sendAlert(msg);
@@ -132,9 +135,9 @@ indodax.setNewCoinCallback(async (coin) => {
   await telegramService.sendAlert(msg);
 });
 
-// Trade executed (BUY or SELL): notify WhatsApp, Telegram & broadcast
+// Trade executed (BUY or SELL): notify WhatsApp, Telegram & broadcast to admins only
 tradingEngine.setTradeCallback(async (event) => {
-  broadcast('TRADE_EVENT', event);
+  broadcastAdmin('TRADE_EVENT', event);
   if (event.type === 'BUY') {
     const msg = `🟢 *[BUY ORDER EXECUTED]*\nPair: *${event.data.symbol.toUpperCase()}*\nHarga: Rp ${event.data.price.toLocaleString('id-ID')}\nTotal: Rp ${event.data.totalIdr.toLocaleString('id-ID')} (${event.data.mode.toUpperCase()})\nAlasan: ${event.data.reason}`;
     await whatsappService.sendAlert(msg);
@@ -179,10 +182,11 @@ indodaxMarketStream.setTickCallback((tick) => {
 let wasWaConnected = false;
 whatsappService.setCallbacks(
   (qrCodeDataUrl) => {
-    broadcast('WHATSAPP_QR', { qrCode: qrCodeDataUrl });
+    // A pairing QR grants control of the WhatsApp session; admins only.
+    broadcastAdmin('WHATSAPP_QR', { qrCode: qrCodeDataUrl });
   },
   async (status) => {
-    broadcast('WHATSAPP_STATUS', status);
+    broadcastAdmin('WHATSAPP_STATUS', status);
     if (status.connected) {
       wasWaConnected = true;
     } else if (wasWaConnected) {
@@ -375,22 +379,21 @@ wss.on('connection', (ws: WebSocket, req) => {
   });
 
   const configuredToken = getSetting('admin_access_token', '').trim();
-  const urlObj = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-  const tokenQuery = urlObj.searchParams.get('token');
 
-  const isAdmin = !configuredToken || (!!tokenQuery && secureCompareTokens(tokenQuery, configuredToken));
-  if (isAdmin) {
-    authenticatedSockets.add(ws);
-    ws.send(JSON.stringify({ type: 'CONNECTED', authenticated: true, isAdmin: true, message: 'Connected to Realtime WebSocket (Admin Mode)' }));
-  } else {
-    // Connect in Observer / View-Only mode without kicking out
-    ws.send(JSON.stringify({ type: 'CONNECTED', authenticated: false, isAdmin: false, message: 'Connected to Realtime WebSocket (View-Only Observer)' }));
-  }
+  // Never accept tokens in the URL: authenticate through an AUTH message after connect.
+  ws.send(
+    JSON.stringify({
+      type: 'CONNECTED',
+      authenticated: false,
+      isAdmin: false,
+      message: 'Connected to Realtime WebSocket (View-Only Observer)',
+    })
+  );
 
   ws.on('message', (raw) => {
     try {
       const data = JSON.parse(raw.toString());
-      if (data.type === 'AUTH' && configuredToken && data.token && secureCompareTokens(data.token, configuredToken)) {
+      if (data.type === 'AUTH' && isAuthenticatedAdminToken(configuredToken, data.token)) {
         authenticatedSockets.add(ws);
         ws.send(JSON.stringify({ type: 'AUTH_SUCCESS', authenticated: true, isAdmin: true }));
       }
@@ -418,9 +421,33 @@ if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes(
     console.log(`\n======================================================`);
     console.log(`🚀 AI Trading Server running on http://localhost:${PORT}`);
     console.log(`📡 WebSocket endpoint: ws://localhost:${PORT}/ws`);
-    console.log(`🔐 ADMIN ACCESS TOKEN: ${adminToken}`);
-    console.log(`   (Gunakan token ini untuk otentikasi dashboard & API)`);
+    if (process.stdout.isTTY) {
+      console.log(`🔐 ADMIN ACCESS TOKEN: ${adminToken || '(belum dikonfigurasi)'}`);
+      console.log('   (Gunakan token ini untuk otentikasi dashboard & API)');
+    } else {
+      console.log('🔐 ADMIN ACCESS TOKEN: disembunyikan karena log non-interaktif.');
+      console.log('   Jalankan `npm run admin:token` di server untuk menampilkan token.');
+    }
     console.log(`======================================================\n`);
+
+    // Reconcile live exchange state before any background engine starts.
+    const safety = await tradingEngine.reconcileOnStartup();
+    for (const issue of safety.issues) {
+      console.warn(`[Startup Reconciliation] ${issue}`);
+    }
+    if (safety.issues.length > 0) {
+      const msg = `⚠️ *[STARTUP RECONCILIATION]*\n${safety.issues.map((i) => `• ${i}`).join('\n')}\n\nAuto-trading tetap PAUSED sampai state diverifikasi.`;
+      await Promise.allSettled([whatsappService.sendAlert(msg), telegramService.sendAlert(msg)]);
+    }
+
+    const wasAutoActive = getSetting('auto_trading_was_active_before_restart', '0') === '1';
+    const autoResume = getSetting('auto_resume_on_startup', '0') === '1';
+    if (autoResume && wasAutoActive && safety.safeToResume) {
+      setSetting('is_auto_trading_active', '1');
+      console.log('[Startup] Auto-resume diaktifkan: state aman dan auto_resume_on_startup=1.');
+    } else if (wasAutoActive) {
+      console.log('[Startup] Auto-trading tetap PAUSED (kebijakan aman / butuh rekonsiliasi).');
+    }
 
     // Start background engines
     tradingEngine.start(15000);

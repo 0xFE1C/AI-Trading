@@ -35,6 +35,18 @@ export function secureCompareTokens(
   return crypto.timingSafeEqual(h1, h2);
 }
 
+/**
+ * Admin access is fail-closed: an empty configured token never grants access.
+ */
+export function isAuthenticatedAdminToken(
+  configuredToken: string | undefined | null,
+  providedToken: string | undefined | null
+): boolean {
+  const configured = (configuredToken || '').trim();
+  if (!configured) return false;
+  return secureCompareTokens(providedToken, configured);
+}
+
 export class AdminTokenRotationService {
   private timer: NodeJS.Timeout | null = null;
   private callbacks: TokenRotateCallback[] = [];
@@ -150,9 +162,13 @@ export class AdminTokenRotationService {
     console.log(`\n======================================================`);
     console.log(`🔄 [ADMIN ACCESS TOKEN ROTATED]`);
     console.log(`📌 Alasan   : ${reason}`);
-    console.log(`🔐 TOKEN BARU: ${newToken}`);
+    if (process.stdout.isTTY) {
+      console.log(`🔐 TOKEN BARU: ${newToken}`);
+      console.log(`   (Gunakan token baru ini untuk otentikasi dashboard & API)`);
+    } else {
+      console.log('🔐 TOKEN BARU: disembunyikan karena log non-interaktif (jalankan `npm run admin:token`).');
+    }
     console.log(`🕒 Waktu    : ${dateStr}`);
-    console.log(`   (Gunakan token baru ini untuk otentikasi dashboard & API)`);
     console.log(`======================================================\n`);
 
     // 2. Kirim pesan notifikasi ke WhatsApp dan Telegram jika diaktifkan
@@ -161,9 +177,8 @@ export class AdminTokenRotationService {
         `🔐 *[ROTASI ADMIN ACCESS TOKEN]*\n\n` +
         `📌 *Alasan:* ${reason}\n` +
         `🕒 *Waktu:* ${dateStr}\n\n` +
-        `🔑 *Admin Access Token Baru:*\n` +
-        `\`${newToken}\`\n\n` +
-        `⚠️ *Penting:* Token lama sudah tidak berlaku. Salin token di atas untuk membuka Pengaturan Dashboard dan mengeksekusi perintah admin.`;
+        `⚠️ *Token lama sudah tidak berlaku.* Token baru sengaja TIDAK dikirim melalui chat. ` +
+        `Ambil token baru langsung di server dengan perintah \`npm run admin:token\`.`;
 
       try {
         await whatsappService.sendAlert(alertMsg);

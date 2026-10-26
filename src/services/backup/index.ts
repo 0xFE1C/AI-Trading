@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import Database from 'better-sqlite3';
-import { db } from '../../db/index.js';
+import { db, DATA_DIR } from '../../db/index.js';
 
 export interface BackupItem {
   filename: string;
@@ -16,7 +16,7 @@ export class BackupService {
   private intervalTimer: NodeJS.Timeout | null = null;
 
   constructor() {
-    this.backupDir = path.resolve(process.cwd(), 'data', 'backups');
+    this.backupDir = path.join(DATA_DIR, 'backups');
     if (!fs.existsSync(this.backupDir)) {
       fs.mkdirSync(this.backupDir, { recursive: true });
     }

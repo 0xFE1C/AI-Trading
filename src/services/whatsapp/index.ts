@@ -6,7 +6,7 @@ import makeWASocket, {
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
-import { db, getSetting, setSetting, applyRiskProfile, RISK_PROFILES } from '../../db/index.js';
+import { db, getSetting, setSetting, applyRiskProfile, RISK_PROFILES, DATA_DIR } from '../../db/index.js';
 import { tradingEngine, PositionRecord } from '../trading/index.js';
 import { calculateCapitalAllocation } from '../trading/riskGuard.js';
 import { indodax } from '../indodax/index.js';
@@ -14,7 +14,7 @@ import { agentSwarm } from '../agents/index.js';
 import { aiClient } from '../ai/index.js';
 import { secureCompareTokens } from '../auth/tokenRotation.js';
 
-const AUTH_DIR = path.resolve(process.cwd(), 'data', 'baileys_auth');
+const AUTH_DIR = path.join(DATA_DIR, 'baileys_auth');
 if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 }
@@ -856,37 +856,35 @@ ${posText}`
     const takeProfit = getSetting('take_profit_1_percent', '5.0');
     const allowNewListings = getSetting('allow_new_listings', '1') === '1';
 
-    // 1. Balance & Equity Calculation
+    // 1. Balance & Equity Calculation (active mode only, fee-aware)
     let balanceInfo = '';
-    let totalEquity = 0;
-    const positions = db.prepare("SELECT * FROM positions WHERE status = 'open'").all() as PositionRecord[];
-    const floatingPnl = positions.reduce((acc, p) => acc + ((p.current_price - p.entry_price) * p.amount), 0);
-    const floatingValue = positions.reduce((acc, p) => acc + (p.amount * p.current_price), 0);
+    const activeMode: 'paper' | 'live' = mode === 'live' ? 'live' : 'paper';
+    const positions = db.prepare(
+      "SELECT * FROM positions WHERE status = 'open' AND mode = ?"
+    ).all(activeMode) as PositionRecord[];
 
     if (!isAdmin) {
       balanceInfo = `- Mode: ${mode.toUpperCase()} TRADING
 - Informasi Saldo & Portofolio: [Dilindungi - Khusus Akses Administrator]`;
-    } else if (mode === 'paper') {
-      const paperBal = parseFloat(getSetting('paper_idr_balance', '10000000'));
-      totalEquity = paperBal + floatingValue;
-      balanceInfo = `- Mode: PAPER (Simulasi Uang Virtual)
-- Saldo Kas IDR Tersedia: Rp ${paperBal.toLocaleString('id-ID')}
-- Total Nilai Posisi Koin: Rp ${floatingValue.toLocaleString('id-ID')}
-- Total Ekuitas Portofolio (Kas + Koin): Rp ${totalEquity.toLocaleString('id-ID')}
-- Floating PnL Saat Ini: ${floatingPnl >= 0 ? '+' : ''}Rp ${Math.round(floatingPnl).toLocaleString('id-ID')}`;
     } else {
       try {
-        const idrBal = await indodax.getIdrBalance();
-        const freeIdr = idrBal.free || 0;
-        const lockedIdr = idrBal.locked || 0;
-        totalEquity = freeIdr + lockedIdr + floatingValue;
-        balanceInfo = `- Mode: LIVE (Akun Riil Indodax)
-- Saldo IDR Siap Pakai: Rp ${freeIdr.toLocaleString('id-ID')}
-- Saldo IDR Tertahan (Dalam Order): Rp ${lockedIdr.toLocaleString('id-ID')}
-- Total Nilai Posisi Koin: Rp ${floatingValue.toLocaleString('id-ID')}
-- Estimasi Total Ekuitas: Rp ${totalEquity.toLocaleString('id-ID')}`;
+        const snapshot = await tradingEngine.getEquitySnapshot(activeMode);
+        const floatingPnl = Math.round(snapshot.floatingPnlIdr);
+        if (activeMode === 'paper') {
+          balanceInfo = `- Mode: PAPER (Simulasi Uang Virtual)
+- Saldo Kas IDR Tersedia: Rp ${snapshot.cashIdr.toLocaleString('id-ID')}
+- Total Nilai Posisi Koin (net fee): Rp ${Math.round(snapshot.holdingsValueIdr).toLocaleString('id-ID')}
+- Total Ekuitas Portofolio (Kas + Koin): Rp ${Math.round(snapshot.equityIdr).toLocaleString('id-ID')}
+- Floating PnL Saat Ini: ${floatingPnl >= 0 ? '+' : ''}Rp ${Math.round(floatingPnl).toLocaleString('id-ID')}`;
+        } else {
+          balanceInfo = `- Mode: LIVE (Akun Riil Indodax)
+- Saldo IDR Siap Pakai: Rp ${snapshot.cashFreeIdr.toLocaleString('id-ID')}
+- Saldo IDR Tertahan (Dalam Order): Rp ${snapshot.cashLockedIdr.toLocaleString('id-ID')}
+- Total Nilai Posisi Koin (net fee): Rp ${Math.round(snapshot.holdingsValueIdr).toLocaleString('id-ID')}
+- Estimasi Total Ekuitas: Rp ${Math.round(snapshot.equityIdr).toLocaleString('id-ID')}`;
+        }
       } catch (e: any) {
-        balanceInfo = `- Mode: LIVE (Gagal memuat saldo Indodax live: ${e.message})`;
+        balanceInfo = `- Mode: ${mode.toUpperCase()} (Gagal memuat data saldo/equity: ${e.message})`;
       }
     }
 

@@ -10,7 +10,7 @@ Write-Host ""
 # 1. Periksa Node.js
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "[ERROR] Node.js tidak ditemukan pada sistem!" -ForegroundColor Red
-    Write-Host "Silakan download dan install Node.js (v18+) dari: https://nodejs.org" -ForegroundColor Yellow
+    Write-Host "Silakan download dan install Node.js (v22.12+) dari: https://nodejs.org" -ForegroundColor Yellow
     Read-Host "Tekan Enter untuk keluar"
     Exit 1
 }

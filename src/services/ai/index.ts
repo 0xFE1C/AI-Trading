@@ -1,5 +1,10 @@
 import { db, getSetting, logAiCall } from '../../db/index.js';
 import {
+  decryptProviderApiKeys,
+  decryptProviderOAuth,
+  encryptProviderOAuth,
+} from '../security/secrets.js';
+import {
   refreshAntigravityToken,
   callAntigravityChat,
   fetchLiveAntigravityModels,
@@ -83,7 +88,7 @@ export class UniversalAIClient {
       let oauthData: AntigravityOAuthData | null = null;
       if (provider.oauth_data) {
         try {
-          oauthData = JSON.parse(provider.oauth_data);
+          oauthData = decryptProviderOAuth<AntigravityOAuthData>(provider.oauth_data);
           // Auto-refresh jika token mendekati waktu kedaluwarsa (kurang dari 5 menit)
           if (oauthData && oauthData.refreshToken && Date.now() > (oauthData.expiresAt || 0) - 5 * 60 * 1000) {
             console.log(`[importModels] Auto-refreshing Antigravity token for ${provider.name}...`);
@@ -91,7 +96,7 @@ export class UniversalAIClient {
             oauthData.accessToken = refreshed.accessToken;
             oauthData.expiresAt = refreshed.expiresAt;
             db.prepare('UPDATE providers SET oauth_data = ? WHERE id = ?').run(
-              JSON.stringify(oauthData),
+              encryptProviderOAuth(oauthData),
               provider.id
             );
           }
@@ -122,7 +127,7 @@ export class UniversalAIClient {
       }
     } else {
       // 2. Penanganan Standar untuk Custom Provider (OpenAI, Token Harbor, Anthropic, dll)
-      const apiKeys: string[] = JSON.parse(provider.api_keys || '[]');
+      const apiKeys = decryptProviderApiKeys(provider.api_keys);
       if (apiKeys.length === 0 || !apiKeys[0]) {
         throw new Error(`Provider [${provider.name}] belum memiliki API Key. Harap isi minimal satu API Key.`);
       }
@@ -279,9 +284,9 @@ export class UniversalAIClient {
     rawModelId: string,
     options: CompletionOptions
   ): Promise<string> {
-    const apiKeys: string[] = JSON.parse(provider.api_keys || '[]');
+    const apiKeys = decryptProviderApiKeys(provider.api_keys);
 
-    if (apiKeys.length === 0 || !apiKeys[0]) {
+    if (apiKeys.length === 0) {
       throw new Error(`Provider [${provider.name}] tidak memiliki API Key yang valid.`);
     }
 
@@ -304,7 +309,7 @@ export class UniversalAIClient {
           return completionResult; // Successfully completed!
         }
       } catch (err: any) {
-        const errorMsg = `Key #${i + 1} (${apiKey.substring(0, 8)}...): ${err.message}`;
+        const errorMsg = `Key #${i + 1}: ${err.message}`;
         console.warn(`[AI Failover] ${errorMsg}. Mencoba API Key berikutnya...`);
         errors.push(errorMsg);
       }
@@ -431,11 +436,10 @@ export class UniversalAIClient {
     rawModelId: string,
     options: CompletionOptions
   ): Promise<string> {
-    if (!provider.oauth_data) {
+    let oauthData = decryptProviderOAuth<AntigravityOAuthData>(provider.oauth_data);
+    if (!oauthData) {
       throw new Error(`Provider Antigravity [${provider.name}] belum terhubung melalui Google OAuth.`);
     }
-
-    let oauthData: AntigravityOAuthData = JSON.parse(provider.oauth_data);
 
     // Refresh token jika mendekati waktu habis (kurang dari 5 menit)
     if (Date.now() > (oauthData.expiresAt || 0) - 5 * 60 * 1000) {
@@ -456,7 +460,7 @@ export class UniversalAIClient {
             expiresAt: refreshed.expiresAt,
           };
           db.prepare('UPDATE providers SET oauth_data = ? WHERE id = ?').run(
-            JSON.stringify(oauthData),
+            encryptProviderOAuth(oauthData),
             provider.id
           );
         } catch (refErr: any) {
@@ -485,7 +489,7 @@ export class UniversalAIClient {
           expiresAt: refreshed.expiresAt,
         };
         db.prepare('UPDATE providers SET oauth_data = ? WHERE id = ?').run(
-          JSON.stringify(oauthData),
+          encryptProviderOAuth(oauthData),
           provider.id
         );
         return await callAntigravityChat({
@@ -555,11 +559,10 @@ export class UniversalAIClient {
       throw new Error(`Provider dengan ID ${providerId} tidak ditemukan.`);
     }
 
-    if (!provider.oauth_data) {
+    let oauthData = decryptProviderOAuth<AntigravityOAuthData>(provider.oauth_data);
+    if (!oauthData) {
       throw new Error(`Provider [${provider.name}] tidak memiliki konfigurasi Google OAuth.`);
     }
-
-    let oauthData: AntigravityOAuthData = JSON.parse(provider.oauth_data);
 
     // Auto-refresh token jika mendekati waktu kedaluwarsa
     if (oauthData.refreshToken && Date.now() > (oauthData.expiresAt || 0) - 5 * 60 * 1000) {
@@ -571,7 +574,7 @@ export class UniversalAIClient {
           expiresAt: refreshed.expiresAt,
         };
         db.prepare('UPDATE providers SET oauth_data = ? WHERE id = ?').run(
-          JSON.stringify(oauthData),
+          encryptProviderOAuth(oauthData),
           provider.id
         );
       } catch (err: any) {
