@@ -468,21 +468,103 @@ async function main() {
     console.log(`  Penghematan     : +Rp ${feeSavedIdr.toLocaleString('id-ID')} dari pemotongan biaya spread & komisi\n`);
   }
 
+  console.log('========================================================================================');
+  console.log('       BAGIAN 3: WALK-FORWARD ANALYSIS (JENDELA BERGULIR EKSPANSIF)                     ');
+  console.log('========================================================================================');
+  console.log('Dua lipatan: (train 30d -> test 30d) lalu (train 60d -> test 30d). Sama seperti');
+  console.log('trader nyata: model diuji ulang pada data yang TIDAK PERNAH dilihat saat optimasi.');
+  console.log('Config hanya layak live bila OOS-nya konsisten profit di kedua lipatan.\n');
+
+  const walkForwardResults: Array<{
+    configId: string;
+    configName: string;
+    folds: Array<{ trainDays: number; testDays: number; netPnlIdr: number; profitFactor: number | null; trades: number }>;
+    aggregateOosPnlIdr: number;
+    aggregateOosProfitFactor: number | null;
+    inSamplePnlIdr: number;
+    oosToIsRatio: number | null;
+    verdict: 'WALK_FORWARD_ROBUST' | 'WALK_FORWARD_WEAK' | 'OVERFIT';
+  }> = [];
+
+  for (const cfg of configurations) {
+    const folds: Array<{ trainDays: number; testDays: number; netPnlIdr: number; profitFactor: number | null; trades: number }> = [];
+
+    for (const sym of symbols) {
+      const bars = barData[sym];
+      if (bars.length < 100) continue;
+      const foldSize = Math.floor(bars.length / 3); // ~30 hari per 1h-candle block
+
+      // Fold A: train [0, foldSize) -> test [foldSize, 2*foldSize)
+      const isA = simulateSlice(bars.slice(0, foldSize), cfg, 'taker');
+      const oosA = simulateSlice(bars.slice(foldSize, 2 * foldSize), cfg, 'taker');
+
+      // Fold B: train [0, 2*foldSize) -> test [2*foldSize, end)
+      const isB = simulateSlice(bars.slice(0, 2 * foldSize), cfg, 'taker');
+      const oosB = simulateSlice(bars.slice(2 * foldSize), cfg, 'taker');
+
+      folds.push(
+        { trainDays: 30, testDays: 30, netPnlIdr: oosA.netPnlIdr, profitFactor: oosA.profitFactor, trades: oosA.trades },
+        { trainDays: 60, testDays: 30, netPnlIdr: oosB.netPnlIdr, profitFactor: oosB.profitFactor, trades: oosB.trades },
+        // In-sample references for the ratio (train windows)
+        { trainDays: 30, testDays: 0, netPnlIdr: isA.netPnlIdr, profitFactor: isA.profitFactor, trades: isA.trades },
+        { trainDays: 60, testDays: 0, netPnlIdr: isB.netPnlIdr, profitFactor: isB.profitFactor, trades: isB.trades }
+      );
+    }
+
+    const oosFolds = folds.filter((f) => f.testDays > 0);
+    const isFolds = folds.filter((f) => f.testDays === 0);
+    const aggregateOosPnlIdr = oosFolds.reduce((s, f) => s + f.netPnlIdr, 0);
+    const positiveOosPnl = oosFolds.reduce((s, f) => s + Math.max(0, f.netPnlIdr), 0);
+    const negativeOosPnl = Math.abs(oosFolds.reduce((s, f) => s + Math.min(0, f.netPnlIdr), 0));
+    const aggregateOosProfitFactor = negativeOosPnl === 0 ? (positiveOosPnl > 0 ? null : 0) : parseFloat((positiveOosPnl / negativeOosPnl).toFixed(2));
+    const inSamplePnlIdr = isFolds.reduce((s, f) => s + f.netPnlIdr, 0);
+    const oosToIsRatio = inSamplePnlIdr > 0 ? parseFloat((aggregateOosPnlIdr / inSamplePnlIdr).toFixed(2)) : null;
+
+    let verdict: 'WALK_FORWARD_ROBUST' | 'WALK_FORWARD_WEAK' | 'OVERFIT' = 'OVERFIT';
+    const profitableFolds = oosFolds.filter((f) => f.netPnlIdr > 0).length;
+    if (aggregateOosPnlIdr > 0 && profitableFolds === oosFolds.length) {
+      verdict = 'WALK_FORWARD_ROBUST';
+    } else if (aggregateOosPnlIdr > 0) {
+      verdict = 'WALK_FORWARD_WEAK';
+    }
+
+    walkForwardResults.push({
+      configId: cfg.id,
+      configName: cfg.name,
+      folds: oosFolds,
+      aggregateOosPnlIdr,
+      aggregateOosProfitFactor,
+      inSamplePnlIdr,
+      oosToIsRatio,
+      verdict,
+    });
+
+    const pfStr = aggregateOosProfitFactor !== null ? `${aggregateOosProfitFactor.toFixed(2)}x` : 'N/A';
+    const ratioStr = oosToIsRatio !== null ? oosToIsRatio.toFixed(2) : 'N/A';
+    console.log(`[WALK-FORWARD] ${cfg.name}`);
+    for (const fold of oosFolds) {
+      const foldPf = fold.profitFactor !== null ? `${fold.profitFactor.toFixed(2)}x` : 'N/A';
+      console.log(`  Fold (train ${fold.trainDays}d / test ${fold.testDays}d): OOS PnL Rp ${fold.netPnlIdr.toLocaleString('id-ID')} | PF: ${foldPf} | ${fold.trades} trades`);
+    }
+    console.log(`  Agregat OOS : Rp ${aggregateOosPnlIdr.toLocaleString('id-ID')} | PF: ${pfStr} | Rasio OOS/IS: ${ratioStr} -> [${verdict}]\n`);
+  }
+
   // Save full audit log to JSON
   const auditPath = path.resolve(process.cwd(), 'data', 'optimizer_audit.json');
   fs.writeFileSync(
     auditPath,
-    JSON.stringify(
-      {
-        timestamp: timestampIso,
-        gitCommit,
-        symbols,
-        candleCounts: Object.fromEntries(Object.entries(barData).map(([k, v]) => [k, v.length])),
-        evaluations,
-      },
-      null,
-      2
-    )
+      JSON.stringify(
+        {
+          timestamp: timestampIso,
+          gitCommit,
+          symbols,
+          candleCounts: Object.fromEntries(Object.entries(barData).map(([k, v]) => [k, v.length])),
+          evaluations,
+          walkForward: walkForwardResults,
+        },
+        null,
+        2
+      )
   );
 
   console.log(`[Audit Trail] Log audit lengkap berhasil disimpan ke: data/optimizer_audit.json`);

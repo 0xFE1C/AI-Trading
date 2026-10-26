@@ -271,6 +271,20 @@ export function initDatabase() {
       detail TEXT
     );
 
+    -- Research candle cache (90-day ring buffer, written through whenever the
+    -- engine observes candles). Backtests and walk-forward runs read from here.
+    CREATE TABLE IF NOT EXISTS candles (
+      pair TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      ts INTEGER NOT NULL,
+      open REAL NOT NULL,
+      high REAL NOT NULL,
+      low REAL NOT NULL,
+      close REAL NOT NULL,
+      volume REAL NOT NULL DEFAULT 0,
+      PRIMARY KEY (pair, timeframe, ts)
+    );
+
     -- High-Performance Secondary Indexes
     CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);
     CREATE INDEX IF NOT EXISTS idx_positions_symbol_status ON positions(symbol, status);

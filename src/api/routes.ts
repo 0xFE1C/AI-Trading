@@ -22,6 +22,7 @@ import { tunnelService } from '../services/tunnel/index.js';
 import { buildAntigravityAuthUrl, exchangeCodeForTokens } from '../services/antigravity/oauth.js';
 import { indodaxMarketStream } from '../services/indodax/marketStream.js';
 import { backtestEngine } from '../services/backtest/index.js';
+import { portfolioBacktestEngine } from '../services/backtest/portfolio.js';
 import { reportingService } from '../services/reports/index.js';
 import { backupService } from '../services/backup/index.js';
 import { telegramService } from '../services/telegram/index.js';
@@ -955,6 +956,29 @@ apiRouter.post('/backtest/run', authMiddleware, async (req, res) => {
       days: Number(days) || 30,
       initialBalanceIdr: initialBalanceIdr ? Number(initialBalanceIdr) : undefined,
       allocationPerTradeIdr: allocationPerTradeIdr ? Number(allocationPerTradeIdr) : undefined,
+      trailingStopPercent: trailingStopPercent ? Number(trailingStopPercent) : undefined,
+      takeProfitStep1Percent: takeProfitStep1Percent ? Number(takeProfitStep1Percent) : undefined,
+      minGainThresholdPercent: minGainThresholdPercent ? Number(minGainThresholdPercent) : undefined,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Portfolio backtest: multi-symbol, concurrent position slots, shared cash.
+apiRouter.post('/backtest/portfolio', authMiddleware, async (req, res) => {
+  try {
+    const { symbols, timeframe, days, initialBalanceIdr, allocationPerTradeIdr, maxActiveTrades, trailingStopPercent, takeProfitStep1Percent, minGainThresholdPercent } = req.body;
+
+    const result = await portfolioBacktestEngine.run({
+      symbols: Array.isArray(symbols) ? symbols.map(String) : String(symbols || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+      timeframe: timeframe || '1h',
+      days: Number(days) || 30,
+      initialBalanceIdr: initialBalanceIdr ? Number(initialBalanceIdr) : undefined,
+      allocationPerTradeIdr: allocationPerTradeIdr ? Number(allocationPerTradeIdr) : undefined,
+      maxActiveTrades: maxActiveTrades ? Number(maxActiveTrades) : undefined,
       trailingStopPercent: trailingStopPercent ? Number(trailingStopPercent) : undefined,
       takeProfitStep1Percent: takeProfitStep1Percent ? Number(takeProfitStep1Percent) : undefined,
       minGainThresholdPercent: minGainThresholdPercent ? Number(minGainThresholdPercent) : undefined,

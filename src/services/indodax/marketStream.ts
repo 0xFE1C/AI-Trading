@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { saveCandles } from '../candles/store.js';
 
 export interface RealCandle {
   time: string;
@@ -100,6 +101,8 @@ export class IndodaxMarketStream {
               rawVolume: rawVol,
             };
           });
+
+          this.persistCandlesThrottled(cleanPair, timeframe, rawBars);
         }
       }
     } catch (err: any) {
@@ -515,6 +518,37 @@ export class IndodaxMarketStream {
   /** Observability: live feed connection state for /api/metrics. */
   public getLiveStatus(): { connected: boolean } {
     return { connected: this.isConnected && this.ws?.readyState === WebSocket.OPEN };
+  }
+
+  private lastPersistAt = new Map<string, number>();
+
+  /**
+   * Write-through research cache: closed candles land in SQLite so backtests
+   * and walk-forward runs stop depending on the undocumented history_v2
+   * endpoint. Throttled to one write per pair/timeframe per 5 minutes.
+   */
+  private persistCandlesThrottled(pair: string, timeframe: string, rawBars: any[]) {
+    const key = `${pair}:${timeframe}`;
+    const now = Date.now();
+    if (now - (this.lastPersistAt.get(key) || 0) < 5 * 60 * 1000) return;
+    this.lastPersistAt.set(key, now);
+
+    try {
+      saveCandles(
+        pair,
+        timeframe,
+        rawBars.map((b: any) => ({
+          timestamp: (typeof b.Time === 'number' ? b.Time : parseInt(b.Time, 10)) * 1000,
+          open: typeof b.Open === 'number' ? b.Open : parseFloat(b.Open),
+          high: typeof b.High === 'number' ? b.High : parseFloat(b.High),
+          low: typeof b.Low === 'number' ? b.Low : parseFloat(b.Low),
+          close: typeof b.Close === 'number' ? b.Close : parseFloat(b.Close),
+          volume: typeof b.Volume === 'number' ? b.Volume : parseFloat(b.Volume || '0'),
+        }))
+      );
+    } catch {
+      // Best-effort; saveCandles already logs and swallows.
+    }
   }
 }
 
