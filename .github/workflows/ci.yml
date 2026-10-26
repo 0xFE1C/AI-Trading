@@ -43,5 +43,12 @@ jobs:
       - name: Run backend tests
         run: npm test
 
+      - name: Coverage gate on critical modules (riskGuard, secrets, indicators, signals)
+        run: npm run test:coverage:critical
+
+      - name: Run client tests
+        working-directory: client
+        run: npm test
+
       - name: Build client
         run: npm --prefix client run build

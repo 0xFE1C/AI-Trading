@@ -17,6 +17,7 @@ import { backupService } from './services/backup/index.js';
 import { tunnelService } from './services/tunnel/index.js';
 import { indodaxMarketStream } from './services/indodax/marketStream.js';
 import { adminTokenService, isAuthenticatedAdminToken } from './services/auth/tokenRotation.js';
+import { installConsoleBridge } from './utils/logger.js';
 
 import dns from 'dns';
 try {
@@ -24,6 +25,10 @@ try {
 } catch {}
 
 dotenv.config();
+
+// Structured logging (pino) console bridge: no-op unless
+// AI_TRADING_STRUCTURED_LOGS=1 or LOG_FILE is set, and never in tests.
+installConsoleBridge();
 
 // 1. Initialize SQLite Database
 initDatabase();
@@ -557,9 +562,33 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err);
+  // Last-chance notification while the bots may still be connected: an
+  // uncaught exception leads to a full process restart, and restarts with
+  // open live positions are exactly when operators must be woken up.
+  try {
+    const openLive = db.prepare("SELECT COUNT(*) as c FROM positions WHERE status = 'open' AND mode = 'live'").get() as { c: number };
+    if (openLive.c > 0) {
+      const msg = `🚨 *[UNCAUGHT EXCEPTION — BOT AKAN RESTART]*\n${err?.message || err}\n\n${openLive.c} posisi LIVE terbuka. Proses memulai graceful shutdown; pastikan auto-restart (Docker/systemd) aktif agar proteksi exit kembali jalan.`;
+      Promise.allSettled([whatsappService.sendAlert(msg), telegramService.sendAlert(msg)]).finally(() => {
+        gracefulShutdown('uncaughtException');
+      });
+      return;
+    }
+  } catch {}
   gracefulShutdown('uncaughtException');
 });
 
+let unhandledRejectionCount = 0;
+let lastRejectionAlertAt = 0;
 process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
+  unhandledRejectionCount++;
+  // Throttled visibility: rejections mean a bug, but must not spam the admin
+  // channel — at most one alert per hour with a running total.
+  const now = Date.now();
+  if (now - lastRejectionAlertAt > 60 * 60 * 1000) {
+    lastRejectionAlertAt = now;
+    const msg = `⚠️ *[UNHANDLED REJECTION]*\nTotal sejak start: ${unhandledRejectionCount}\nTerakhir: ${String(reason instanceof Error ? reason.message : reason).slice(0, 300)}\n\nCek log server untuk stack trace lengkap.`;
+    Promise.allSettled([whatsappService.sendAlert(msg), telegramService.sendAlert(msg)]).catch(() => {});
+  }
 });

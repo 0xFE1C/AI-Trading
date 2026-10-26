@@ -179,6 +179,11 @@ export class TradingEngine {
   private lastPruneTimestamp = 0;
   private lastEquityFailureAlertAt = 0;
   private lastUnprotectedAlertAt = 0;
+  private lastWatchdogPingAt = 0;
+  private loopCount = 0;
+  private lastLoopStartedAt = 0;
+  private lastLoopDurationMs = 0;
+  private startedAt = 0;
 
   // Hoisted prepared statements to avoid SQL parsing overhead per realtime tick
   private stmtGetOpenPosByPair = db.prepare(`
@@ -236,6 +241,7 @@ export class TradingEngine {
   public start(intervalMs = 15000) {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.startedAt = Date.now();
     this.refreshOpenSymbols();
     this.runLoop();
     this.loopTimer = setInterval(() => this.runLoop(), intervalMs);
@@ -714,6 +720,9 @@ export class TradingEngine {
   public async runLoop() {
     if (this.isProcessing) return; // In-flight guard prevents overlapping loops
     this.isProcessing = true;
+    const loopStart = Date.now();
+    this.lastLoopStartedAt = loopStart;
+    this.loopCount++;
 
     try {
       // 0. Periodic data maintenance (once per 24 hours)
@@ -773,7 +782,59 @@ export class TradingEngine {
       console.error('[Trading Engine Error]', err.message);
     } finally {
       this.isProcessing = false;
+      this.lastLoopDurationMs = Date.now() - loopStart;
+      this.pingExternalWatchdog();
     }
+  }
+
+  /**
+   * Dead-man's notification for EXTERNAL uptime monitors (healthchecks.io and
+   * compatible pinging services). Fired at most once per minute after a
+   * successful engine loop; if this ping stops, the monitor alerts you that
+   * the bot stopped protecting positions. Configure via the WATCHDOG_URL env.
+   */
+  private pingExternalWatchdog() {
+    const url = process.env.WATCHDOG_URL;
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    const now = Date.now();
+    if (now - this.lastWatchdogPingAt < 60_000) return;
+    this.lastWatchdogPingAt = now;
+    fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) }).catch(() => {
+      // Watchdog delivery failures are intentionally silent; the monitor
+      // itself flags the missed ping.
+    });
+  }
+
+  /**
+   * Cheap engine-state gauges for the Prometheus /api/metrics endpoint.
+   * Everything here is a local DB/cache read — no exchange calls.
+   */
+  public getEngineMetrics() {
+    const mode = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
+    const openByMode = (m: string) =>
+      (db.prepare("SELECT COUNT(*) as c FROM positions WHERE status = 'open' AND mode = ?").get(m) as { c: number }).c;
+    const circuitTriggeredAt = parseInt(getSetting('circuit_breaker_triggered_at', '0'), 10);
+    const pendingIntents = db.prepare(
+      "SELECT COUNT(*) as c FROM order_intents WHERE state IN ('sent', 'ack')"
+    ).get() as { c: number };
+
+    return {
+      tradingMode: mode,
+      autoTradingActive: getSetting('is_auto_trading_active', '0') === '1',
+      openPositionsPaper: openByMode('paper'),
+      openPositionsLive: openByMode('live'),
+      unprotectedLivePositions: (db.prepare(
+        "SELECT COUNT(*) as c FROM positions WHERE status = 'open' AND mode = 'live' AND unprotected_since IS NOT NULL"
+      ).get() as { c: number }).c,
+      drawdownHalt: parseInt(getSetting('drawdown_halt_since', '0'), 10) > 0 ? 1 : 0,
+      circuitBreakerActive:
+        circuitTriggeredAt > 0 && Date.now() - circuitTriggeredAt < 24 * 3600 * 1000 ? 1 : 0,
+      pendingOrderIntents: pendingIntents.c,
+      loopCount: this.loopCount,
+      lastLoopAt: this.lastLoopStartedAt,
+      lastLoopDurationMs: this.lastLoopDurationMs,
+      engineUptimeSeconds: this.startedAt > 0 ? Math.round((Date.now() - this.startedAt) / 1000) : 0,
+    };
   }
 
   // --- Manage Open Positions (Dynamic Exit - NO FIXED TIME) ---

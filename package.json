@@ -17,7 +17,9 @@
     "build": "tsc && npm --prefix client run build",
     "optimize": "tsx scripts/optimize_strategy.ts",
     "db:reset": "tsx scripts/init_fresh_db.ts",
-    "admin:token": "tsx scripts/show_admin_token.ts"
+    "admin:token": "tsx scripts/show_admin_token.ts",
+    "test:coverage": "c8 --include=src --reporter=text --reporter=lcov npm test",
+    "test:coverage:critical": "c8 --include=src/services/trading/riskGuard.ts --include=src/services/security/secrets.ts --include=src/utils/indicators.ts --include=src/services/signals --check-coverage --lines 80 --reporter=text npm test"
   },
   "dependencies": {
     "@ngrok/ngrok": "^1.7.0",
@@ -39,6 +41,7 @@
     "@types/node": "^25.5.0",
     "@types/qrcode": "^1.5.5",
     "@types/ws": "^8.18.1",
+    "c8": "^12.0.0",
     "typescript": "^6.0.2"
   },
   "allowScripts": {

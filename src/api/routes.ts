@@ -1060,6 +1060,45 @@ apiRouter.get('/system/health', (req, res) => {
   }
 });
 
+// Prometheus text exposition for external monitoring (no secrets exposed).
+// Scrape with e.g. `scrape_configs: [{ targets: ['localhost:3001'] }]`.
+apiRouter.get('/metrics', (req, res) => {
+  try {
+    const engine = tradingEngine.getEngineMetrics();
+    const mem = process.memoryUsage();
+    const lines: string[] = [];
+
+    const push = (name: string, help: string, type: string, value: number | string) => {
+      lines.push(`# HELP ${name} ${help}`);
+      lines.push(`# TYPE ${name} ${type}`);
+      lines.push(`${name} ${value}`);
+    };
+
+    push('ai_trading_engine_uptime_seconds', 'Seconds since the trading engine started.', 'gauge', engine.engineUptimeSeconds);
+    push('ai_trading_loop_count_total', 'Number of engine loop iterations completed.', 'counter', engine.loopCount);
+    push('ai_trading_last_loop_duration_ms', 'Duration of the most recent engine loop in milliseconds.', 'gauge', engine.lastLoopDurationMs);
+    push('ai_trading_auto_trading_active', '1 when auto-trading is enabled.', 'gauge', engine.autoTradingActive ? 1 : 0);
+    push('ai_trading_trading_mode', 'Current trading mode: 1 = live, 0 = paper.', 'gauge', engine.tradingMode === 'live' ? 1 : 0);
+    lines.push('# HELP ai_trading_open_positions Open positions by mode.');
+    lines.push('# TYPE ai_trading_open_positions gauge');
+    lines.push(`ai_trading_open_positions{mode="paper"} ${engine.openPositionsPaper}`);
+    lines.push(`ai_trading_open_positions{mode="live"} ${engine.openPositionsLive}`);
+    push('ai_trading_unprotected_live_positions', 'Live positions without a guaranteed exit plan.', 'gauge', engine.unprotectedLivePositions);
+    push('ai_trading_drawdown_halt', '1 when the drawdown kill switch is latched.', 'gauge', engine.drawdownHalt);
+    push('ai_trading_circuit_breaker_active', '1 when the daily loss circuit breaker cooldown is active.', 'gauge', engine.circuitBreakerActive);
+    push('ai_trading_pending_order_intents', 'Order intents awaiting exchange confirmation.', 'gauge', engine.pendingOrderIntents);
+    push('ai_trading_market_ws_connected', '1 when the Indodax live market WebSocket is connected.', 'gauge', indodaxMarketStream.getLiveStatus().connected ? 1 : 0);
+    push('ai_trading_process_heap_used_bytes', 'Process heap used in bytes.', 'gauge', mem.heapUsed);
+    push('ai_trading_process_rss_bytes', 'Process resident set size in bytes.', 'gauge', mem.rss);
+    push('ai_trading_process_uptime_seconds', 'Process uptime in seconds.', 'gauge', Math.round(process.uptime()));
+
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(lines.join('\n') + '\n');
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 
 

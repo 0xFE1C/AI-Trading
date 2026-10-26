@@ -36,4 +36,9 @@ VOLUME ["/app/data"]
 
 EXPOSE 3001
 
+# Container is unhealthy when the API stops answering — combined with
+# `restart: unless-stopped` in docker-compose this auto-recovers crashes.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/api/system/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD ["npx", "--no-install", "tsx", "src/server.ts"]

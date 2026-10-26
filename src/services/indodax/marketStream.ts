@@ -511,6 +511,11 @@ export class IndodaxMarketStream {
     }
     this.isConnected = false;
   }
+
+  /** Observability: live feed connection state for /api/metrics. */
+  public getLiveStatus(): { connected: boolean } {
+    return { connected: this.isConnected && this.ws?.readyState === WebSocket.OPEN };
+  }
 }
 
 export const indodaxMarketStream = new IndodaxMarketStream();
