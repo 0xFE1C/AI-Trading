@@ -365,10 +365,31 @@ export class IndodaxClient {
     return crypto.createHmac('sha256', secretKey).update(data).digest('hex');
   }
 
-  private async callPrivateApi<T>(
+  private static readonly MAX_PRIVATE_RETRIES = 3;
+
+  private retryDelayMs(attempt: number, retryAfterHeader?: string | null): number {
+    const retryAfter = parseFloat(retryAfterHeader || '0');
+    if (Number.isFinite(retryAfter) && retryAfter > 0) {
+      return Math.min(retryAfter * 1000, 15000);
+    }
+    // Exponential backoff with jitter: ~400ms, ~800ms, ~1600ms (+-25%)
+    const base = 400 * Math.pow(2, attempt);
+    const jitter = base * (0.75 + Math.random() * 0.5);
+    return Math.min(Math.round(jitter), 8000);
+  }
+
+  /**
+   * Sends a signed private request. GET/DELETE are retried on transient
+   * failures (network error, 429, 5xx) with exponential backoff honoring
+   * Retry-After. POST is NEVER retried blindly: createOrder is not idempotent
+   * and a duplicate market order would double an entry — order intents cover
+   * crash recovery for POSTs instead.
+   */
+  private async executePrivateRequest<T>(
     endpoint: string,
     method: 'GET' | 'POST' | 'DELETE',
-    params: Record<string, string | number> = {}
+    params: Record<string, string | number>,
+    attempt = 0
   ): Promise<T> {
     const { apiKey, secretKey } = this.getAuthCredentials();
     if (!apiKey || !secretKey) {
@@ -409,8 +430,36 @@ export class IndodaxClient {
       options.body = queryString;
     }
 
-    const res = await fetch(url, options);
-    const data = await this.safeParseResponse<any>(res, `PrivateApi(${endpoint})`);
+    let res: Response;
+    try {
+      res = await fetch(url, options);
+    } catch (err: any) {
+      if (isGetOrDelete && attempt < IndodaxClient.MAX_PRIVATE_RETRIES) {
+        await sleep(this.retryDelayMs(attempt));
+        return this.executePrivateRequest<T>(endpoint, method, params, attempt + 1);
+      }
+      throw new Error(`Indodax Trade API network error (${endpoint}): ${err?.message || err}`);
+    }
+
+    if (!res.ok) {
+      const retryable = res.status === 429 || res.status >= 500;
+      if (retryable && isGetOrDelete && attempt < IndodaxClient.MAX_PRIVATE_RETRIES) {
+        await sleep(this.retryDelayMs(attempt, res.headers.get('retry-after')));
+        return this.executePrivateRequest<T>(endpoint, method, params, attempt + 1);
+      }
+      const rawText = await res.text().catch(() => '');
+      const cleanSnippet = rawText.slice(0, 150).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      throw new Error(`Indodax Trade API gagal (${endpoint} ${res.status} ${res.statusText}): ${cleanSnippet || 'Gateway/Cloudflare error'}`);
+    }
+
+    const rawText = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      const cleanSnippet = rawText.slice(0, 150).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      throw new Error(`Indodax Trade API mengembalikan non-JSON response (${endpoint} ${res.status}): ${cleanSnippet || 'Invalid JSON format'}`);
+    }
 
     if (data && typeof data.code === 'number' && data.code < 0) {
       throw new Error(`Indodax Trade API error: ${data.msg || res.statusText} (code: ${data.code})`);
@@ -419,12 +468,25 @@ export class IndodaxClient {
     return data as T;
   }
 
+  private async callPrivateApi<T>(
+    endpoint: string,
+    method: 'GET' | 'POST' | 'DELETE',
+    params: Record<string, string | number> = {}
+  ): Promise<T> {
+    return this.executePrivateRequest<T>(endpoint, method, params);
+  }
+
   // --- Official Endpoints per INDODAX-TradeAPI-2.md ---
 
   /**
    * GET /api/v2/account
    * Mengambil saldo akun (balances: [{ asset: 'IDR', free: '...', locked: '...' }])
+   * Responses are deduplicated for 1s and concurrent calls share one request:
+   * the engine reads the account every loop and per-tick paths read it too.
    */
+  private accountCache: { data: any; time: number } | null = null;
+  private accountInFlight: Promise<any> | null = null;
+
   public async getAccountInfo(): Promise<{
     canTrade: boolean;
     canWithdraw: boolean;
@@ -432,18 +494,35 @@ export class IndodaxClient {
     balances: Array<{ asset: string; free: string; locked: string }>;
     data?: { balance: { idr: number } }; // backward compatibility
   }> {
-    const result = await this.callPrivateApi<any>('/api/v2/account', 'GET', {});
-
-    // Compute IDR free balance for convenience
-    let idrFree = 0;
-    if (Array.isArray(result?.balances)) {
-      const idrEntry = result.balances.find((b: any) => String(b.asset).toUpperCase() === 'IDR');
-      if (idrEntry) idrFree = parseFloat(idrEntry.free) || 0;
+    const now = Date.now();
+    if (this.accountCache && now - this.accountCache.time < 1000) {
+      return this.accountCache.data;
+    }
+    if (this.accountInFlight) {
+      return this.accountInFlight;
     }
 
-    // Attach backward-compatible helper field
-    result.data = { balance: { idr: idrFree } };
-    return result;
+    this.accountInFlight = (async () => {
+      try {
+        const result = await this.callPrivateApi<any>('/api/v2/account', 'GET', {});
+
+        // Compute IDR free balance for convenience
+        let idrFree = 0;
+        if (Array.isArray(result?.balances)) {
+          const idrEntry = result.balances.find((b: any) => String(b.asset).toUpperCase() === 'IDR');
+          if (idrEntry) idrFree = parseFloat(idrEntry.free) || 0;
+        }
+
+        // Attach backward-compatible helper field
+        result.data = { balance: { idr: idrFree } };
+        this.accountCache = { data: result, time: Date.now() };
+        return result;
+      } finally {
+        this.accountInFlight = null;
+      }
+    })();
+
+    return this.accountInFlight;
   }
 
   public async getIdrBalance(): Promise<{ free: number; locked: number; total: number }> {
@@ -479,6 +558,7 @@ export class IndodaxClient {
     quoteOrderQty?: number; // Nominal IDR untuk MARKET BUY
     quantity?: number; // Jumlah koin untuk MARKET SELL atau LIMIT
     price?: number; // Harga satuan koin untuk LIMIT
+    newClientOrderId?: string; // Client-defined idempotency key (alphanumeric _-, max 36)
   }): Promise<IndodaxOrderResponse & { order_id?: string }> {
     const upperSymbol = options.symbol.toUpperCase().replace('/', '').replace('_', '');
     const upperSide = options.side.toUpperCase() as 'BUY' | 'SELL';
@@ -489,6 +569,11 @@ export class IndodaxClient {
       side: upperSide,
       type: upperType,
     };
+
+    if (options.newClientOrderId) {
+      // Official spec: alphanumeric + `_` + `-` only, max 36 characters
+      params.newClientOrderId = String(options.newClientOrderId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 36);
+    }
 
     if (upperType === 'MARKET') {
       if (upperSide === 'BUY') {
@@ -515,12 +600,14 @@ export class IndodaxClient {
 
     const result = await this.callPrivateApi<any>('/api/v2/order', 'POST', params);
 
-    // Normalize order response
-    const orderId = result.orderId || result.order_id || String(Date.now());
+    // Normalize order response. Never fabricate a fake id: fall back to the
+    // clientOrderId (traceable via the order-intent journal) instead of Date.now().
+    const orderId = result.orderId || result.order_id || params.newClientOrderId || '';
     return {
       ...result,
       orderId,
       order_id: String(orderId), // For backward compatibility
+      clientOrderId: result.clientOrderId || params.newClientOrderId || '',
     };
   }
 
@@ -557,6 +644,19 @@ export class IndodaxClient {
     return await this.callPrivateApi('/api/v2/order', 'GET', {
       symbol: upperSymbol,
       orderId: String(orderId),
+    });
+  }
+
+  /**
+   * GET /api/v2/order via origClientOrderId. Used by order-intent recovery:
+   * after a crash between "order sent" and "fill recorded", the journal's
+   * client_order_id is the only durable handle for the in-flight order.
+   */
+  public async getOrderByClientOrderId(symbol: string, clientOrderId: string): Promise<any> {
+    const upperSymbol = symbol.toUpperCase().replace('/', '').replace('_', '');
+    return await this.callPrivateApi('/api/v2/order', 'GET', {
+      symbol: upperSymbol,
+      origClientOrderId: clientOrderId,
     });
   }
 

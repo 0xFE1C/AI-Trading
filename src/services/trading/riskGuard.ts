@@ -108,6 +108,67 @@ export function checkRsiGuard(rsi15m: number | null, maxRsi = 70): GateResult {
   };
 }
 
+/**
+ * Peak-to-trough equity kill switch plus an absolute equity floor.
+ * Unlike the daily circuit breaker (24h cooldown, entries only), a drawdown
+ * breach represents a slow multi-day bleed and halts until a manual reset.
+ */
+export function checkMaxDrawdown(
+  currentEquityIdr: number,
+  peakEquityIdr: number,
+  maxDrawdownPct: number,
+  equityFloorIdr: number
+): GateResult {
+  const drawdownPct =
+    peakEquityIdr > 0 && currentEquityIdr < peakEquityIdr
+      ? ((peakEquityIdr - currentEquityIdr) / peakEquityIdr) * 100
+      : 0;
+
+  const belowFloor = equityFloorIdr > 0 && currentEquityIdr < equityFloorIdr;
+  const drawdownBreached = maxDrawdownPct > 0 && drawdownPct >= maxDrawdownPct;
+  const passed = !belowFloor && !drawdownBreached;
+
+  let reason = 'Drawdown dan equity floor dalam batas aman';
+  if (belowFloor) {
+    reason = `Equity Rp ${Math.round(currentEquityIdr).toLocaleString('id-ID')} di bawah floor Rp ${Math.round(equityFloorIdr).toLocaleString('id-ID')}`;
+  } else if (drawdownBreached) {
+    reason = `Drawdown ${drawdownPct.toFixed(2)}% >= batas ${maxDrawdownPct}% dari puncak Rp ${Math.round(peakEquityIdr).toLocaleString('id-ID')}`;
+  }
+
+  return {
+    passed,
+    reason,
+    values: {
+      equityIdr: Math.round(currentEquityIdr),
+      peakEquityIdr: Math.round(peakEquityIdr),
+      drawdownPct: round2(drawdownPct),
+      maxDrawdownPct,
+      equityFloorIdr: Math.round(equityFloorIdr),
+      belowFloor,
+    },
+  };
+}
+
+/**
+ * Caps a per-trade allocation to a percentage of current equity.
+ * The legacy max_allocation_per_trade_idr is an absolute number that does not
+ * scale with account growth; this cap closes that hole when configured.
+ */
+export function capAllocationByEquityPercent(
+  allocationIdr: number,
+  equityIdr: number,
+  maxAllocationPercent: number
+): { allocationIdr: number; capped: boolean; capIdr: number } {
+  if (maxAllocationPercent <= 0 || equityIdr <= 0) {
+    return { allocationIdr, capped: false, capIdr: 0 };
+  }
+  const capIdr = Math.round((equityIdr * maxAllocationPercent) / 100);
+  if (allocationIdr <= capIdr) {
+    return { allocationIdr, capped: false, capIdr };
+  }
+  return { allocationIdr: capIdr, capped: true, capIdr };
+}
+
 export interface CapitalPlan {
   capitalIdr: number;
   profile: 'conservative' | 'balanced' | 'aggressive';

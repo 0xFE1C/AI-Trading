@@ -15,13 +15,15 @@ import {
   MarketSummary,
 } from '../signals/index.js';
 import {
-  checkCircuitBreaker,
   checkExposure,
   checkBtcRegime,
   checkThreatScope,
   checkSlippageBudget,
   checkSpreadTrap,
   checkRsiGuard,
+  checkMaxDrawdown,
+  capAllocationByEquityPercent,
+  GateResult,
 } from './riskGuard.js';
 import { agentBus } from '../agents/bus.js';
 import { getTakerFeeRate } from './fees.js';
@@ -112,6 +114,7 @@ export interface PositionRecord {
   exit_reason: string | null;
   mode: 'paper' | 'live';
   exit_claimed_at?: number | null;
+  unprotected_since?: number | null;
 }
 
 export interface EquitySnapshot {
@@ -175,6 +178,7 @@ export class TradingEngine {
   private openSymbolsSet = new Set<string>();
   private lastPruneTimestamp = 0;
   private lastEquityFailureAlertAt = 0;
+  private lastUnprotectedAlertAt = 0;
 
   // Hoisted prepared statements to avoid SQL parsing overhead per realtime tick
   private stmtGetOpenPosByPair = db.prepare(`
@@ -285,6 +289,12 @@ export class TradingEngine {
         issues.push(`${openOrders.length} open order masih aktif di bursa. Auto-resume diblokir sampai order ditinjau.`);
       }
 
+      // Resolve order intents orphaned by a crash between send and record
+      const intentRecovery = await this.reconcileUnresolvedIntents();
+      for (const intentIssue of intentRecovery.issues) {
+        issues.push(`[Order Intent] ${intentIssue}`);
+      }
+
       // Resolve stale exit claims created by a crash mid-exit
       const claimed = db.prepare("SELECT * FROM positions WHERE status = 'open' AND exit_claimed_at IS NOT NULL").all() as PositionRecord[];
       for (const pos of claimed) {
@@ -304,6 +314,7 @@ export class TradingEngine {
         const available = this.getExchangeBaseBalance(balanceMap, pos);
 
         if (available <= 0) {
+          this.markPositionUnprotected(pos.id, 'Saldo koin tidak ditemukan di bursa saat rekonsiliasi startup');
           issues.push(`Saldo ${pos.traded_currency.toUpperCase()} tidak ditemukan di bursa untuk posisi ${pos.symbol.toUpperCase()}. Mungkin sudah dijual manual atau tertahan order pending.`);
           continue;
         }
@@ -315,9 +326,24 @@ export class TradingEngine {
             correctedCost,
             pos.id
           );
+          if (available * pos.current_price < indodax.getMinTradeIdr(pos.symbol)) {
+            this.markPositionUnprotected(pos.id, `Sisa saldo ${available} di bawah minimum order setelah koreksi`);
+          }
           issues.push(`Jumlah posisi ${pos.symbol.toUpperCase()} dikoreksi dari ${pos.amount} ke ${available} mengikuti saldo bursa.`);
         } else if (available > pos.amount * 1.02) {
           console.warn(`[Reconciliation] Saldo ${pos.symbol.toUpperCase()} di bursa (${available}) lebih besar dari catatan posisi (${pos.amount}). Mungkin ada pembelian manual yang belum tercatat.`);
+        }
+      }
+
+      // Exchange and database now agree: any earlier unprotected flag from a
+      // transient condition (e.g. a sell that actually landed) is cleared.
+      if (issues.length === 0) {
+        const staleUnprotected = db.prepare(
+          "SELECT id, symbol FROM positions WHERE status = 'open' AND mode = 'live' AND unprotected_since IS NOT NULL"
+        ).all() as Array<{ id: string; symbol: string }>;
+        for (const pos of staleUnprotected) {
+          this.clearPositionUnprotected(pos.id);
+          console.log(`[Reconciliation] Posisi ${pos.symbol.toUpperCase()} kembali terlindungi (state bursa konsisten).`);
         }
       }
 
@@ -400,6 +426,203 @@ export class TradingEngine {
   }
 
   /**
+   * Flags a live position as lacking a guaranteed exit plan (dust remainder,
+   * sell failure, balance ambiguity). While any live position is flagged and
+   * require_protective_orders=1, the engine refuses to open new positions.
+   */
+  private markPositionUnprotected(id: string, reason: string) {
+    try {
+      db.prepare("UPDATE positions SET unprotected_since = ? WHERE id = ? AND status = 'open' AND unprotected_since IS NULL").run(
+        Date.now(),
+        id
+      );
+      const row = db.prepare('SELECT symbol, unprotected_since FROM positions WHERE id = ?').get(id) as any;
+      if (row?.unprotected_since) {
+        console.warn(`[Exit Guard] Posisi ${String(row.symbol).toUpperCase()} ditandai TANPA exit plan: ${reason}`);
+      }
+    } catch {}
+  }
+
+  private clearPositionUnprotected(id: string) {
+    try {
+      db.prepare("UPDATE positions SET unprotected_since = NULL WHERE id = ?").run(id);
+    } catch {}
+  }
+
+  // --- Order Intent Journal (idempotency & crash recovery) ---
+
+  /**
+   * Writes an intent row BEFORE the order request leaves the process and
+   * derives a durable clientOrderId from it. The official Indodax Trade API v2
+   * accepts a 36-char `newClientOrderId` and supports lookup via
+   * `origClientOrderId`, so a crash between send and DB-write is recoverable
+   * by querying the exchange with this id instead of guessing from balances.
+   */
+  private recordOrderIntent(
+    kind: 'entry' | 'exit' | 'partial_tp' | 'panic' | 'derisk',
+    symbol: string,
+    side: 'BUY' | 'SELL',
+    orderType: 'MARKET' | 'LIMIT',
+    params: Record<string, any>,
+    positionId?: string
+  ): { localId: string; clientOrderId: string } {
+    const localId = `oi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    // alphanumeric + _ - only, max 36 chars (official v2 constraint)
+    const clientOrderId = `itd${kind.slice(0, 3)}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+      .replace(/[^A-Za-z0-9_-]/g, '')
+      .slice(0, 36);
+    try {
+      db.prepare(`
+        INSERT INTO order_intents (id, ts, symbol, side, kind, order_type, params_json, position_id, client_order_id, state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent')
+      `).run(
+        localId,
+        Date.now(),
+        symbol.toLowerCase(),
+        side,
+        kind,
+        orderType,
+        JSON.stringify(params),
+        positionId || null,
+        clientOrderId
+      );
+    } catch (err: any) {
+      // Journaling must never block trading; the clientOrderId still travels
+      // with the order so the exchange itself can be queried afterwards.
+      console.warn(`[Order Intent] Gagal mencatat intent: ${err?.message}`);
+    }
+    return { localId, clientOrderId };
+  }
+
+  private ackOrderIntent(localId: string, exchangeOrderId: string, clientOrderId?: string) {
+    try {
+      db.prepare("UPDATE order_intents SET state = 'ack', exchange_order_id = ? WHERE id = ?").run(
+        String(exchangeOrderId || ''),
+        localId
+      );
+    } catch {}
+    if (clientOrderId && !exchangeOrderId) {
+      console.warn(`[Order Intent] ${localId} ack tanpa orderId bursa; pemulihan memakai clientOrderId ${clientOrderId}.`);
+    }
+  }
+
+  private resolveOrderIntent(localId: string, detail?: string) {
+    try {
+      db.prepare("UPDATE order_intents SET state = 'resolved', resolved_at = ?, detail = COALESCE(?, detail) WHERE id = ?").run(
+        Date.now(),
+        detail || null,
+        localId
+      );
+    } catch {}
+  }
+
+  private failOrderIntent(localId: string, error: string) {
+    try {
+      db.prepare("UPDATE order_intents SET state = 'unresolved', detail = ? WHERE id = ? AND state != 'resolved'").run(
+        error.slice(0, 500),
+        localId
+      );
+    } catch {}
+  }
+
+  /**
+   * Resolves journal rows stuck in 'sent'/'ack' (a crash happened between
+   * sending and recording the fill). Each unresolved row is queried on the
+   * exchange by its clientOrderId. `requiresHalt` is true when a finding
+   * implies the database may disagree with the exchange (a filled order that
+   * was never recorded, or an order we failed to cancel) — auto-trading must
+   * pause until that is resolved. Transient query failures do NOT halt.
+   */
+  public async reconcileUnresolvedIntents(maxAgeMs = 60_000): Promise<{ issues: string[]; requiresHalt: boolean }> {
+    const issues: string[] = [];
+    let requiresHalt = false;
+    let rows: Array<{
+      id: string;
+      ts: number;
+      symbol: string;
+      side: string;
+      kind: string;
+      client_order_id: string | null;
+      state: string;
+      exchange_order_id: string | null;
+    }> = [];
+    try {
+      rows = db.prepare(`
+        SELECT id, ts, symbol, side, kind, client_order_id, state, exchange_order_id
+        FROM order_intents
+        WHERE state IN ('sent', 'ack') AND ts < ?
+        ORDER BY ts ASC
+        LIMIT 25
+      `).all(Date.now() - maxAgeMs) as any[];
+    } catch {
+      return { issues, requiresHalt };
+    }
+
+    const liveMode = getSetting('trading_mode', 'paper') === 'live';
+    if (!liveMode) {
+      // Paper intents never reach an exchange; nothing to recover.
+      for (const row of rows) this.resolveOrderIntent(row.id, 'paper mode cleanup');
+      return { issues, requiresHalt };
+    }
+
+    for (const row of rows) {
+      try {
+        if (row.state === 'sent' && !row.client_order_id) {
+          this.failOrderIntent(row.id, 'intent tanpa clientOrderId (sebelum upgrade jurnal)');
+          issues.push(`Order intent ${row.id} (${row.kind} ${row.symbol.toUpperCase()}) tidak dapat dilacak. Periksa riwayat order manual di Indodax.`);
+          requiresHalt = true;
+          continue;
+        }
+
+        const raw = await indodax.getOrderByClientOrderId(row.symbol, row.client_order_id!);
+        const fill = indodax.extractOrderFill(raw, {});
+        const status = fill.status.toUpperCase();
+
+        if (fill.executedQty > 0 || status === 'FILLED') {
+          this.resolveOrderIntent(row.id, `Recovered via clientOrderId: ${status}, executedQty=${fill.executedQty}`);
+          issues.push(
+            `Order intent ${row.id} (${row.kind} ${row.side} ${row.symbol.toUpperCase()}) TERNYATA TERISI di bursa (${fill.executedQty} @ ~Rp ${Math.round(fill.averagePrice).toLocaleString('id-ID')}) tetapi tidak sempat dicatat. Verifikasi posisi/saldo.`
+          );
+          requiresHalt = true;
+        } else if (['CANCELED', 'CANCELLED', 'REJECTED', 'EXPIRED'].includes(status)) {
+          this.resolveOrderIntent(row.id, `Recovered via clientOrderId: ${status}`);
+        } else if (status === 'NEW' || status === 'OPEN' || status === 'PARTIALLY_FILLED') {
+          // Still resting on the exchange. The engine does not manage orders it
+          // cannot see in the positions table: cancel it to avoid an orphan.
+          try {
+            if (row.exchange_order_id) {
+              await indodax.cancelOrder(row.symbol, row.exchange_order_id);
+              this.resolveOrderIntent(row.id, `Order resting dibatalkan saat pemulihan (${status})`);
+              issues.push(`Order intent ${row.id} (${row.kind} ${row.symbol.toUpperCase()}) masih resting di bursa dan telah dibatalkan.`);
+            } else {
+              this.failOrderIntent(row.id, `Masih resting (${status}) tanpa exchange_order_id`);
+              issues.push(`Order intent ${row.id} (${row.kind} ${row.symbol.toUpperCase()}) masih resting di bursa tanpa orderId. Periksa manual.`);
+              requiresHalt = true;
+            }
+          } catch (cancelErr: any) {
+            this.failOrderIntent(row.id, `Gagal membatalkan order resting: ${cancelErr?.message}`);
+            issues.push(`Order intent ${row.id} (${row.kind} ${row.symbol.toUpperCase()}) resting di bursa dan gagal dibatalkan: ${cancelErr?.message}`);
+            requiresHalt = true;
+          }
+        } else if (!status || status === 'UNKNOWN') {
+          // extractOrderFill normalizes a missing status to 'UNKNOWN'; the v2
+          // API always returns a status for orders that exist, so an unknown
+          // order never reached the exchange.
+          this.failOrderIntent(row.id, 'Order tidak ditemukan di bursa (kemungkinan gagal terkirim)');
+        } else {
+          this.resolveOrderIntent(row.id, `Recovered status: ${status}`);
+        }
+      } catch (err: any) {
+        // Transient query failure: leave the row for the next cycle. This must
+        // NOT halt trading — the next loop retries the lookup.
+        issues.push(`Order intent ${row.id} belum terkonfirmasi (akan dicoba ulang): ${err?.message}`);
+      }
+    }
+
+    return { issues, requiresHalt };
+  }
+
+  /**
    * Pemrosesan Tick Real-Time Sub-Detik dari Indodax WebSocket:
    * Menggeser trailing stop naik seketika saat harga melonjak,
    * dan mengeksekusi trailing stop keluar dalam milidetik tanpa menunggu polling timer 15 detik!
@@ -471,7 +694,7 @@ export class TradingEngine {
 
           if (confirmedExit) {
             const exitReason = `⚡ Realtime Trailing Stop Loss tersentuh di Rp ${trailingStopPrice.toLocaleString('id-ID')} (PnL: ${pnlPercent.toFixed(2)}%)`;
-            await this.closePositionUnlocked(pos, currentPrice, exitReason);
+            await this.closePositionUnlocked(pos, currentPrice, exitReason, { floorPrice: trailingStopPrice });
           }
           return;
         }
@@ -512,6 +735,27 @@ export class TradingEngine {
 
       // 2.5. Monitor and manage ghost positions (A/B Counterfactual Shadow Trades)
       await this.manageGhostPositions();
+
+      // 2.6. Recover order intents orphaned by a crash between "order sent"
+      // and "fill recorded". A critical finding pauses auto-trading.
+      try {
+        const intentRecovery = await this.reconcileUnresolvedIntents();
+        for (const issue of intentRecovery.issues) {
+          console.warn(`[Order Intent Recovery] ${issue}`);
+        }
+        if (intentRecovery.requiresHalt) {
+          setSetting('is_auto_trading_active', '0');
+          if (this.onTradeEventCallback) {
+            this.onTradeEventCallback({
+              type: 'ALERT',
+              data: {
+                title: 'Order Intent Recovery: Auto-Trading Dijeda',
+                message: `Ada order yang tidak sinkron dengan database (kemungkinan terisi di bursa saat crash). Auto-trading dijeda. Detail di log server. Verifikasi posisi lalu aktifkan kembali.`,
+              },
+            });
+          }
+        }
+      } catch {}
 
       // 3. New Entry Gates: Check if Auto-Trading is active
       const isAutoActive = getSetting('is_auto_trading_active', '0') === '1';
@@ -608,7 +852,11 @@ export class TradingEngine {
           }
 
           if (shouldExit) {
-            await this.closePositionUnlocked(pos, currentPrice, exitReason);
+            // Trailing-stop exits protect the stop level as a floor; sentiment
+            // exits use the collar default (price minus price_collar_percent).
+            await this.closePositionUnlocked(pos, currentPrice, exitReason, {
+              floorPrice: exitReason.startsWith('Trailing Stop Loss') ? trailingStopPrice : undefined,
+            });
           } else {
             // Update position telemetry
             this.stmtUpdatePosTick.run(currentPrice, highestPrice, trailingStopPrice, pnlIdr, pnlPercent, pos.id);
@@ -810,6 +1058,39 @@ export class TradingEngine {
       return;
     }
     logEntryGate('*', 'circuit_breaker', true, { limitPercent: dailyLimit });
+
+    // 1.5 Drawdown kill-switch hard gate (also evaluated in the run loop; a
+    // breach stays latched here until the manual /trading/drawdown-reset).
+    if (parseInt(getSetting('drawdown_halt_since', '0'), 10) > 0) {
+      logEntryGate('*', 'drawdown_kill_switch', false, { reason: 'Halt aktif, menunggu reset manual' });
+      return;
+    }
+
+    // 1.6 Exit-guard: never open new live positions while an existing one has
+    // no guaranteed exit plan (dust remainder, sell failure, balance doubt).
+    const entryMode: 'paper' | 'live' = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
+    if (entryMode === 'live' && getSetting('require_protective_orders', '1') === '1') {
+      const unprotectedRow = db.prepare(
+        "SELECT COUNT(*) as c FROM positions WHERE status = 'open' AND mode = 'live' AND unprotected_since IS NOT NULL"
+      ).get() as { c: number };
+      if (unprotectedRow.c > 0) {
+        logEntryGate('*', 'exit_guard', false, { unprotectedPositions: unprotectedRow.c });
+        if (Date.now() - this.lastUnprotectedAlertAt > 15 * 60 * 1000) {
+          this.lastUnprotectedAlertAt = Date.now();
+          console.warn(`[Exit Guard] ${unprotectedRow.c} posisi live tanpa exit plan. Entry baru ditahan.`);
+          if (this.onTradeEventCallback) {
+            this.onTradeEventCallback({
+              type: 'ALERT',
+              data: {
+                title: 'Exit Guard: Entry Ditahan',
+                message: `${unprotectedRow.c} posisi live tidak memiliki exit plan terjamin (unprotected). Entry baru ditahan sampai posisi tersebut diselesaikan atau dilindungi. Periksa dashboard.`,
+              },
+            });
+          }
+        }
+        return;
+      }
+    }
 
     // 2. Open Position Slots (active mode only; paper and live exposure never mix)
     const mode: 'paper' | 'live' = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
@@ -1127,6 +1408,31 @@ export class TradingEngine {
 
     // Depth & Slippage Check
     const depth = await indodax.getDepth(candidateSymbol);
+
+    // Equity-percent allocation cap: the absolute max_allocation_per_trade_idr
+    // does not scale with account growth; max_allocation_percent (>0) caps the
+    // per-trade budget relative to CURRENT equity before slippage math runs.
+    const maxAllocPct = parseFloat(getSetting('max_allocation_percent', '0'));
+    if (maxAllocPct > 0) {
+      try {
+        const equitySnap = await this.getEquitySnapshot(mode);
+        const capResult = capAllocationByEquityPercent(maxAllocationIdr, equitySnap.equityIdr, maxAllocPct);
+        if (capResult.capped) {
+          logEntryGate(candidateSymbol, 'allocation_cap', true, {
+            requested: maxAllocationIdr,
+            cappedTo: capResult.allocationIdr,
+            maxAllocationPercent: maxAllocPct,
+            equityIdr: Math.round(equitySnap.equityIdr),
+          });
+          maxAllocationIdr = capResult.allocationIdr;
+        }
+      } catch (err: any) {
+        // Fail-open for the cap only: the absolute IDR allocation still applies
+        // and an unreadable equity must not silently change position sizing.
+        console.warn(`[Allocation Cap] Equity tidak terbaca, cap % dilewati: ${err?.message}`);
+      }
+    }
+
     const slippageCheck = indodax.calculateSlippage(depth, 'buy', maxAllocationIdr);
     const slippageGate = checkSlippageBudget(slippageCheck.slippagePercent, slippageTolerance);
     logEntryGate(candidateSymbol, 'slippage', slippageGate.passed, slippageGate.values);
@@ -1510,6 +1816,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     const feeRate = getTakerFeeRate();
     const totalRequired = totalIdr * (1 + feeRate);
     let orderId = `paper_buy_${Date.now()}`;
+    let buyIntentLocalId: string | null = null;
     let effectivePrice = price;
     let effectiveAmount = amount;
 
@@ -1557,13 +1864,23 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
         }
 
         totalIdr = effectiveTotalIdr;
-        const liveOrder = await indodax.createOrder({
-          symbol,
-          side: 'BUY',
-          type: 'MARKET',
-          quoteOrderQty: Math.floor(totalIdr),
-        });
-        orderId = String(liveOrder.orderId || liveOrder.order_id || `live_buy_${Date.now()}`);
+        const buyIntent = this.recordOrderIntent('entry', symbol, 'BUY', 'MARKET', { quoteOrderQty: Math.floor(totalIdr), expectedPrice: effectivePrice });
+        let liveOrder: any;
+        try {
+          liveOrder = await indodax.createOrder({
+            symbol,
+            side: 'BUY',
+            type: 'MARKET',
+            quoteOrderQty: Math.floor(totalIdr),
+            newClientOrderId: buyIntent.clientOrderId,
+          });
+        } catch (orderErr: any) {
+          this.failOrderIntent(buyIntent.localId, `createOrder gagal: ${orderErr?.message}`);
+          throw orderErr;
+        }
+        this.ackOrderIntent(buyIntent.localId, String(liveOrder.orderId || liveOrder.order_id || ''), buyIntent.clientOrderId);
+        buyIntentLocalId = buyIntent.localId;
+        orderId = String(liveOrder.orderId || liveOrder.order_id || buyIntent.clientOrderId || `live_buy_${Date.now()}`);
 
         let fill = await indodax.waitForOrderFill(
           symbol,
@@ -1594,6 +1911,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
 
         if (fill.executedQty <= 0) {
           console.error(`[Live Buy Not Filled] Order ${orderId} ${symbol.toUpperCase()} tidak terisi (status ${fill.status}). Tidak ada posisi yang dibuat.`);
+          this.resolveOrderIntent(buyIntentLocalId!, `Order tidak terisi (status ${fill.status})`);
           return false;
         }
 
@@ -1664,6 +1982,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       );
     });
     txBuy();
+    if (buyIntentLocalId) this.resolveOrderIntent(buyIntentLocalId);
     this.refreshOpenSymbols();
 
     console.log(`[BUY EXECUTED] ${symbol.toUpperCase()} | Harga: Rp ${effectivePrice.toLocaleString('id-ID')} | Total: Rp ${totalIdr.toLocaleString('id-ID')} (${mode})`);
@@ -1682,7 +2001,8 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     pos: PositionRecord,
     amountToSell: number,
     price: number,
-    reason: string
+    reason: string,
+    opts: { floorPrice?: number; intentKind?: 'exit' | 'partial_tp' | 'panic' | 'derisk' } = {}
   ): Promise<SellExecutionResult> {
     if (!(amountToSell > 0) || !(price > 0)) {
       console.warn(`[Sell Aborted] Jumlah/harga tidak valid untuk ${pos.symbol}: amount=${amountToSell}, price=${price}`);
@@ -1696,6 +2016,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     let pendingReview = false;
     let historyRecorded = false;
     const feeRate = getTakerFeeRate();
+    const intentKind = opts.intentKind || 'exit';
 
     if (pos.mode === 'paper') {
       // Credit paper balance net of the configured taker fee
@@ -1705,53 +2026,197 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     } else {
       // Live Trading: Kirim order jual ke Indodax
       try {
-        const liveOrder = await indodax.createOrder({
-          symbol: pos.symbol,
-          side: 'SELL',
-          type: 'MARKET',
-          quantity: amountToSell,
-        });
-        orderId = String(liveOrder.orderId || liveOrder.order_id || `live_sell_${Date.now()}`);
+        // Exit execution with a price floor: a LIMIT SELL resting at the floor
+        // can never fill below it. Normally it crosses the book instantly at
+        // the best bid; if the book collapses mid-flight the order rests until
+        // the timeout, then the remainder is cancelled and market-sold (the
+        // same outcome as a blind market order, but never worse on thin books).
+        const floorEnabled = getSetting('exit_floor_limit_enabled', '1') === '1';
+        const limitTimeoutMs = Math.max(500, parseInt(getSetting('limit_exit_timeout_ms', '3000'), 10) || 3000);
+        const collarPct = Math.max(0.1, parseFloat(getSetting('price_collar_percent', '1.0')) || 1.0);
+        const floorPrice = opts.floorPrice && opts.floorPrice > 0
+          ? opts.floorPrice
+          : price * (1 - collarPct / 100);
 
-        let fill = await indodax.waitForOrderFill(
+        const exitIntent = this.recordOrderIntent(
+          intentKind,
           pos.symbol,
-          orderId,
-          liveOrder,
-          { requestedQty: amountToSell, expectedPrice: price },
-          5000
+          'SELL',
+          'LIMIT',
+          { quantity: amountToSell, floorPrice, reason },
+          pos.id
         );
 
-        if (fill.executedQty <= 0 && !fill.isFinal) {
-          console.warn(`[Live Sell Pending] Order ${orderId} ${pos.symbol.toUpperCase()} belum terkonfirmasi (status ${fill.status}). Mencoba membatalkan.`);
+        let limitExecuted = 0;
+        let limitQuote = 0;
+        let limitAvg = 0;
+        let remainder = amountToSell;
+
+        if (floorEnabled && floorPrice > 0) {
           try {
-            await indodax.cancelOrder(pos.symbol, orderId);
-          } catch (cancelErr: any) {
-            console.error(`[Live Sell CRITICAL] Order ${orderId} ${pos.symbol.toUpperCase()} tidak dapat dikonfirmasi maupun dibatalkan: ${cancelErr.message}. Posisi dikunci untuk verifikasi manual.`);
-            setSetting('is_auto_trading_active', '0');
-            return failedSell(true);
+            const limitOrder = await indodax.createOrder({
+              symbol: pos.symbol,
+              side: 'SELL',
+              type: 'LIMIT',
+              quantity: amountToSell,
+              price: Math.floor(floorPrice),
+              newClientOrderId: exitIntent.clientOrderId,
+            });
+            const limitOrderId = String(limitOrder.orderId || limitOrder.order_id || '');
+            this.ackOrderIntent(exitIntent.localId, limitOrderId, exitIntent.clientOrderId);
+            orderId = limitOrderId || exitIntent.clientOrderId;
+
+            let fill = await indodax.waitForOrderFill(
+              pos.symbol,
+              limitOrderId,
+              limitOrder,
+              { requestedQty: amountToSell, expectedPrice: floorPrice },
+              limitTimeoutMs
+            );
+
+            if (fill.executedQty > 0 && !fill.isFinal) {
+              // Still working when the timeout hit: cancel the remainder, then
+              // re-read the order to capture the final executed quantity.
+              try {
+                await indodax.cancelOrder(pos.symbol, limitOrderId);
+              } catch (cancelErr: any) {
+                console.error(`[Live Sell CRITICAL] Limit sell ${limitOrderId} ${pos.symbol.toUpperCase()} tidak dapat dibatalkan: ${cancelErr.message}. Posisi dikunci untuk verifikasi manual.`);
+                setSetting('is_auto_trading_active', '0');
+                this.failOrderIntent(exitIntent.localId, `Cancel limit sell gagal: ${cancelErr.message}`);
+                return failedSell(true);
+              }
+              fill = await indodax.waitForOrderFill(
+                pos.symbol,
+                limitOrderId,
+                undefined,
+                { requestedQty: amountToSell, expectedPrice: floorPrice },
+                1500
+              );
+            }
+
+            limitExecuted = Math.min(fill.executedQty, amountToSell);
+            limitQuote = fill.quoteQty > 0 ? fill.quoteQty : limitExecuted * (fill.averagePrice || floorPrice);
+            limitAvg = fill.averagePrice > 0 ? fill.averagePrice : (limitExecuted > 0 ? limitQuote / limitExecuted : 0);
+            remainder = amountToSell - limitExecuted;
+
+            if (limitExecuted > 0) {
+              console.log(`[Floored Exit] ${pos.symbol.toUpperCase()} limit sell terisi ${limitExecuted.toFixed(8)} @ ~Rp ${Math.round(limitAvg).toLocaleString('id-ID')} (lantai Rp ${Math.floor(floorPrice).toLocaleString('id-ID')}).`);
+            }
+          } catch (limitErr: any) {
+            // Limit placement failed entirely: fall back to the market path so
+            // the exit still happens (identical to pre-collar behavior).
+            console.warn(`[Floored Exit Fallback] Limit sell gagal untuk ${pos.symbol.toUpperCase()}: ${limitErr.message}. Melanjutkan dengan MARKET SELL.`);
+            this.failOrderIntent(exitIntent.localId, `Limit sell gagal, fallback market: ${limitErr.message}`);
+            remainder = amountToSell;
           }
-          fill = await indodax.waitForOrderFill(
-            pos.symbol,
-            orderId,
-            undefined,
-            { requestedQty: amountToSell, expectedPrice: price },
-            1500
-          );
+        } else {
+          this.failOrderIntent(exitIntent.localId, 'Floored exit disabled; market sell langsung');
+          remainder = amountToSell;
         }
 
-        if (fill.executedQty <= 0) {
-          console.error(`[Live Sell Not Filled] Order ${orderId} ${pos.symbol.toUpperCase()} tidak terisi (status ${fill.status}). Posisi tetap terbuka.`);
-          return failedSell(!fill.isFinal);
+        // Market-sell whatever the floored limit could not fill.
+        if (remainder > 0) {
+          const minTradeIdr = indodax.getMinTradeIdr(pos.symbol);
+          const remainderValue = remainder * Math.max(price, 1);
+          if (limitExecuted > 0 && remainderValue < minTradeIdr) {
+            // Dust remainder below the exchange minimum can never be sold.
+            // Keep the (already reduced) position open and flag it for review;
+            // the shared accounting below still records the limit fill.
+            console.warn(`[Live Sell Dust] Sisa ${remainder.toFixed(8)} ${pos.symbol.toUpperCase()} bernilai di bawah minimum bursa. Sisa posisi ditandai untuk review manual.`);
+            this.markPositionUnprotected(pos.id, `Dust remainder ${remainder.toFixed(8)} di bawah minimum order bursa`);
+            this.resolveOrderIntent(exitIntent.localId, `Limit terisi ${limitExecuted.toFixed(8)}; sisa ${remainder.toFixed(8)} dust di bawah minimum`);
+            filledAmount = limitExecuted;
+            proceedsIdr = limitQuote;
+            averagePrice = limitAvg || price;
+          } else {
+            const marketIntent = this.recordOrderIntent(
+              intentKind,
+              pos.symbol,
+              'SELL',
+              'MARKET',
+              { quantity: remainder, reason: `${reason} (market remainder)` },
+              pos.id
+            );
+            let marketOrder: any;
+            try {
+              marketOrder = await indodax.createOrder({
+                symbol: pos.symbol,
+                side: 'SELL',
+                type: 'MARKET',
+                quantity: remainder,
+                newClientOrderId: marketIntent.clientOrderId,
+              });
+            } catch (orderErr: any) {
+              this.failOrderIntent(marketIntent.localId, `createOrder gagal: ${orderErr?.message}`);
+              throw orderErr;
+            }
+            const marketOrderId = String(marketOrder.orderId || marketOrder.order_id || '');
+            this.ackOrderIntent(marketIntent.localId, marketOrderId, marketIntent.clientOrderId);
+            if (!limitExecuted) orderId = marketOrderId || marketIntent.clientOrderId;
+
+            let fill = await indodax.waitForOrderFill(
+              pos.symbol,
+              marketOrderId,
+              marketOrder,
+              { requestedQty: remainder, expectedPrice: price },
+              5000
+            );
+
+            if (fill.executedQty <= 0 && !fill.isFinal) {
+              console.warn(`[Live Sell Pending] Order ${marketOrderId} ${pos.symbol.toUpperCase()} belum terkonfirmasi (status ${fill.status}). Mencoba membatalkan.`);
+              try {
+                await indodax.cancelOrder(pos.symbol, marketOrderId);
+              } catch (cancelErr: any) {
+                console.error(`[Live Sell CRITICAL] Order ${marketOrderId} ${pos.symbol.toUpperCase()} tidak dapat dikonfirmasi maupun dibatalkan: ${cancelErr.message}. Posisi dikunci untuk verifikasi manual.`);
+                setSetting('is_auto_trading_active', '0');
+                this.failOrderIntent(marketIntent.localId, `Cancel market sell gagal: ${cancelErr.message}`);
+                this.resolveOrderIntent(exitIntent.localId, `Limit terisi ${limitExecuted.toFixed(8)} sebelum market remainder gagal`);
+                return failedSell(true);
+              }
+              fill = await indodax.waitForOrderFill(
+                pos.symbol,
+                marketOrderId,
+                undefined,
+                { requestedQty: remainder, expectedPrice: price },
+                1500
+              );
+            }
+
+            if (fill.executedQty <= 0 && limitExecuted <= 0) {
+              console.error(`[Live Sell Not Filled] Order ${marketOrderId} ${pos.symbol.toUpperCase()} tidak terisi (status ${fill.status}). Posisi tetap terbuka.`);
+              this.resolveOrderIntent(marketIntent.localId, `Order tidak terisi (status ${fill.status})`);
+              return failedSell(!fill.isFinal);
+            }
+
+            // The limit portion is final even if the market remainder failed.
+            if (fill.executedQty <= 0) {
+              this.resolveOrderIntent(exitIntent.localId, `Limit terisi ${limitExecuted.toFixed(8)}; market remainder tidak terisi`);
+            }
+
+            const marketFilled = Math.min(fill.executedQty, remainder);
+            const marketQuote = fill.quoteQty > 0 ? fill.quoteQty : marketFilled * (fill.averagePrice || price);
+            filledAmount = limitExecuted + marketFilled;
+            proceedsIdr = limitQuote + marketQuote;
+            averagePrice = filledAmount > 0 ? proceedsIdr / filledAmount : price;
+            this.resolveOrderIntent(exitIntent.localId, `Limit terisi ${limitExecuted.toFixed(8)} + market ${marketFilled.toFixed(8)}`);
+            this.resolveOrderIntent(marketIntent.localId, `Market remainder terisi ${marketFilled.toFixed(8)}`);
+
+            if (!fill.verified && marketFilled > 0) {
+              console.warn(`[Live Sell Unverified] Order ${marketOrderId} tidak menyertakan executedQty/status final; memakai estimasi fill (${marketFilled.toFixed(8)} @ Rp ${fill.averagePrice || price}).`);
+            } else if (marketFilled < remainder * 0.999) {
+              console.warn(`[Live Sell Partial] Diminta ${remainder.toFixed(8)} ${pos.symbol.toUpperCase()}, terisi ${marketFilled.toFixed(8)}.`);
+            }
+          }
+        } else {
+          filledAmount = limitExecuted;
+          proceedsIdr = limitQuote;
+          averagePrice = limitAvg || price;
+          this.resolveOrderIntent(exitIntent.localId, `Limit sell terisi penuh ${limitExecuted.toFixed(8)}`);
         }
 
-        filledAmount = Math.min(fill.executedQty, amountToSell);
-        averagePrice = fill.averagePrice > 0 ? fill.averagePrice : price;
-        proceedsIdr = fill.quoteQty > 0 ? fill.quoteQty : filledAmount * averagePrice;
-
-        if (!fill.verified) {
-          console.warn(`[Live Sell Unverified] Order ${orderId} tidak menyertakan executedQty/status final; memakai estimasi fill (${filledAmount} @ Rp ${averagePrice}).`);
-        } else if (filledAmount < amountToSell * 0.999) {
-          console.warn(`[Live Sell Partial] Diminta ${amountToSell.toFixed(8)} ${pos.symbol.toUpperCase()}, terisi ${filledAmount.toFixed(8)}.`);
+        if (filledAmount <= 0) {
+          console.error(`[Live Sell Not Filled] ${pos.symbol.toUpperCase()} tidak terisi sama sekali. Posisi tetap terbuka.`);
+          return failedSell(true);
         }
       } catch (err: any) {
         // STRICT: Jika order jual gagal di bursa, jangan tutup posisi.
@@ -1804,46 +2269,50 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
   }
 
   /**
-   * Partial take-profit. The exit claim guarantees only one flow can scale out.
-   * The claim is retained if the post-sell DB update fails, so a retry cannot
-   * double-sell; startup reconciliation resolves any leftover claim.
+   * Sells `fraction` of an ALREADY EXIT-CLAIMED position and updates the
+   * remainder in place. Shared by the TP1 scale-out and the drawdown de-risk
+   * path. Returns true when the sell executed (fully or partially).
    */
-  private async executePartialTakeProfit(
-    pos: PositionRecord,
+  private async sellPositionFraction(
+    claimed: PositionRecord,
+    fraction: number,
     currentPrice: number,
-    targetTp1: number
+    reason: string,
+    intentKind: 'partial_tp' | 'derisk' = 'partial_tp'
   ): Promise<boolean> {
-    const claimed = this.claimPositionForExit(pos.id);
-    if (!claimed) return false;
+    const sellAmount = claimed.amount * fraction;
+
+    if (fraction >= 0.999999) {
+      return this.closePositionUnlocked(claimed, currentPrice, reason, { intentKind: intentKind === 'partial_tp' ? 'partial_tp' : 'derisk' });
+    }
+
+    // A fraction below the exchange minimum would fail forever and leave the
+    // position unhandled; exit the whole position instead.
+    if (sellAmount * currentPrice < indodax.getMinTradeIdr(claimed.symbol)) {
+      console.warn(`[Partial Exit] Fraksi posisi ${claimed.symbol.toUpperCase()} di bawah minimum bursa. Menutup seluruh posisi.`);
+      return this.closePositionUnlocked(
+        claimed,
+        currentPrice,
+        `${reason} (nilai parsial di bawah minimum bursa — ditutup penuh)`,
+        { intentKind: intentKind === 'partial_tp' ? 'partial_tp' : 'derisk' }
+      );
+    }
 
     let sold = false;
     let keepClaim = false;
     try {
-      const halfAmount = claimed.amount * 0.5;
-
-      // A half-sized order below the exchange minimum would fail forever and
-      // leave TP1 unhandled; exit the whole position instead.
-      if (halfAmount * currentPrice < indodax.getMinTradeIdr(claimed.symbol)) {
-        this.releasePositionClaim(claimed.id);
-        console.warn(`[Partial TP] Setengah posisi ${claimed.symbol.toUpperCase()} di bawah minimum bursa. Menutup seluruh posisi.`);
-        return this.closePositionUnlocked(
-          claimed,
-          currentPrice,
-          `Take-Profit penuh (nilai parsial di bawah minimum bursa)`
-        );
-      }
-
       const sell = await this.executeSell(
         claimed,
-        halfAmount,
+        sellAmount,
         currentPrice,
-        `Partial Take-Profit (+${targetTp1}% Target 1)`
+        reason,
+        { intentKind }
       );
 
       if (!sell.ok) {
         keepClaim = sell.pendingReview;
         if (keepClaim) {
-          console.error(`[Partial TP CRITICAL] Order parsial ${claimed.symbol.toUpperCase()} belum final. Claim dipertahankan agar tidak terjadi jual ganda.`);
+          console.error(`[Partial Exit CRITICAL] Order parsial ${claimed.symbol.toUpperCase()} belum final. Claim dipertahankan agar tidak terjadi jual ganda.`);
         }
         return false;
       }
@@ -1856,10 +2325,14 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
         return this.finalizeClosedPosition(
           claimed,
           sell.averagePrice || currentPrice,
-          `Take-Profit penuh saat partial exit`,
+          reason,
           sell.proceedsIdr,
           sell.historyRecorded
         );
+      }
+
+      if (remainingAmount * currentPrice < indodax.getMinTradeIdr(claimed.symbol)) {
+        this.markPositionUnprotected(claimed.id, `Sisa ${remainingAmount.toFixed(8)} di bawah minimum order bursa setelah partial exit`);
       }
 
       const feeRate = getTakerFeeRate();
@@ -1893,14 +2366,45 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
     }
   }
 
-  public async closePosition(pos: PositionRecord, exitPrice: number, exitReason: string): Promise<boolean> {
-    return this.withPositionLock(pos.id, () => this.closePositionUnlocked(pos, exitPrice, exitReason));
+  /**
+   * Partial take-profit. The exit claim guarantees only one flow can scale out.
+   * The claim is retained if the post-sell DB update fails, so a retry cannot
+   * double-sell; startup reconciliation resolves any leftover claim.
+   */
+  private async executePartialTakeProfit(
+    pos: PositionRecord,
+    currentPrice: number,
+    targetTp1: number
+  ): Promise<boolean> {
+    const claimed = this.claimPositionForExit(pos.id);
+    if (!claimed) return false;
+
+    // TP1 scale-out fraction: 50 (default) banks half and rides the rest to
+    // the breakeven stop; 100 exits everything at TP1 (no remainder to
+    // protect). Values outside 1..100 fall back to 50.
+    const fractionPct = parseFloat(getSetting('tp1_sell_fraction_percent', '50'));
+    const fraction = Number.isFinite(fractionPct) && fractionPct >= 1 && fractionPct <= 100
+      ? fractionPct / 100
+      : 0.5;
+
+    return this.sellPositionFraction(
+      claimed,
+      fraction,
+      currentPrice,
+      `Partial Take-Profit (+${targetTp1}% Target 1, jual ${(fraction * 100).toFixed(0)}%)`,
+      'partial_tp'
+    );
+  }
+
+  public async closePosition(pos: PositionRecord, exitPrice: number, exitReason: string, opts: { intentKind?: 'exit' | 'partial_tp' | 'panic' | 'derisk' } = {}): Promise<boolean> {
+    return this.withPositionLock(pos.id, () => this.closePositionUnlocked(pos, exitPrice, exitReason, { intentKind: opts.intentKind || 'exit' }));
   }
 
   private async closePositionUnlocked(
     pos: PositionRecord,
     exitPrice: number,
-    exitReason: string
+    exitReason: string,
+    opts: { floorPrice?: number; intentKind?: 'exit' | 'partial_tp' | 'panic' | 'derisk' } = {}
   ): Promise<boolean> {
     const claimed = this.claimPositionForExit(pos.id);
     if (!claimed) {
@@ -1908,10 +2412,23 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       return false;
     }
 
+    // A position worth less than the exchange minimum can never be sold whole;
+    // retrying every loop would only spam failed orders. Flag it for manual
+    // review instead of entering a permanent failure loop.
+    if (claimed.mode === 'live' && claimed.amount * exitPrice < indodax.getMinTradeIdr(claimed.symbol)) {
+      this.releasePositionClaim(claimed.id);
+      this.markPositionUnprotected(claimed.id, `Nilai posisi Rp ${Math.round(claimed.amount * exitPrice).toLocaleString('id-ID')} di bawah minimum order bursa`);
+      console.warn(`[Close Position Skipped] ${claimed.symbol.toUpperCase()} bernilai di bawah minimum bursa. Posisi ditandai untuk review manual.`);
+      return false;
+    }
+
     let sold = false;
     let keepClaim = false;
     try {
-      const sell = await this.executeSell(claimed, claimed.amount, exitPrice, exitReason);
+      const sell = await this.executeSell(claimed, claimed.amount, exitPrice, exitReason, {
+        floorPrice: opts.floorPrice,
+        intentKind: opts.intentKind || 'exit',
+      });
 
       if (!sell.ok) {
         keepClaim = sell.pendingReview;
@@ -2057,7 +2574,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       try {
         const ticker = await indodax.getTicker(pos.symbol);
         const currentPrice = parseFloat(ticker.ticker.last) || pos.current_price;
-        const closed = await this.closePosition(pos, currentPrice, 'EMERGENCY PANIC SELL TRIGGERED VIA COMMAND');
+        const closed = await this.closePosition(pos, currentPrice, 'EMERGENCY PANIC SELL TRIGGERED VIA COMMAND', { intentKind: 'panic' });
         if (closed) closedCount++;
       } catch (err) {
         console.error(`Gagal panic sell ${pos.symbol}:`, err);
@@ -2203,7 +2720,116 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
       }
     }
 
+    // 4. Drawdown kill switch (peak-to-trough) + absolute equity floor.
+    // Unlike the daily breaker this catches a slow multi-day bleed and only
+    // resets via the manual /api/trading/drawdown-reset endpoint.
+    await this.evaluateDrawdownKillSwitch(mode, snapshot);
+    if (parseInt(getSetting('drawdown_halt_since', '0'), 10) > 0) {
+      return true;
+    }
+
     return false;
+  }
+
+  /**
+   * Tracks the mode-scoped equity peak and evaluates the drawdown kill switch.
+   * On breach: auto-trading halts, an alert fires, and the configured de-risk
+   * mode runs ('halt' entries only, 'halve' sells 50% of every position,
+   * 'flatten' liquidates everything). Reset is manual via the dashboard API.
+   */
+  private async evaluateDrawdownKillSwitch(mode: 'paper' | 'live', snapshot: EquitySnapshot): Promise<void> {
+    const now = Date.now();
+    const maxDdPct = parseFloat(getSetting('max_drawdown_percent', '15'));
+    const equityFloor = parseFloat(getSetting('equity_floor_idr', '0'));
+    const peakKey = mode === 'live' ? 'equity_peak_live' : 'equity_peak_paper';
+    let peak = parseFloat(getSetting(peakKey, '0'));
+    if (!Number.isFinite(peak) || peak < 0) peak = 0;
+
+    if (snapshot.equityIdr > peak) {
+      setSetting(peakKey, String(Math.round(snapshot.equityIdr)));
+      peak = snapshot.equityIdr;
+    }
+
+    const ddGate = checkMaxDrawdown(snapshot.equityIdr, peak, maxDdPct, equityFloor);
+    if (ddGate.passed) {
+      logEntryGate('*', 'drawdown_kill_switch', true, ddGate.values);
+      return;
+    }
+
+    const haltSince = parseInt(getSetting('drawdown_halt_since', '0'), 10);
+    if (haltSince > 0) {
+      // Already halted; the alert and de-risk ran when it first tripped.
+      logEntryGate('*', 'drawdown_kill_switch', false, ddGate.values);
+      return;
+    }
+
+    console.error(`[DRAWDOWN KILL SWITCH] ${ddGate.reason} (${mode.toUpperCase()}). Auto-trading dihentikan sampai reset manual.`);
+    setSetting('drawdown_halt_since', String(now));
+    setSetting('is_auto_trading_active', '0');
+    logEntryGate('*', 'drawdown_kill_switch', false, ddGate.values);
+
+    const deriskMode = getSetting('derisk_mode_on_drawdown', 'halt');
+    let deriskNote = 'Posisi terbuka tetap dikelola trailing stop.';
+    try {
+      if (deriskMode === 'flatten') {
+        const closed = await this.panicSellAll();
+        deriskNote = `Semua posisi dilikuidasi (${closed} posisi ditutup) sesuai mode de-risk flatten.`;
+      } else if (deriskMode === 'halve') {
+        await this.deriskHalvePositions(mode);
+        deriskNote = 'Setiap posisi dikurangi 50% sesuai mode de-risk halve.';
+      }
+    } catch (err: any) {
+      deriskNote = `De-risk gagal dijalankan: ${err?.message}. Posisi tetap dikelola trailing stop.`;
+    }
+
+    if (this.onTradeEventCallback) {
+      this.onTradeEventCallback({
+        type: 'ALERT',
+        data: {
+          title: 'Drawdown Kill Switch Triggered (Reset Manual)',
+          message: `${ddGate.reason} (${mode.toUpperCase()}). Auto-trading dihentikan. ${deriskNote} Reset manual: dashboard → POST /api/trading/drawdown-reset.`,
+        },
+      });
+    }
+  }
+
+  /**
+   * De-risk 'halve': sells 50% of every open position in the given mode so a
+   * drawdown breach actively reduces exposure instead of only blocking entries.
+   */
+  private async deriskHalvePositions(mode: 'paper' | 'live'): Promise<void> {
+    const positions = db.prepare("SELECT * FROM positions WHERE status = 'open' AND mode = ?").all(mode) as PositionRecord[];
+    for (const snapshot of positions) {
+      try {
+        await this.withPositionLock(snapshot.id, async () => {
+          const fresh = this.getOpenPosition(snapshot.id);
+          if (!fresh || fresh.exit_claimed_at) return;
+          const claimed = this.claimPositionForExit(fresh.id);
+          if (!claimed) return;
+          const mark = fresh.current_price > 0 ? fresh.current_price : fresh.entry_price;
+          const ok = await this.sellPositionFraction(claimed, 0.5, mark, 'De-Risk Drawdown: posisi dikurangi 50%', 'derisk');
+          if (!ok) {
+            console.warn(`[Drawdown De-Risk] Pengurangan 50% ${fresh.symbol.toUpperCase()} belum selesai; akan dicoba ulang pada reset berikutnya.`);
+          }
+        });
+      } catch (err: any) {
+        console.warn(`[Drawdown De-Risk] Gagal memproses ${snapshot.symbol}:`, err?.message);
+      }
+    }
+  }
+
+  /**
+   * Manual reset of the drawdown kill switch (admin endpoint). The equity peak
+   * is re-based to the current equity so the kill switch measures from today,
+   * not from an old peak that would instantly re-trigger.
+   */
+  public async resetDrawdownKillSwitch(): Promise<{ cleared: boolean; mode: 'paper' | 'live'; equityIdr: number }> {
+    const mode: 'paper' | 'live' = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
+    const snapshot = await this.getEquitySnapshot(mode);
+    setSetting('drawdown_halt_since', '0');
+    setSetting(mode === 'live' ? 'equity_peak_live' : 'equity_peak_paper', String(Math.round(snapshot.equityIdr)));
+    console.log(`[Drawdown Kill Switch] Reset manual. Peak equity ${mode.toUpperCase()} di-rebase ke Rp ${Math.round(snapshot.equityIdr).toLocaleString('id-ID')}.`);
+    return { cleared: true, mode, equityIdr: snapshot.equityIdr };
   }
 
   // --- A/B Counterfactual AI Validation Metrics ---

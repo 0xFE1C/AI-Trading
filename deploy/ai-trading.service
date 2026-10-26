@@ -1,0 +1,37 @@
+# AI Trading Terminal — systemd unit for always-on VPS deployment.
+#
+# Install:
+#   1. Copy this file:  sudo cp deploy/ai-trading.service /etc/systemd/system/
+#   2. Edit User/WorkingDirectory to match your VPS user and project path.
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable --now ai-trading
+#
+# Why Restart=always matters: the Indodax Trade API v2 cannot host stop-loss
+# orders, so exit protection lives in this process. Automatic restart keeps
+# the unprotected window after a crash in the seconds-to-minutes range.
+
+[Unit]
+Description=AI Trading Terminal (Indodax)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# CHANGE these two lines to your environment:
+User=felix
+WorkingDirectory=/opt/ai-trading
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+# Give the graceful shutdown handler (DB checkpoint, deadman cancel, alerts)
+# time to finish before SIGKILL.
+TimeoutStopSec=15
+KillSignal=SIGINT
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -251,6 +251,26 @@ export function initDatabase() {
       consumed_by TEXT
     );
 
+    -- Order Intent Journal (idempotency & crash recovery).
+    -- Every live order writes an intent BEFORE the request is sent so a crash
+    -- between "order sent" and "position recorded" can be resolved by querying
+    -- the exchange with the client_order_id instead of guessing from balances.
+    CREATE TABLE IF NOT EXISTS order_intents (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL, -- 'BUY' | 'SELL'
+      kind TEXT NOT NULL, -- 'entry' | 'exit' | 'partial_tp' | 'panic' | 'derisk'
+      order_type TEXT NOT NULL, -- 'MARKET' | 'LIMIT'
+      params_json TEXT NOT NULL,
+      position_id TEXT,
+      client_order_id TEXT,
+      state TEXT NOT NULL DEFAULT 'sent', -- 'sent' | 'ack' | 'resolved' | 'unresolved'
+      exchange_order_id TEXT,
+      resolved_at INTEGER,
+      detail TEXT
+    );
+
     -- High-Performance Secondary Indexes
     CREATE INDEX IF NOT EXISTS idx_positions_status ON positions(status);
     CREATE INDEX IF NOT EXISTS idx_positions_symbol_status ON positions(symbol, status);
@@ -269,6 +289,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_regime_ts ON regime_log(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_shortlist ON opportunity_shortlist(ts DESC, consumed);
     CREATE INDEX IF NOT EXISTS idx_agent_messages_topic ON agent_messages(topic, ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_order_intents_state ON order_intents(state, ts DESC);
   `);
 
   // Safe migration for existing sqlite database: add oauth_data column if missing
@@ -288,6 +309,14 @@ export function initDatabase() {
 
   try {
     db.exec('ALTER TABLE positions ADD COLUMN realized_pnl_idr REAL NOT NULL DEFAULT 0;');
+  } catch {
+    // Column already exists
+  }
+
+  // Timestamp when the position lost a guaranteed exit plan (sell failure,
+  // balance ambiguity). NULL = protected (engine is actively managing an exit).
+  try {
+    db.exec('ALTER TABLE positions ADD COLUMN unprotected_since INTEGER;');
   } catch {
     // Column already exists
   }
@@ -324,6 +353,19 @@ export function initDatabase() {
     deadman_switch_enabled: '1',
     auto_resume_on_startup: '0', // '1' resumes auto-trading after a clean restart/reconciliation
     auto_trading_was_active_before_restart: '0',
+    // --- Institutional safety layer (Phase 1 hardening) ---
+    max_drawdown_percent: '15', // peak-to-trough equity kill switch; '0' disables
+    equity_floor_idr: '0', // absolute equity floor in IDR; '0' disables
+    derisk_mode_on_drawdown: 'halt', // 'halt' (stop entries only) | 'halve' (sell 50% each) | 'flatten' (liquidate all)
+    max_allocation_percent: '0', // per-trade cap as % of current equity; '0' = use IDR setting only
+    price_collar_percent: '1.0', // max acceptable deviation between expected and actual fill price
+    exit_floor_limit_enabled: '1', // live exits first place a LIMIT SELL at a floor price (anti-slippage)
+    limit_exit_timeout_ms: '3000', // how long the floored limit sell may rest before cancel+market remainder
+    require_protective_orders: '1', // block new live entries while any live position lacks an exit plan
+    tp1_sell_fraction_percent: '50', // fraction of the position sold at TP1 (100 = full exit, no unprotected remainder)
+    drawdown_halt_since: '0', // timestamp when the drawdown kill switch fired; '0' = clear (manual reset via API)
+    equity_peak_live: '0', // runtime-tracked peak live equity for drawdown math
+    equity_peak_paper: '0', // runtime-tracked peak paper equity for drawdown math
     ngrok_authtoken: '',
     known_pairs_seeded: '0', // '1' after the initial pair universe has been recorded without alerts
     admin_token_rotation_mode: 'fixed', // 'fixed' (default) | 'on_startup' | 'interval'

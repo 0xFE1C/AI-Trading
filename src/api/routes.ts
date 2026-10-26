@@ -822,6 +822,20 @@ apiRouter.post('/trading/panic', authMiddleware, panicRateLimiter, async (req, r
   }
 });
 
+// Manual reset of the drawdown kill switch (admin only). The equity peak is
+// re-based to current equity so the switch measures from now, not an old peak.
+apiRouter.post('/trading/drawdown-reset', authMiddleware, tradingToggleLimiter, async (req, res) => {
+  try {
+    const result = await tradingEngine.resetDrawdownKillSwitch();
+    res.json({
+      success: true,
+      message: `Drawdown kill switch direset (mode ${result.mode.toUpperCase()}). Peak equity di-rebase ke Rp ${Math.round(result.equityIdr).toLocaleString('id-ID')}. Auto-trading tetap PAUSED — aktifkan manual dari dashboard bila siap.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // --- 11. Risk Profile Presets (View-Only, Change Requires Admin) ---
 apiRouter.get('/settings/profiles', (req, res) => {
   res.json({

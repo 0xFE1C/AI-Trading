@@ -511,6 +511,19 @@ async function gracefulShutdown(signal: string) {
       clearInterval(wsHeartbeatInterval);
       wsHeartbeatInterval = null;
     }
+
+    // Last warning while notifications are still connected: open live positions
+    // lose all in-process exit protection (trailing stop) once this process stops.
+    try {
+      const openLive = db.prepare(
+        "SELECT COUNT(*) as c FROM positions WHERE status = 'open' AND mode = 'live'"
+      ).get() as { c: number };
+      if (openLive.c > 0) {
+        const msg = `🛑 *[BOT DIHENTIKAN DENGAN POSISI LIVE TERBUKA]*\n${openLive.c} posisi LIVE masih terbuka. Trailing stop & proteksi exit TIDAK aktif selama bot mati. Segera jalankan kembali server atau pantau posisi manual di Indodax.`;
+        await Promise.allSettled([whatsappService.sendAlert(msg), telegramService.sendAlert(msg)]);
+      }
+    } catch {}
+
     await whatsappService.disconnect();
     await indodax.cancelDeadmanSwitch();
 
