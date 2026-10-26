@@ -416,6 +416,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         }
       }
 
+      // Institutional protection validation
+      if (payload.max_drawdown_percent) {
+        const dd = parseFloat(payload.max_drawdown_percent);
+        if (isNaN(dd) || dd < 0 || dd > 90) {
+          setToast({ message: l('Max drawdown kill switch must be between 0 (off) and 90%', 'Kill switch drawdown maksimal harus antara 0 (off) s/d 90%'), type: 'error' });
+          return;
+        }
+      }
+      if (payload.equity_floor_idr) {
+        const floor = parseFloat(payload.equity_floor_idr);
+        if (isNaN(floor) || floor < 0) {
+          setToast({ message: l('Equity floor must be a non-negative IDR value', 'Equity floor harus bernilai IDR non-negatif'), type: 'error' });
+          return;
+        }
+      }
+      if (payload.max_allocation_percent) {
+        const allocPct = parseFloat(payload.max_allocation_percent);
+        if (isNaN(allocPct) || allocPct < 0 || allocPct > 100) {
+          setToast({ message: l('Max allocation percent must be between 0 (off) and 100%', 'Maks alokasi persen harus antara 0 (off) s/d 100%'), type: 'error' });
+          return;
+        }
+      }
+      if (payload.tp1_sell_fraction_percent) {
+        const frac = parseFloat(payload.tp1_sell_fraction_percent);
+        if (isNaN(frac) || frac < 1 || frac > 100) {
+          setToast({ message: l('TP1 sell fraction must be between 1% and 100%', 'Fraksi jual TP1 harus antara 1% s/d 100%'), type: 'error' });
+          return;
+        }
+      }
+
       if (ngrokToken) {
         payload.ngrok_authtoken = ngrokToken;
       }
@@ -1504,6 +1534,142 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
                   />
                   <span className="text-[11px] text-slate-500 block mt-1">Batasi bot hanya pada simbol tertentu (pisahkan dengan koma)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Institutional Capital Protection (Phase 1 hardening) */}
+            <div className="pt-4">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                {l('Institutional Capital Protection (Live)', 'Proteksi Modal Institusional (Live)')}
+              </h4>
+              <p className="text-[11px] text-slate-500 mb-3">
+                {l(
+                  'Layered safeguards: a peak-to-trough drawdown kill switch, an absolute equity floor, anti-slippage floored exits, and an exit guard that blocks new entries while a position lacks an exit plan.',
+                  'Lapisan pengaman berlapis: kill switch drawdown dari puncak, equity floor absolut, floored exit anti-slippage, dan exit guard yang menahan entry baru saat ada posisi tanpa exit plan.'
+                )}
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Max Drawdown Kill Switch (%)', 'Kill Switch Drawdown Maksimal (%)')}</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={settings.max_drawdown_percent || '15'}
+                    onChange={(e) => updateSettingField('max_drawdown_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('Halt auto-trading when equity falls this far below its peak (0 = off). Manual reset required.', 'Hentikan auto-trading saat equity turun sejauh ini dari puncaknya (0 = off). Reset hanya manual.')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Absolute Equity Floor (IDR)', 'Equity Floor Absolut (IDR)')}</label>
+                  <input
+                    type="number"
+                    step="1000000"
+                    min="0"
+                    value={settings.equity_floor_idr || '0'}
+                    onChange={(e) => updateSettingField('equity_floor_idr', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('Hard stop: halt everything below this equity value (0 = off).', 'Rem darurat: hentikan semuanya jika equity jatuh di bawah nilai ini (0 = off).')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('De-Risk Action on Drawdown', 'Aksi De-Risk Saat Drawdown')}</label>
+                  <select
+                    value={settings.derisk_mode_on_drawdown || 'halt'}
+                    onChange={(e) => updateSettingField('derisk_mode_on_drawdown', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 outline-none focus:border-blue-500"
+                  >
+                    <option value="halt">{l('Halt entries only (positions managed)', 'Hentikan entry saja (posisi tetap dikelola)')}</option>
+                    <option value="halve">{l('Halve every open position (sell 50%)', 'Kurangi semua posisi 50%')}</option>
+                    <option value="flatten">{l('Flatten everything (liquidate all)', 'Likuidasi semua posisi')}</option>
+                  </select>
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('What happens to open positions when the kill switch fires.', 'Yang terjadi pada posisi terbuka saat kill switch terpicu.')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Max Allocation per Trade (% of Equity)', 'Maks Alokasi per Trade (% Equity)')}</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="100"
+                    value={settings.max_allocation_percent || '0'}
+                    onChange={(e) => updateSettingField('max_allocation_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('Caps the per-trade budget relative to CURRENT equity (0 = use IDR value only). Keeps sizing honest as capital grows.', 'Batasi budget per trade relatif terhadap equity TERKINI (0 = pakai nilai IDR saja). Ukuran tetap wajar saat modal bertambah.')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Price Collar for Market Orders (%)', 'Price Collar Order Market (%)')}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={settings.price_collar_percent || '1.0'}
+                    onChange={(e) => updateSettingField('price_collar_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('Maximum acceptable deviation of the actual fill price from the expected price.', 'Deviasi maksimal harga fill aktual dari harga ekspektasi.')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('TP1 Sell Fraction (%)', 'Fraksi Jual di TP1 (%)')}</label>
+                  <input
+                    type="number"
+                    step="5"
+                    min="1"
+                    max="100"
+                    value={settings.tp1_sell_fraction_percent || '50'}
+                    onChange={(e) => updateSettingField('tp1_sell_fraction_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('50 = bank half, ride the rest to the breakeven stop. 100 = full exit at TP1 (no remainder to protect).', '50 = amankan separuh, sisanya ditalangi stop breakeven. 100 = keluar penuh di TP1 (tanpa sisa yang perlu dilindungi).')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Floored Limit Exits', 'Floored Limit Exit')}</label>
+                  <select
+                    value={settings.exit_floor_limit_enabled ?? '1'}
+                    onChange={(e) => updateSettingField('exit_floor_limit_enabled', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 outline-none focus:border-blue-500"
+                  >
+                    <option value="1">{l('Enabled (sells can never fill below the floor)', 'Aktif (jual tak pernah terisi di bawah lantai harga)')}</option>
+                    <option value="0">{l('Disabled (blind market sells)', 'Nonaktif (market sell langsung)')}</option>
+                  </select>
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('Exits place a LIMIT SELL at the floor first, then market-sell any remainder.', 'Exit memasang LIMIT SELL di harga lantai dulu, sisa dijual market.')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Exit Guard (Block New Entries)', 'Exit Guard (Tahan Entry Baru)')}</label>
+                  <select
+                    value={settings.require_protective_orders ?? '1'}
+                    onChange={(e) => updateSettingField('require_protective_orders', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 outline-none focus:border-blue-500"
+                  >
+                    <option value="1">{l('Enabled (no new entries while unprotected)', 'Aktif (tanpa entry baru saat ada posisi tak terlindungi)')}</option>
+                    <option value="0">{l('Disabled (always allow entries)', 'Nonaktif (entry selalu boleh)')}</option>
+                  </select>
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('Refuses new live entries while any position lacks a guaranteed exit plan.', 'Menolak entry live baru selama ada posisi tanpa exit plan terjamin.')}</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Floored Exit Timeout (ms)', 'Timeout Floored Exit (ms)')}</label>
+                  <input
+                    type="number"
+                    step="500"
+                    min="500"
+                    value={settings.limit_exit_timeout_ms || '3000'}
+                    onChange={(e) => updateSettingField('limit_exit_timeout_ms', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">{l('How long the floored limit sell may rest before the remainder is market-sold.', 'Berapa lama limit sell boleh menunggu sebelum sisanya dijual market.')}</span>
                 </div>
               </div>
             </div>

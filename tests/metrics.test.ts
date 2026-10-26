@@ -81,3 +81,26 @@ test('GET /api/metrics exposes Prometheus text format without secrets', async ()
   assert.ok(!body.toLowerCase().includes('secret'));
   assert.ok(!body.includes('admin_access_token'));
 });
+
+test('GET /api/trading/safety-status returns drawdown/guard telemetry for admins', async () => {
+  const res = await fetch(`${baseUrl}/api/trading/safety-status`, {
+    headers: { Authorization: 'Bearer metrics-admin-token' },
+  });
+  assert.equal(res.status, 200);
+  const { data } = (await res.json()) as any;
+  assert.equal(data.tradingMode, 'live');
+  assert.equal(data.drawdownHalt, true);
+  assert.equal(data.unprotectedPositions, 1);
+  assert.ok(data.pendingOrderIntents >= 1);
+  assert.equal(typeof data.peakEquityIdr, 'number');
+  assert.equal(typeof data.maxDrawdownPercent, 'number');
+  assert.equal(typeof data.requireProtectiveOrders, 'boolean');
+  assert.equal(typeof data.exitFloorLimitEnabled, 'boolean');
+  // No secrets may leak through the safety payload
+  assert.ok(!JSON.stringify(data).includes('token'));
+});
+
+test('GET /api/trading/safety-status rejects unauthenticated requests', async () => {
+  const res = await fetch(`${baseUrl}/api/trading/safety-status`);
+  assert.equal(res.status, 401);
+});

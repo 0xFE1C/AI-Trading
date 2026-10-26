@@ -19,15 +19,18 @@ import {
   Info,
   Sliders,
   Sparkles,
+  X,
+  PieChart,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { BacktestParams, BacktestResult, BacktestTrade } from '../types';
+import { BacktestParams, BacktestResult, BacktestTrade, PortfolioBacktestResult } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const POPULAR_PAIRS = ['BTCIDR', 'ETHIDR', 'SOLIDR', 'PEPEIDR', 'DOGEIDR', 'XRPIDR', 'BNBIDR'];
 
 export const BacktestView: React.FC = () => {
   const { l, formatCurrency, formatNumber, language } = useLanguage();
+  const [mode, setMode] = useState<'single' | 'portfolio'>('single');
   const [params, setParams] = useState<BacktestParams>({
     symbol: 'BTCIDR',
     timeframe: '1h',
@@ -41,20 +44,64 @@ export const BacktestView: React.FC = () => {
     strategyType: 'live_momentum',
   });
 
+  // Portfolio mode state: concurrent multi-symbol simulation
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTCIDR', 'ETHIDR', 'SOLIDR']);
+  const [customSymbol, setCustomSymbol] = useState('');
+  const [maxActiveTrades, setMaxActiveTrades] = useState(3);
+  const [portfolioResult, setPortfolioResult] = useState<PortfolioBacktestResult | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const toggleSymbol = (pair: string) => {
+    setSelectedSymbols((prev) =>
+      prev.includes(pair) ? prev.filter((s) => s !== pair) : [...prev, pair].slice(0, 10)
+    );
+  };
+
+  const addCustomSymbol = () => {
+    const clean = customSymbol.trim().toUpperCase().replace('/', '').replace('_', '');
+    if (!clean) return;
+    const pair = clean.endsWith('IDR') ? clean : `${clean}IDR`;
+    if (!selectedSymbols.includes(pair)) {
+      setSelectedSymbols((prev) => [...prev, pair].slice(0, 10));
+    }
+    setCustomSymbol('');
+  };
 
   const handleRunBacktest = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const data = await api.runBacktest(params);
-      setResult(data);
+      if (mode === 'portfolio') {
+        if (selectedSymbols.length === 0) {
+          throw new Error(l('Select at least one symbol for the portfolio backtest.', 'Pilih minimal satu simbol untuk backtest portofolio.'));
+        }
+        const data = await api.runPortfolioBacktest({
+          symbols: selectedSymbols,
+          timeframe: params.timeframe,
+          days: params.days,
+          initialBalanceIdr: params.initialBalanceIdr,
+          allocationPerTradeIdr: params.allocationPerTradeIdr,
+          maxActiveTrades,
+          trailingStopPercent: params.trailingStopPercent,
+          takeProfitStep1Percent: params.takeProfitStep1Percent,
+          minGainThresholdPercent: params.minGainThresholdPercent,
+          slippagePercent: params.slippagePercent,
+        });
+        setResult(null);
+        setPortfolioResult(data);
+      } else {
+        const data = await api.runBacktest(params);
+        setPortfolioResult(null);
+        setResult(data);
+      }
     } catch (err: any) {
       setError(err.message || l('Failed to execute backtest.', 'Gagal menjalankan backtest.'));
       setResult(null);
+      setPortfolioResult(null);
     } finally {
       setLoading(false);
     }
@@ -73,30 +120,61 @@ export const BacktestView: React.FC = () => {
             {l('Indodax Strategy Quantitative Simulation', 'Simulasi Kuantitatif Strategi Indodax')}
           </h2>
           <p className="text-xs text-slate-400 max-w-2xl mt-1">
-            {l(
-              'Test momentum algorithm performance, ratchet trailing stops, partial take-profits, and slippage modeling on real historical Indodax candlesticks (TradingView API) before running Live Trading.',
-              'Uji performa algoritma momentum, ratchet trailing stop, partial take-profit, dan pemodelan slippage pada candlestick historis Indodax nyata (TradingView API) sebelum menjalankan Live Trading.'
-            )}
+            {mode === 'single'
+              ? l(
+                  'Test momentum algorithm performance, ratchet trailing stops, partial take-profits, and slippage modeling on real historical Indodax candlesticks (TradingView API) before running Live Trading.',
+                  'Uji performa algoritma momentum, ratchet trailing stop, partial take-profit, dan pemodelan slippage pada candlestick historis Indodax nyata (TradingView API) sebelum menjalankan Live Trading.'
+                )
+              : l(
+                  'Portfolio simulation: multiple symbols, concurrent position slots, and one shared cash pool — mirroring how the live engine actually trades.',
+                  'Simulasi portofolio: banyak simbol, slot posisi konkuren, dan satu kas bersama — mencerminkan cara live engine benar-benar trading.'
+                )}
           </p>
         </div>
 
-        <button
-          onClick={() => handleRunBacktest()}
-          disabled={loading}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 text-white font-semibold text-xs transition-all shadow-lg shadow-indigo-600/20 whitespace-nowrap"
-        >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>{l('Processing Simulation...', 'Memproses Simulasi...')}</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4 fill-current" />
-              <span>{l('Run Backtest', 'Jalankan Backtest')}</span>
-            </>
-          )}
-        </button>
+        {/* Mode Toggle + Run Button */}
+        <div className="flex flex-col gap-3 shrink-0">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl border border-slate-800 bg-[#070b13]">
+            <button
+              type="button"
+              onClick={() => setMode('single')}
+              className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'single' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5" />
+              {l('Single Pair', 'Satu Pair')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('portfolio')}
+              className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'portfolio' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <PieChart className="w-3.5 h-3.5" />
+              {l('Portfolio', 'Portofolio')}
+            </button>
+          </div>
+
+          <button
+            onClick={() => handleRunBacktest()}
+            disabled={loading || (mode === 'portfolio' && selectedSymbols.length === 0)}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 text-white font-semibold text-xs transition-all shadow-lg shadow-indigo-600/20 whitespace-nowrap"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>{l('Processing Simulation...', 'Memproses Simulasi...')}</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-current" />
+                <span>{mode === 'portfolio' ? l('Run Portfolio Backtest', 'Jalankan Backtest Portofolio') : l('Run Backtest', 'Jalankan Backtest')}</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Methodology & Transparency Disclaimer Banner */}
@@ -189,7 +267,8 @@ export const BacktestView: React.FC = () => {
         </div>
 
         <form onSubmit={handleRunBacktest} className="space-y-4">
-          {/* Strategy Mode Selector */}
+          {/* Strategy Mode Selector (single-pair mode only) */}
+          {mode === 'single' && (
           <div>
             <label className="text-xs font-semibold text-slate-300 block mb-1.5">
               {l('Choose Strategy Rules / Engine:', 'Pilih Mesin / Aturan Strategi:')}
@@ -250,9 +329,110 @@ export const BacktestView: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-            {/* Symbol Selection */}
+          {/* Portfolio Symbol Selection (portfolio mode only) */}
+          {mode === 'portfolio' && (
+          <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-950/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                <Layers className="w-4 h-4 text-indigo-400" />
+                <span>{l('Portfolio Symbols (max 10)', 'Simbol Portofolio (maks 10)')}</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {selectedSymbols.length}/10 {l('selected', 'dipilih')}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {selectedSymbols.map((pair) => (
+                <span
+                  key={pair}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-mono font-semibold"
+                >
+                  {pair.replace('IDR', '')}
+                  <button
+                    type="button"
+                    onClick={() => toggleSymbol(pair)}
+                    className="hover:bg-white/20 rounded p-0.5 transition-colors"
+                    aria-label={`Remove ${pair}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {selectedSymbols.length === 0 && (
+                <span className="text-[11px] text-slate-500">
+                  {l('No symbols selected — pick at least one below.', 'Belum ada simbol — pilih minimal satu di bawah.')}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {POPULAR_PAIRS.filter((p) => !selectedSymbols.includes(p)).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => toggleSymbol(p)}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  + {p.replace('IDR', '')}
+                </button>
+              ))}
+              <div className="flex items-center gap-1.5 ml-1">
+                <input
+                  type="text"
+                  value={customSymbol}
+                  onChange={(e) => setCustomSymbol(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomSymbol();
+                    }
+                  }}
+                  placeholder={l('Add: SOL…', 'Tambah: SOL…')}
+                  className="w-24 bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded px-2 py-1 text-[11px] text-slate-100 font-mono outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomSymbol}
+                  className="px-2 py-1 rounded text-[10px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                >
+                  + {l('Add', 'Tambah')}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  {l('Max Concurrent Positions (Slots)', 'Maks Posisi Konkuren (Slot)')}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={maxActiveTrades}
+                  onChange={(e) => setMaxActiveTrades(Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)))}
+                  className="w-full bg-[#070b13] border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono outline-none"
+                />
+                <span className="text-[10px] text-slate-500 block mt-1">
+                  {l('Mirrors the live engine max_active_trades setting', 'Mencerminkan setting max_active_trades di live engine')}
+                </span>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-2.5 text-[11px] text-slate-400">
+                {l(
+                  'Entry rule is the same 24h rolling momentum scan as the live engine: top gainer enters when a slot and cash are free. Portfolio mode ignores the strategy selector above.',
+                  'Aturan entry sama dengan scan momentum 24 jam live engine: gainer teratas masuk saat slot dan kas tersedia. Mode portofologi mengabaikan pemilih strategi di atas.'
+                )}
+              </div>
+            </div>
+          </div>
+          )}
+
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${mode === 'single' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4 pt-2`}>
+            {/* Symbol Selection (single-pair mode only) */}
+            {mode === 'single' && (
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1.5">
                 {l('Pair / Crypto Asset', 'Pair / Aset Kripto')}
@@ -284,6 +464,7 @@ export const BacktestView: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Timeframe */}
             <div>
@@ -451,8 +632,8 @@ export const BacktestView: React.FC = () => {
         </div>
       )}
 
-      {/* Results Section */}
-      {result && (
+      {/* Results Section (Single Pair) */}
+      {mode === 'single' && result && (
         <div className="space-y-6">
           {/* Truncation Notification If Any */}
           {result.dataTruncated && (
@@ -752,6 +933,273 @@ export const BacktestView: React.FC = () => {
                   })}
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Results Section (Portfolio) */}
+      {mode === 'portfolio' && portfolioResult && (
+        <div className="space-y-6">
+          {/* Header badges */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-400 font-mono">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-500/30">
+                {l('Portfolio: ', 'Portofolio: ')}
+                {portfolioResult.symbolsWithData.join(', ')}
+              </span>
+              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                {portfolioResult.totalCandles} {l('candles', 'candle')}
+              </span>
+              {portfolioResult.symbolsRequested.length !== portfolioResult.symbolsWithData.length && (
+                <span className="px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-500/30">
+                  {l('No data: ', 'Tanpa data: ')}
+                  {portfolioResult.symbolsRequested.filter((s) => !portfolioResult.symbolsWithData.includes(s)).join(', ')}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                {l('Costs: Slippage', 'Biaya: Slippage')} {portfolioResult.slippagePercent}% + {l('Fee', 'Fee Indodax')} {portfolioResult.feePercent}%
+              </span>
+            </div>
+          </div>
+
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400">Net PnL (IDR)</span>
+              <div className={`text-base font-bold font-mono ${portfolioResult.netPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {portfolioResult.netPnlIdr >= 0 ? '+' : ''}{formatCurrency(portfolioResult.netPnlIdr)}
+              </div>
+              <span className={`text-[10px] font-semibold font-mono ${portfolioResult.netPnlPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {portfolioResult.netPnlPercent >= 0 ? '+' : ''}{portfolioResult.netPnlPercent}% return
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400">Win Rate</span>
+              <div className={`text-base font-bold font-mono ${portfolioResult.winRatePercent >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {portfolioResult.winRatePercent}%
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {portfolioResult.winningTrades} {l('Wins', 'Menang')} / {portfolioResult.losingTrades} {l('Losses', 'Kalah')}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400">Profit Factor</span>
+              <div className={`text-base font-bold font-mono ${portfolioResult.profitFactor === null ? 'text-emerald-400' : portfolioResult.profitFactor >= 1.5 ? 'text-emerald-400' : portfolioResult.profitFactor >= 1.0 ? 'text-blue-400' : 'text-rose-400'}`}>
+                {portfolioResult.profitFactor !== null ? `${portfolioResult.profitFactor}x` : (portfolioResult.winningTrades > 0 ? `∞ (${l('Zero Loss', 'Tanpa Loss')})` : '0.00x')}
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {portfolioResult.profitFactor === null ? '100% Win Rate' : portfolioResult.profitFactor >= 1.5 ? l('Very Strong', 'Sangat Sehat') : portfolioResult.profitFactor >= 1.0 ? l('Moderate', 'Moderat') : l('Needs Review', 'Perlu Evaluasi')}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400">Max Drawdown</span>
+              <div className={`text-base font-bold font-mono ${portfolioResult.maxDrawdownPercent <= 5 ? 'text-emerald-400' : portfolioResult.maxDrawdownPercent <= 12 ? 'text-amber-400' : 'text-rose-400'}`}>
+                -{portfolioResult.maxDrawdownPercent}%
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {l('Peak to trough drop', 'Penurunan puncak ke lembah')}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400">{l('Max Concurrent Slots', 'Slot Konkuren Maks')}</span>
+              <div className="text-base font-bold font-mono text-slate-100">
+                {portfolioResult.maxConcurrentPositions}
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {l('Used avg', 'Rata-rata terpakai')}: {portfolioResult.slotUtilizationPercent}%
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0b101b] space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400">{l('Final Balance', 'Saldo Akhir')}</span>
+              <div className="text-base font-bold font-mono text-slate-100">
+                {formatCurrency(portfolioResult.finalBalance)}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {l('Initial Capital', 'Modal')} {formatCurrency(portfolioResult.initialBalance)}
+              </span>
+            </div>
+          </div>
+
+          {/* Equity Curve */}
+          {portfolioResult.equityCurve.length > 1 && (
+            <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <span>{l('Portfolio Equity Curve', 'Kurva Ekuitas Portofolio')}</span>
+                </div>
+                <div className="text-xs font-mono text-slate-400">
+                  {portfolioResult.symbolsWithData.length} {l('symbols', 'simbol')} &bull; {portfolioResult.timeframe} &bull; ~{portfolioResult.days} {l('Days', 'Hari')}
+                </div>
+              </div>
+
+              <div className="h-48 w-full relative">
+                {(() => {
+                  const values = portfolioResult.equityCurve.map((c) => c.equity);
+                  const min = Math.min(...values) * 0.995;
+                  const max = Math.max(...values) * 1.005;
+                  const range = max - min || 1;
+
+                  const points = portfolioResult.equityCurve
+                    .map((c, idx) => {
+                      const x = (idx / (portfolioResult.equityCurve.length - 1)) * 1000;
+                      const y = 180 - ((c.equity - min) / range) * 160;
+                      return `${x},${y}`;
+                    })
+                    .join(' ');
+
+                  const isProfitable = portfolioResult.netPnlIdr >= 0;
+
+                  return (
+                    <svg viewBox="0 0 1000 200" className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="eqGradPortfolio" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor={isProfitable ? '#10b981' : '#f43f5e'} stopOpacity="0.25" />
+                          <stop offset="100%" stopColor={isProfitable ? '#10b981' : '#f43f5e'} stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <polygon points={`0,180 ${points} 1000,180`} fill="url(#eqGradPortfolio)" />
+                      <polyline
+                        points={points}
+                        fill="none"
+                        stroke={isProfitable ? '#10b981' : '#f43f5e'}
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  );
+                })()}
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
+                <span>
+                  {l('Start: ', 'Mulai: ')}
+                  {new Date(portfolioResult.equityCurve[0]?.timestamp || Date.now()).toLocaleDateString('id-ID')}
+                </span>
+                <span>
+                  {l('Latest: ', 'Terakhir: ')}
+                  {new Date(portfolioResult.equityCurve[portfolioResult.equityCurve.length - 1]?.timestamp || Date.now()).toLocaleDateString('id-ID')}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Per-Symbol Attribution */}
+          <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-200 pb-2 border-b border-slate-800">
+              <PieChart className="w-4 h-4 text-indigo-400" />
+              <span>{l('Per-Symbol Contribution', 'Kontribusi per Simbol')}</span>
+            </div>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-slate-800 text-[11px] text-slate-400 uppercase">
+                    <th className="py-2.5 px-3">{l('Symbol', 'Simbol')}</th>
+                    <th className="py-2.5 px-3">{l('Candles', 'Candle')}</th>
+                    <th className="py-2.5 px-3">{l('Trades', 'Trade')}</th>
+                    <th className="py-2.5 px-3 text-right">Net PnL (IDR)</th>
+                    <th className="py-2.5 px-3 text-right">{l('Share', 'Kontribusi')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {[...portfolioResult.perSymbol]
+                    .sort((a, b) => b.netPnlIdr - a.netPnlIdr)
+                    .map((s) => {
+                      const totalPositive = portfolioResult.perSymbol.reduce((acc, x) => acc + Math.max(0, x.netPnlIdr), 0) || 1;
+                      const share = s.netPnlIdr > 0 ? (s.netPnlIdr / totalPositive) * 100 : 0;
+                      return (
+                        <tr key={s.symbol} className="hover:bg-slate-900/40 transition-colors">
+                          <td className="py-2 px-3 font-bold text-slate-200">{s.symbol}</td>
+                          <td className="py-2 px-3 text-slate-400">{s.candles}</td>
+                          <td className="py-2 px-3 text-slate-300">{s.trades}</td>
+                          <td className={`py-2 px-3 text-right font-bold ${s.netPnlIdr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {s.netPnlIdr >= 0 ? '+' : ''}{formatCurrency(s.netPnlIdr)}
+                          </td>
+                          <td className="py-2 px-3 text-right text-slate-400">
+                            {share > 0 ? `${share.toFixed(1)}%` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Portfolio Trade Log */}
+          <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+                <Clock className="w-4 h-4 text-indigo-400" />
+                <span>{l('Portfolio Trade Log', 'Catatan Trade Portofolio')} ({portfolioResult.trades.length} {l('Trades', 'Trade')})</span>
+              </div>
+            </div>
+
+            {portfolioResult.trades.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-500">
+                {l(
+                  'No entry signals met the momentum criteria across the selected symbols in this period.',
+                  'Tidak ada sinyal entry yang memenuhi kriteria momentum pada simbol yang dipilih di periode ini.'
+                )}
+              </div>
+            ) : (
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-[11px] text-slate-400 uppercase">
+                      <th className="py-2.5 px-3">{l('Symbol', 'Simbol')}</th>
+                      <th className="py-2.5 px-3">{l('Entry Time', 'Waktu Masuk')}</th>
+                      <th className="py-2.5 px-3">{l('Exit Time', 'Waktu Keluar')}</th>
+                      <th className="py-2.5 px-3">{l('Entry Price', 'Harga Masuk')}</th>
+                      <th className="py-2.5 px-3">{l('Exit Price', 'Harga Keluar')}</th>
+                      <th className="py-2.5 px-3">{l('Exit Reason', 'Alasan Keluar')}</th>
+                      <th className="py-2.5 px-3 text-right">PnL (IDR)</th>
+                      <th className="py-2.5 px-3 text-right">Return</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {portfolioResult.trades.slice(0, 50).map((trade, idx) => {
+                      const isWin = trade.pnlIdr > 0;
+                      return (
+                        <tr key={`${trade.symbol}-${trade.entryTime}-${idx}`} className="hover:bg-slate-900/40 transition-colors">
+                          <td className="py-2 px-3 font-bold text-slate-200">{trade.symbol}</td>
+                          <td className="py-2 px-3 text-slate-300">{new Date(trade.entryTime).toLocaleString('id-ID')}</td>
+                          <td className="py-2 px-3 text-slate-300">{new Date(trade.exitTime).toLocaleString('id-ID')}</td>
+                          <td className="py-2 px-3 text-slate-200">{formatCurrency(trade.entryPrice)}</td>
+                          <td className="py-2 px-3 text-slate-200">{formatCurrency(trade.exitPrice)}</td>
+                          <td className="py-2 px-3 text-slate-400">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
+                              isWin ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-300'
+                            }`}>
+                              {trade.exitReason}
+                            </span>
+                          </td>
+                          <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {isWin ? '+' : ''}{formatCurrency(trade.pnlIdr)}
+                          </td>
+                          <td className={`py-2 px-3 text-right font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {isWin ? '+' : ''}{trade.pnlPercent}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {portfolioResult.trades.length > 50 && (
+                  <p className="text-[11px] text-slate-500 text-center pt-3">
+                    {l('Showing the 50 most recent trades.', 'Menampilkan 50 trade terbaru.')}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -837,6 +837,42 @@ apiRouter.post('/trading/drawdown-reset', authMiddleware, tradingToggleLimiter, 
   }
 });
 
+// Safety telemetry for the dashboard protection card (admin only, no secrets).
+apiRouter.get('/trading/safety-status', authMiddleware, (req, res) => {
+  try {
+    const engine = tradingEngine.getEngineMetrics();
+    const mode = engine.tradingMode;
+    const peak = parseFloat(getSetting(mode === 'live' ? 'equity_peak_live' : 'equity_peak_paper', '0')) || 0;
+    const maxDrawdownPct = parseFloat(getSetting('max_drawdown_percent', '15')) || 0;
+    const haltSince = parseInt(getSetting('drawdown_halt_since', '0'), 10) || 0;
+
+    res.json({
+      success: true,
+      data: {
+        tradingMode: mode,
+        autoTradingActive: engine.autoTradingActive,
+        openPositions: mode === 'live' ? engine.openPositionsLive : engine.openPositionsPaper,
+        unprotectedPositions: engine.unprotectedLivePositions,
+        pendingOrderIntents: engine.pendingOrderIntents,
+        circuitBreakerActive: engine.circuitBreakerActive === 1,
+        drawdownHalt: haltSince > 0,
+        drawdownHaltSince: haltSince > 0 ? haltSince : null,
+        peakEquityIdr: Math.round(peak),
+        maxDrawdownPercent: maxDrawdownPct,
+        equityFloorIdr: parseFloat(getSetting('equity_floor_idr', '0')) || 0,
+        deriskMode: getSetting('derisk_mode_on_drawdown', 'halt'),
+        requireProtectiveOrders: getSetting('require_protective_orders', '1') === '1',
+        exitFloorLimitEnabled: getSetting('exit_floor_limit_enabled', '1') === '1',
+        lastLoopAt: engine.lastLoopAt,
+        lastLoopDurationMs: engine.lastLoopDurationMs,
+        engineUptimeSeconds: engine.engineUptimeSeconds,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // --- 11. Risk Profile Presets (View-Only, Change Requires Admin) ---
 apiRouter.get('/settings/profiles', (req, res) => {
   res.json({

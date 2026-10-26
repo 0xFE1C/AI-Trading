@@ -32,8 +32,10 @@ import {
   BookOpen,
   Calculator,
   Lock,
+  ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
-import { SystemStatus, RiskProfileKey } from '../types';
+import { SystemStatus, RiskProfileKey, SafetyStatus } from '../types';
 import { CryptoChart } from './CryptoChart';
 import { AbValidationSection } from './AbValidationSection';
 import { EntryDiagnosticsSection } from './EntryDiagnosticsSection';
@@ -77,6 +79,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [showDiagnosticsInSimple, setShowDiagnosticsInSimple] = useState<boolean>(true);
   const [updatingProfile, setUpdatingProfile] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [safetyStatus, setSafetyStatus] = useState<SafetyStatus | null>(null);
+  const [safetyLoading, setSafetyLoading] = useState<boolean>(false);
 
   // Persistent Onboarding Checklist
   const [checklist, setChecklist] = useState<Record<string, boolean>>(() => {
@@ -131,6 +135,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
     loadDashboardContext();
   }, [language]);
+
+  // Institutional safety telemetry: polled separately (30s) so protection
+  // state stays fresh even when the main status refresh is slower.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    const loadSafety = async () => {
+      try {
+        const safety = await api.getSafetyStatus();
+        if (!cancelled) setSafetyStatus(safety);
+      } catch {
+        // Silent: the card simply shows the last known state
+      }
+    };
+    loadSafety();
+    const timer = setInterval(loadSafety, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isAdmin, status?.mode]);
+
+  const handleResetDrawdown = async () => {
+    if (!isAdmin) {
+      if (onOpenAuthModal) onOpenAuthModal();
+      return;
+    }
+    setSafetyLoading(true);
+    try {
+      const res = await api.resetDrawdownKillSwitch();
+      setToast({ message: res.message || l('Drawdown kill switch reset.', 'Kill switch drawdown berhasil direset.'), type: 'success' });
+      const safety = await api.getSafetyStatus();
+      setSafetyStatus(safety);
+      onRefresh();
+    } catch (err: any) {
+      setToast({ message: `${l('Failed to reset drawdown kill switch: ', 'Gagal reset kill switch drawdown: ')}${err.message}`, type: 'error' });
+    } finally {
+      setSafetyLoading(false);
+    }
+  };
 
   const toggleGuide = () => {
     setIsGuideOpen((prev) => {
@@ -351,6 +395,88 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 1.5 Institutional Protection Status Strip (drawdown kill switch, exit guard) */}
+      {isAdmin && safetyStatus && (
+        <div
+          className={`rounded-2xl border p-4 shadow-lg transition-all ${
+            safetyStatus.drawdownHalt
+              ? 'border-rose-500/40 bg-gradient-to-r from-rose-950/40 via-[#0b101b] to-[#0b101b]'
+              : 'border-slate-800/80 bg-gradient-to-r from-[#0b1120] via-[#0b101b] to-[#0b101b]'
+          }`}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`p-2 rounded-xl border shrink-0 ${
+                  safetyStatus.drawdownHalt
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                }`}
+              >
+                {safetyStatus.drawdownHalt ? <ShieldAlert className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-slate-100">
+                    {safetyStatus.drawdownHalt
+                      ? l('DRAWDOWN KILL SWITCH ACTIVE', 'KILL SWITCH DRAWDOWN AKTIF')
+                      : l('Capital Protection: All Layers Armed', 'Proteksi Modal: Semua Lapisan Aktif')}
+                  </span>
+                  {safetyStatus.circuitBreakerActive && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/60 text-amber-300 border border-amber-500/30">
+                      {l('Daily circuit breaker cooling down', 'Circuit breaker harian cooldown')}
+                    </span>
+                  )}
+                  {safetyStatus.unprotectedPositions > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-950/60 text-rose-300 border border-rose-500/30">
+                      {safetyStatus.unprotectedPositions} {l('position(s) without exit plan', 'posisi tanpa exit plan')}
+                    </span>
+                  )}
+                  {safetyStatus.pendingOrderIntents > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-950/60 text-blue-300 border border-blue-500/30">
+                      {safetyStatus.pendingOrderIntents} {l('order intent(s) awaiting confirmation', 'order menunggu konfirmasi')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 truncate">
+                  {safetyStatus.drawdownHalt
+                    ? l(
+                        'Peak-to-trough equity loss breached the configured limit. Auto-trading is halted; de-risk mode: ',
+                        'Kerugian equity dari puncak melewati batas. Auto-trading dihentikan; mode de-risk: '
+                      ) + safetyStatus.deriskMode.toUpperCase()
+                    : l(
+                        'Drawdown kill switch, exit guard, floored exits & daily breaker monitoring this bot.',
+                        'Kill switch drawdown, exit guard, floored exit & circuit breaker harian memantau bot ini.'
+                      ) + ' '}
+                  {!safetyStatus.drawdownHalt && (
+                    <span className="font-mono">
+                      {l('Peak', 'Puncak')}: {safetyStatus.peakEquityIdr > 0 ? formatCurrency(safetyStatus.peakEquityIdr) : '—'}
+                      {' • '}{l('Max DD limit', 'Batas DD')}: {safetyStatus.maxDrawdownPercent}%
+                      {' • '}{l('Loop', 'Loop')}: {safetyStatus.lastLoopDurationMs}ms
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            {safetyStatus.drawdownHalt && (
+              <button
+                type="button"
+                onClick={handleResetDrawdown}
+                disabled={safetyLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-rose-900/50 text-white font-semibold text-xs transition-all shadow-lg shadow-rose-600/20 whitespace-nowrap shrink-0"
+              >
+                {safetyLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                {l('Reset Kill Switch (Manual)', 'Reset Kill Switch (Manual)')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 2. Unified, Collapsible Quick Start Guide & Checklist */}
       <div className="rounded-2xl border border-slate-800/90 bg-gradient-to-b from-[#0c1426] via-[#090f1d] to-[#070b14] shadow-md overflow-hidden transition-all">

@@ -221,6 +221,75 @@ export interface BacktestResult {
   equityCurve: Array<{ time: string; timestamp: number; equity: number }>;
 }
 
+export interface PortfolioBacktestParams {
+  symbols: string[];
+  timeframe?: '15m' | '1h' | '4h' | '1d';
+  days?: number;
+  initialBalanceIdr?: number;
+  allocationPerTradeIdr?: number;
+  maxActiveTrades?: number;
+  trailingStopPercent?: number;
+  takeProfitStep1Percent?: number;
+  minGainThresholdPercent?: number;
+  slippagePercent?: number;
+}
+
+export interface PortfolioBacktestTrade {
+  symbol: string;
+  entryTime: number;
+  exitTime: number;
+  entryPrice: number;
+  exitPrice: number;
+  pnlIdr: number;
+  pnlPercent: number;
+  exitReason: string;
+}
+
+export interface PortfolioBacktestResult {
+  timeframe: string;
+  days: number;
+  symbolsRequested: string[];
+  symbolsWithData: string[];
+  totalCandles: number;
+  initialBalance: number;
+  finalBalance: number;
+  netPnlIdr: number;
+  netPnlPercent: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRatePercent: number;
+  profitFactor: number | null;
+  maxDrawdownPercent: number;
+  maxConcurrentPositions: number;
+  slotUtilizationPercent: number;
+  slippagePercent: number;
+  feePercent: number;
+  perSymbol: Array<{ symbol: string; candles: number; trades: number; netPnlIdr: number }>;
+  equityCurve: Array<{ timestamp: number; equity: number }>;
+  trades: PortfolioBacktestTrade[];
+}
+
+export interface SafetyStatus {
+  tradingMode: 'paper' | 'live';
+  autoTradingActive: boolean;
+  openPositions: number;
+  unprotectedPositions: number;
+  pendingOrderIntents: number;
+  circuitBreakerActive: boolean;
+  drawdownHalt: boolean;
+  drawdownHaltSince: number | null;
+  peakEquityIdr: number;
+  maxDrawdownPercent: number;
+  equityFloorIdr: number;
+  deriskMode: 'halt' | 'halve' | 'flatten';
+  requireProtectiveOrders: boolean;
+  exitFloorLimitEnabled: boolean;
+  lastLoopAt: number;
+  lastLoopDurationMs: number;
+  engineUptimeSeconds: number;
+}
+
 export interface GhostPosition {
   id: string;
   evaluation_id: string | null;

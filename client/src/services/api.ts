@@ -10,6 +10,9 @@ import {
   RiskProfileInfo,
   BacktestParams,
   BacktestResult,
+  PortfolioBacktestParams,
+  PortfolioBacktestResult,
+  SafetyStatus,
   AbValidationMetrics,
   AntigravityAccountQuota,
   PerformanceReport,
@@ -394,6 +397,38 @@ export const api = {
     }
   },
 
+  async getSafetyStatus(): Promise<SafetyStatus> {
+    try {
+      const json: any = await request('/trading/safety-status');
+      return json.data;
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      return {
+        tradingMode: 'paper',
+        autoTradingActive: false,
+        openPositions: 0,
+        unprotectedPositions: 0,
+        pendingOrderIntents: 0,
+        circuitBreakerActive: false,
+        drawdownHalt: false,
+        drawdownHaltSince: null,
+        peakEquityIdr: 0,
+        maxDrawdownPercent: 15,
+        equityFloorIdr: 0,
+        deriskMode: 'halt',
+        requireProtectiveOrders: true,
+        exitFloorLimitEnabled: true,
+        lastLoopAt: 0,
+        lastLoopDurationMs: 0,
+        engineUptimeSeconds: 0,
+      };
+    }
+  },
+
+  async resetDrawdownKillSwitch(): Promise<{ message: string }> {
+    return await request('/trading/drawdown-reset', { method: 'POST' });
+  },
+
   async getWhatsAppStatus(): Promise<any> {
     try {
       const json: any = await request('/whatsapp');
@@ -547,6 +582,14 @@ export const api = {
         days: params.days || 30,
       };
     }
+  },
+
+  async runPortfolioBacktest(params: PortfolioBacktestParams): Promise<PortfolioBacktestResult> {
+    const json: any = await request('/backtest/portfolio', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+    return json.data;
   },
 
   async getAbMetrics(): Promise<AbValidationMetrics> {
