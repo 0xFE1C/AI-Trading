@@ -26,7 +26,8 @@ export interface CompletionOptions {
   temperature?: number;
   max_tokens?: number;
   jsonMode?: boolean;
-  agentCaller?: string; // 'scout' | 'analyst' | 'master' | 'postmortem' | 'whatsapp'
+  agentCaller?: string; // 'scout' | 'analyst' | 'master' | 'postmortem' | 'whatsapp' | 'portfolio'
+  promptVersion?: string; // from PROMPT_VERSIONS; recorded in ai_call_logs for the audit trail
 }
 
 export interface ProviderRecord {
@@ -252,7 +253,7 @@ export class UniversalAIClient {
     if (!provider) {
       provider = db.prepare('SELECT * FROM providers WHERE is_active = 1 LIMIT 1').get() as ProviderRecord | undefined;
       if (!provider) {
-        logAiCall(caller, aliasModelId, estInputTokens, 0, Date.now() - startTime, 'error');
+        logAiCall(caller, aliasModelId, estInputTokens, 0, Date.now() - startTime, 'error', options.promptVersion);
         throw new Error('Belum ada AI Provider yang aktif. Silakan tambahkan di menu Settings > AI Providers.');
       }
       modelRecord = db.prepare('SELECT * FROM models WHERE provider_id = ? LIMIT 1').get(provider.id) as ModelRecord | undefined;
@@ -270,11 +271,11 @@ export class UniversalAIClient {
 
       this.degradedMode = false;
       const estOutputTokens = Math.max(1, Math.ceil(result.length / 4));
-      logAiCall(caller, `${provider.alias}/${rawModelId}`, estInputTokens, estOutputTokens, Date.now() - startTime, 'ok');
+      logAiCall(caller, `${provider.alias}/${rawModelId}`, estInputTokens, estOutputTokens, Date.now() - startTime, 'ok', options.promptVersion);
       return result;
     } catch (err: any) {
       this.degradedMode = true;
-      logAiCall(caller, `${provider?.alias || 'unknown'}/${rawModelId}`, estInputTokens, 0, Date.now() - startTime, 'error');
+      logAiCall(caller, `${provider?.alias || 'unknown'}/${rawModelId}`, estInputTokens, 0, Date.now() - startTime, 'error', options.promptVersion);
       throw err;
     }
   }

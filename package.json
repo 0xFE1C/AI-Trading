@@ -19,7 +19,8 @@
     "db:reset": "tsx scripts/init_fresh_db.ts",
     "admin:token": "tsx scripts/show_admin_token.ts",
     "test:coverage": "c8 --include=src --reporter=text --reporter=lcov npm test",
-    "test:coverage:critical": "c8 --include=src/services/trading/riskGuard.ts --include=src/services/security/secrets.ts --include=src/utils/indicators.ts --include=src/services/signals --check-coverage --lines 80 --reporter=text npm test"
+    "test:coverage:critical": "c8 --include=src/services/trading/riskGuard.ts --include=src/services/security/secrets.ts --include=src/utils/indicators.ts --include=src/services/signals --check-coverage --lines 80 --reporter=text npm test",
+    "ai:eval": "tsx scripts/eval_ai_prompts.ts"
   },
   "dependencies": {
     "@ngrok/ngrok": "^1.7.0",

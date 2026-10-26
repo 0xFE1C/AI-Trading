@@ -321,6 +321,13 @@ export function initDatabase() {
     // Column already exists
   }
 
+  // Prompt version audit trail: which wording of a prompt produced this call.
+  try {
+    db.exec('ALTER TABLE ai_call_logs ADD COLUMN prompt_version TEXT;');
+  } catch {
+    // Column already exists
+  }
+
   // Default configuration settings
   const defaultSettings: Record<string, string> = {
     trading_mode: 'paper', // default safe paper trading mode
@@ -601,14 +608,15 @@ export function logAiCall(
   estInputTokens: number,
   estOutputTokens: number,
   latencyMs: number,
-  status: string
+  status: string,
+  promptVersion?: string
 ) {
   try {
     const id = `aicall_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     db.prepare(`
-      INSERT INTO ai_call_logs (id, ts, agent, model, est_input_tokens, est_output_tokens, latency_ms, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, Date.now(), agent, model || 'unknown', estInputTokens, estOutputTokens, latencyMs, status);
+      INSERT INTO ai_call_logs (id, ts, agent, model, est_input_tokens, est_output_tokens, latency_ms, status, prompt_version)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, Date.now(), agent, model || 'unknown', estInputTokens, estOutputTokens, latencyMs, status, promptVersion || null);
   } catch (err) {
     // Non-fatal logging
   }

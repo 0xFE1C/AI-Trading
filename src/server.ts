@@ -412,6 +412,8 @@ const PORT = process.env.PORT || 3001;
 // Pairs cache refresh interval (seeds pair rules + new-listing radar detection)
 let pairsRefreshInterval: NodeJS.Timeout | null = null;
 let walCheckpointInterval: NodeJS.Timeout | null = null;
+let advisoryInterval: NodeJS.Timeout | null = null;
+let weeklyReportInterval: NodeJS.Timeout | null = null;
 
 if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes('test'))) {
   server.listen(PORT, async () => {
@@ -475,6 +477,27 @@ if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes(
       });
     }, 5 * 60 * 1000);
 
+    // Portfolio Advisor (read-only daily review) + Weekly Learning Report.
+    // Both self-throttle; the advisory also runs on boot after the swarm warms up.
+    const sendToAdminBots = async (msg: string) => {
+      await Promise.allSettled([whatsappService.sendAlert(msg), telegramService.sendAlert(msg)]);
+    };
+    advisoryInterval = setInterval(() => {
+      agentSwarm.runPortfolioAdvisory().catch(() => {});
+    }, 6 * 3600 * 1000);
+    if (advisoryInterval.unref) advisoryInterval.unref();
+    let lastWeeklyReportAt = 0;
+    weeklyReportInterval = setInterval(async () => {
+      if (Date.now() - lastWeeklyReportAt < 7 * 24 * 3600 * 1000) return;
+      lastWeeklyReportAt = Date.now();
+      await agentSwarm.sendWeeklyLearningReport(sendToAdminBots);
+    }, 24 * 3600 * 1000);
+    if (weeklyReportInterval.unref) weeklyReportInterval.unref();
+    // Kick the advisor once shortly after boot (models/settings are ready then)
+    setTimeout(() => {
+      agentSwarm.runPortfolioAdvisory().catch(() => {});
+    }, 90 * 1000);
+
     // Periodic WAL Checkpoint every 10 minutes to prevent -wal file growth
     walCheckpointInterval = setInterval(() => {
       try {
@@ -511,6 +534,14 @@ async function gracefulShutdown(signal: string) {
     if (walCheckpointInterval) {
       clearInterval(walCheckpointInterval);
       walCheckpointInterval = null;
+    }
+    if (advisoryInterval) {
+      clearInterval(advisoryInterval);
+      advisoryInterval = null;
+    }
+    if (weeklyReportInterval) {
+      clearInterval(weeklyReportInterval);
+      weeklyReportInterval = null;
     }
     if (wsHeartbeatInterval) {
       clearInterval(wsHeartbeatInterval);

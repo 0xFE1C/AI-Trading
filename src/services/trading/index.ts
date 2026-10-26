@@ -28,6 +28,7 @@ import {
 import { agentBus } from '../agents/bus.js';
 import { getTakerFeeRate } from './fees.js';
 import { allowsDeterministicFallback } from './aiPolicy.js';
+import { buildMasterEntryPrompt } from '../ai/prompts.js';
 
 export interface AbValidationMetrics {
   totalEvaluations: number;
@@ -1739,18 +1740,17 @@ export class TradingEngine {
       const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
       const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
 
-      const prompt = `Anda adalah AI Quantitative Risk Manager.
-Evaluasi apakah aman membuka posisi BUY dengan menguji potensi profit vs skenario risiko:
-Koin: ${symbol.toUpperCase()} | Harga: Rp ${price.toLocaleString('id-ID')}
-Profil Risiko: ${riskProfile.toUpperCase()} (Risk Budget: SL -${trailingStopPercent}%, TP1 +${targetTp1}%)
-Setup Kuantitatif: ${reason}${telemetryLine ? `\nMikro-Struktur Pasar: ${telemetryLine}` : ''}
-Sentimen Berita: ${sentimentLabel}
-
-MEMORI BELAJAR (SELF-LEARNING LOOP):
-${lessonsContext}
-
-Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
-{"verdict": "YA", "confidence": 0.85, "reason": "Satu kalimat ringkas alasan evaluasi risiko"}`;
+      const { prompt, version } = buildMasterEntryPrompt({
+        symbol,
+        price,
+        riskProfile,
+        trailingStopPercent,
+        targetTp1,
+        setupReason: reason,
+        telemetryLine,
+        sentimentLabel,
+        lessonsContext,
+      });
 
       const response = await aiClient.complete({
         model,
@@ -1758,6 +1758,7 @@ Jawab HANYA dalam format JSON valid (tanpa markdown backtick):
         temperature: 0.1,
         max_tokens: 80,
         agentCaller: 'master',
+        promptVersion: version,
       });
 
       const approved = TradingEngine.parseAiConfirmation(response);

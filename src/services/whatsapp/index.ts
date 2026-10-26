@@ -10,6 +10,7 @@ import { db, getSetting, setSetting, applyRiskProfile, RISK_PROFILES, DATA_DIR }
 import { tradingEngine, PositionRecord } from '../trading/index.js';
 import { calculateCapitalAllocation } from '../trading/riskGuard.js';
 import { indodax } from '../indodax/index.js';
+import { buildWhatsappSystemPrompt } from '../ai/prompts.js';
 import { agentSwarm } from '../agents/index.js';
 import { aiClient } from '../ai/index.js';
 import { secureCompareTokens } from '../auth/tokenRotation.js';
@@ -1079,7 +1080,80 @@ ${lessonsList}
   /**
    * Eksekusi aksi sistem trading berdasarkan instruksi AI Assistant
    */
-  public async executeAiAction(actionName: string, params: any, isAdmin: boolean): Promise<string> {
+  // --- Two-Step Confirmation for Destructive AI Actions ---
+  // The conversational agent can emit action blocks from free-form chat. An
+  // LLM misread or a spoofed admin session must never move real funds
+  // directly: risky actions arm a pending confirmation and require the admin
+  // to reply with a 6-digit code within 5 minutes.
+
+  private static readonly DESTRUCTIVE_AI_ACTIONS = new Set([
+    'RESUME_AUTOTRADING',
+    'SET_RISK_PROFILE',
+    'SET_TRADING_MODE',
+    'BUY_COIN',
+    'SELL_COIN',
+    'PANIC_SELL',
+  ]);
+
+  private static readonly CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+
+  private pendingAiConfirmations = new Map<
+    string,
+    { action: string; params: any; code: string; issuedAt: number }
+  >();
+
+  private static readonly ACTION_LABELS: Record<string, string> = {
+    RESUME_AUTOTRADING: 'mengaktifkan kembali auto-trading',
+    SET_RISK_PROFILE: 'mengubah profil risiko',
+    SET_TRADING_MODE: 'mengubah mode trading (paper/live)',
+    BUY_COIN: 'membeli koin',
+    SELL_COIN: 'menjual posisi koin',
+    PANIC_SELL: 'melikuidasi SEMUA posisi ke IDR',
+  };
+
+  private async issueAiActionConfirmation(jid: string, act: string, params: any): Promise<string> {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    // One pending action per chat: a newer request replaces the older one.
+    this.pendingAiConfirmations.set(jid, { action: act, params, code, issuedAt: Date.now() });
+    const label = WhatsAppBotService.ACTION_LABELS[act] || act.toLowerCase();
+    return [
+      '🔐 *KONFIRMASI DUA LANGKAH*',
+      '',
+      `Aksi *${act}* (${label}) tergolong aksi berisiko dan wajib dikonfirmasi.`,
+      '',
+      `Balas pesan ini dengan kode: *${code}*`,
+      `_Kode berlaku 5 menit. Balas apa pun selain kode untuk membatalkan._`,
+    ].join('\n');
+  }
+
+  /**
+   * Consumes a pending confirmation if `message` is a 6-digit code. Returns
+   * null when nothing is pending or the message is not a code (letting the
+   * AI chat flow handle it). Executed here, OUTSIDE the LLM, so the model
+   * can never bypass or fabricate the second factor.
+   */
+  public async tryConsumeAiConfirmation(jid: string, message: string, isAdmin: boolean): Promise<string | null> {
+    const pending = this.pendingAiConfirmations.get(jid);
+    if (!pending) return null;
+    const trimmed = (message || '').trim();
+    if (!/^\d{6}$/.test(trimmed)) return null;
+
+    this.pendingAiConfirmations.delete(jid);
+
+    if (Date.now() - pending.issuedAt > WhatsAppBotService.CONFIRMATION_TTL_MS) {
+      return `⌛ *Kode kedaluwarsa.* Aksi *${pending.action}* dibatalkan. Minta ulang bila masih ingin mengeksekusi.`;
+    }
+    if (trimmed !== pending.code) {
+      return `❌ *Kode salah.* Aksi *${pending.action}* dibatalkan. Minta ulang bila masih ingin mengeksekusi.`;
+    }
+    if (!isAdmin) {
+      return '⚠️ *Sesi admin berakhir.* Aksi dibatalkan. Autentikasi ulang dengan */admin <token>* lalu minta ulang aksinya.';
+    }
+
+    return this.runAiAction(pending.action, pending.params);
+  }
+
+  public async executeAiAction(actionName: string, params: any, isAdmin: boolean, jid?: string): Promise<string> {
     const act = (actionName || '').toUpperCase().trim();
 
     // Guard: Hanya administrator yang boleh mengubah status atau mengeksekusi order
@@ -1087,6 +1161,14 @@ ${lessonsList}
       return `⚠️ *Akses Tindakan Ditolak*\nPermintaan tindakan *${act}* tidak dapat dieksekusi karena nomor/akun WhatsApp Anda belum terdaftar sebagai Administrator Utama.\n\n💡 *Otentikasi Admin:*\nKetik */admin <admin_access_token>* untuk memverifikasi hak akses admin.`;
     }
 
+    if (jid && WhatsAppBotService.DESTRUCTIVE_AI_ACTIONS.has(act)) {
+      return this.issueAiActionConfirmation(jid, act, params);
+    }
+
+    return this.runAiAction(act, params);
+  }
+
+  private async runAiAction(act: string, params: any): Promise<string> {
     try {
       switch (act) {
         case 'STOP_AUTOTRADING': {
@@ -1204,32 +1286,17 @@ ${lessonsList}
     const whatsappModel = getSetting('whatsapp_model', '');
 
     try {
+      // 0. Confirmation-code consumption happens OUTSIDE the LLM: a pending
+      // destructive action executes only when the admin replies with the code.
+      const confirmationResult = await this.tryConsumeAiConfirmation(jid, userMessage, effectiveIsAdmin);
+      if (confirmationResult !== null) {
+        await this.sendMessage(jid, confirmationResult);
+        return;
+      }
+
       const fullTradingContext = await this.getFullTradingContext(effectiveIsAdmin);
 
-      const systemPrompt = `Anda adalah Asisten AI Crypto Trading yang cerdas, ramah, dan memiliki wewenang mengontrol bot trading.
-Gunakan data portofolio & kondisi pasar real-time di bawah ini untuk menjawab setiap pertanyaan pengguna dengan tepat, transparan, dan berwawasan trading tinggi (maksimal 2-3 paragraf).
-
-${fullTradingContext}
-
-KEMAMPUAN EKSEKUSI TINDAKAN (ACTION EXECUTION):
-Selain menjawab pertanyaan atau memberikan analisis, Anda dapat mengeksekusi aksi sistem secara otomatis jika pengguna secara eksplisit meminta Anda melakukan sesuatu (seperti mematikan bot, mengubah profil risiko, mengganti mode trading, atau membeli/menjual koin).
-Jika ada permintaan aksi eksplisit dari pengguna, sertakan SATU blok JSON di bagian paling akhir respon Anda dengan format:
-\`\`\`action
-{"action": "NAMA_AKSI", "params": {...}}
-\`\`\`
-
-Daftar Aksi yang Didukung:
-1. STOP_AUTOTRADING: Menghentikan/pause auto-trading. params: {}
-2. RESUME_AUTOTRADING: Menyalakan kembali auto-trading. params: {}
-3. SET_RISK_PROFILE: Mengubah profil risiko. params: {"profile": "conservative" | "balanced" | "aggressive"}
-4. SET_TRADING_MODE: Mengubah mode trading. params: {"mode": "paper" | "live"}
-5. BUY_COIN: Membeli koin tertentu. params: {"symbol": "btc", "amountIdr": 100000}
-6. SELL_COIN: Menjual koin tertentu yang sedang di-hold. params: {"symbol": "btc"}
-7. PANIC_SELL: Menjual SEMUA posisi koin terbuka ke IDR seketika. params: {}
-
-PENTING:
-- Jika pengguna hanya bertanya informasi (misal "berapa balance saya", "apa itu stop loss", "kenapa belum beli koin"), JAWAB DENGAN LENGKAP & JANGAN sertakan blok action.
-- Hanya sertakan blok \`\`\`action jika pengguna secara jelas meminta Anda mengeksekusi tindakan atau mengubah setelan.`;
+      const { prompt: systemPrompt, version } = buildWhatsappSystemPrompt(fullTradingContext);
 
       const reply = await aiClient.complete({
         model: whatsappModel || undefined,
@@ -1238,6 +1305,8 @@ PENTING:
           { role: 'user', content: userMessage },
         ],
         temperature: 0.4,
+        agentCaller: 'whatsapp',
+        promptVersion: version,
       });
 
       // 1. Ekstraksi blok action dari jawaban AI
@@ -1262,10 +1331,10 @@ PENTING:
         detectedAction = this.detectFallbackActionIntent(userMessage);
       }
 
-      // 3. Eksekusi aksi jika terdeteksi
+      // 3. Eksekusi aksi jika terdeteksi (aksi berisiko memicu konfirmasi 2-langkah)
       let actionResultText = '';
       if (detectedAction) {
-        actionResultText = await this.executeAiAction(detectedAction.action, detectedAction.params, effectiveIsAdmin);
+        actionResultText = await this.executeAiAction(detectedAction.action, detectedAction.params, effectiveIsAdmin, jid);
       }
 
       let finalMessage = cleanReply;

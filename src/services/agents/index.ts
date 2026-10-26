@@ -6,6 +6,7 @@ import { scoreHeadline } from '../signals/lexicon.js';
 import { detectThreats } from '../signals/threat.js';
 import type { ThreatSignal } from '../signals/types.js';
 import { feedSourceName, getExtraFeedUrls } from './extraFeeds.js';
+import { buildPostmortemPrompt, buildPortfolioReviewPrompt } from '../ai/prompts.js';
 
 export interface RssItem {
   title: string;
@@ -786,15 +787,22 @@ Kembalikan HANYA format JSON valid berikut (tanpa markdown backtick):
 
     const isWin = trade.pnlPercent >= 0;
 
-    const prompt = `Lakukan evaluasi post-mortem objektif atas trade berikut:
-Simbol: ${trade.symbol}
-Harga Beli: ${trade.entryPrice}
-Harga Jual: ${trade.exitPrice}
-PnL: ${trade.pnlPercent.toFixed(2)}% (${isWin ? 'WIN / PROFIT' : 'LOSS / STOP LOSS'})
-Durasi Hold: ${trade.holdDurationMinutes} menit
-Alasan Exit: ${trade.exitReason}
+    // Enrich the lesson with the market regime it was taken in, so retrieval
+    // can condition future prompts on "what worked in THIS regime".
+    let regime = 'UNKNOWN';
+    try {
+      const row = db.prepare('SELECT regime FROM regime_log ORDER BY ts DESC LIMIT 1').get() as { regime?: string } | undefined;
+      if (row?.regime) regime = row.regime;
+    } catch {}
 
-Tuliskan 1 pelajaran penting (maksimal 2 kalimat) untuk memori trading AI agar di masa depan sistem ini dapat mengulangi kesuksesan atau mencegah kerugian pada kondisi serupa.`;
+    const { prompt, version } = buildPostmortemPrompt({
+      symbol: trade.symbol,
+      entryPrice: trade.entryPrice,
+      exitPrice: trade.exitPrice,
+      pnlPercent: trade.pnlPercent,
+      holdDurationMinutes: trade.holdDurationMinutes,
+      exitReason: trade.exitReason,
+    });
 
     try {
       const lesson = await aiClient.complete({
@@ -806,6 +814,7 @@ Tuliskan 1 pelajaran penting (maksimal 2 kalimat) untuk memori trading AI agar d
         temperature: 0.3,
         max_tokens: 200,
         agentCaller: 'postmortem',
+        promptVersion: version,
       });
 
       db.prepare(`
@@ -817,13 +826,162 @@ Tuliskan 1 pelajaran penting (maksimal 2 kalimat) untuk memori trading AI agar d
         trade.symbol,
         isWin ? 'WIN' : 'LOSS',
         trade.pnlPercent,
-        `Volatile / Momentum (${trade.holdDurationMinutes}m)`,
+        `Regime: ${regime} | ${isWin ? 'Win' : 'Loss'} (${trade.holdDurationMinutes}m) | Exit: ${trade.exitReason.slice(0, 80)}`,
         lesson.trim(),
         Date.now()
       );
       console.log(`[AI Post-Mortem] Pelajaran disimpan untuk ${trade.symbol}: ${lesson.trim()}`);
     } catch (err: any) {
       console.warn('[AI Post-Mortem Reviewer] Gagal mereview trade:', err.message);
+    }
+  }
+
+  // --- Portfolio Advisor (READ-ONLY advisory subagent) ---
+
+  private lastPortfolioReviewAt = 0;
+
+  /**
+   * Daily read-only portfolio review. The model never executes anything: the
+   * output lands in subagent_logs (visible on the Multi-Agent dashboard) and
+   * is optionally broadcast to the admin bots. Runs at most once per 24h.
+   */
+  public async runPortfolioAdvisory(force = false): Promise<string | null> {
+    const now = Date.now();
+    if (!force && now - this.lastPortfolioReviewAt < 24 * 3600 * 1000) return null;
+
+    const masterModel = getSetting('master_model', '');
+    if (!masterModel) return null;
+    this.lastPortfolioReviewAt = now;
+
+    const mode = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
+    const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
+
+    const openPositions = db.prepare(`
+      SELECT symbol, entry_price, current_price, pnl_percent, opened_at, amount
+      FROM positions WHERE status = 'open' AND mode = ?
+      ORDER BY opened_at DESC LIMIT 10
+    `).all(mode) as Array<{ symbol: string; entry_price: number; current_price: number; pnl_percent: number; opened_at: number; amount: number }>;
+
+    // 7-day performance for the mode being reviewed
+    const weekAgo = now - 7 * 24 * 3600 * 1000;
+    const perf = db.prepare(`
+      SELECT COUNT(*) as total,
+             SUM(CASE WHEN pnl_idr > 0 THEN 1 ELSE 0 END) as wins,
+             SUM(pnl_idr) as netPnl
+      FROM positions WHERE status = 'closed' AND closed_at >= ? AND mode = ?
+    `).get(weekAgo, mode) as { total: number; wins: number | null; netPnl: number | null };
+
+    let regime = 'UNKNOWN';
+    let threatCount = 0;
+    try {
+      const { threatCount: tc } = this.getAggregatedSentiment();
+      threatCount = tc;
+      const row = db.prepare('SELECT regime FROM regime_log ORDER BY ts DESC LIMIT 1').get() as { regime?: string } | undefined;
+      if (row?.regime) regime = row.regime;
+    } catch {}
+
+    const equityIdr = mode === 'paper'
+      ? parseFloat(getSetting('paper_idr_balance', '10000000')) +
+        openPositions.reduce((acc, p) => acc + p.current_price * p.amount, 0)
+      : openPositions.reduce((acc, p) => acc + p.current_price * p.amount, 0);
+
+    const { prompt, version } = buildPortfolioReviewPrompt({
+      mode,
+      equityIdr,
+      openPositions: openPositions.map((p) => ({
+        symbol: p.symbol,
+        entryPrice: p.entry_price,
+        currentPrice: p.current_price,
+        pnlPercent: p.pnl_percent,
+        holdMinutes: Math.round((now - p.opened_at) / 60000),
+        trailingStopPercent,
+      })),
+      recentPerformance: {
+        winRatePercent: perf.total > 0 && perf.wins !== null ? (perf.wins / perf.total) * 100 : 0,
+        totalPnl7dIdr: perf.netPnl || 0,
+        closedTrades7d: perf.total,
+      },
+      regime,
+      threatCount,
+    });
+
+    try {
+      const review = await aiClient.complete({
+        model: masterModel,
+        messages: [
+          { role: 'system', content: 'Anda Portfolio Reviewer read-only. Anda tidak memiliki kemampuan eksekusi dan tidak boleh mengeluarkan perintah trading.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.4,
+        max_tokens: 300,
+        agentCaller: 'portfolio',
+        promptVersion: version,
+      });
+
+      const summary = review.trim().slice(0, 800);
+      db.prepare(`
+        INSERT INTO subagent_logs (id, agent_id, agent_name, source_name, title, summary, sentiment_score, coins_mentioned, is_threat, timestamp)
+        VALUES (?, 'portfolio_advisor', 'Portfolio Advisor', 'Portfolio Review (Harian)', 'Review Portofolio Harian (Read-Only)', ?, 0, ?, 0, ?)
+      `).run(
+        `port_${Date.now()}`,
+        summary,
+        JSON.stringify(openPositions.map((p) => p.symbol.replace('idr', '').toUpperCase())),
+        Date.now()
+      );
+      console.log(`[Portfolio Advisor] Review harian tersimpan (${openPositions.length} posisi terbuka).`);
+      return summary;
+    } catch (err: any) {
+      console.warn('[Portfolio Advisor] Gagal menjalankan review:', err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Weekly self-learning report: aggregates the last 7 days of trades and
+   * lessons into a compact digest for the admin bots. Read-only reporting.
+   */
+  public async sendWeeklyLearningReport(send: (message: string) => Promise<void>): Promise<void> {
+    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const perf = db.prepare(`
+      SELECT COUNT(*) as total,
+             SUM(CASE WHEN pnl_idr > 0 THEN 1 ELSE 0 END) as wins,
+             SUM(pnl_idr) as netPnl,
+             SUM(CASE WHEN pnl_percent > 0 THEN pnl_percent ELSE 0 END) as grossWin,
+             SUM(CASE WHEN pnl_percent < 0 THEN pnl_percent ELSE 0 END) as grossLoss
+      FROM positions WHERE status = 'closed' AND closed_at >= ?
+    `).get(weekAgo) as { total: number; wins: number | null; netPnl: number | null; grossWin: number | null; grossLoss: number | null };
+
+    const lessons = db.prepare(`
+      SELECT symbol, result, pnl_percent, lesson FROM lessons_learned
+      WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5
+    `).all(weekAgo) as Array<{ symbol: string; result: string; pnl_percent: number; lesson: string }>;
+
+    const winRate = perf.total > 0 && perf.wins !== null ? (perf.wins / perf.total) * 100 : 0;
+    const profitFactor = perf.grossLoss && perf.grossLoss < 0 && perf.grossWin ? Math.abs(perf.grossWin / perf.grossLoss) : null;
+
+    const lines = [
+      '📚 *LAPORAN PEMBELAJARAN MINGGUAN*',
+      '',
+      `Trade ditutup 7 hari: *${perf.total}* | Win rate: *${winRate.toFixed(1)}%*`,
+      `Net PnL: *Rp ${(perf.netPnl || 0).toLocaleString('id-ID')}*`,
+    ];
+    if (profitFactor !== null) {
+      lines.push(`Profit factor: *${profitFactor.toFixed(2)}*`);
+    }
+    if (lessons.length > 0) {
+      lines.push('', '*Pelajaran teratas:*');
+      for (const l of lessons) {
+        lines.push(`• [${l.symbol.toUpperCase()} ${l.result} ${l.pnl_percent.toFixed(1)}%] ${l.lesson.slice(0, 140)}`);
+      }
+    } else {
+      lines.push('', 'Belum ada pelajaran baru minggu ini.');
+    }
+    lines.push('', '_Laporan ini read-only; tidak ada aksi dieksekusi._');
+
+    try {
+      await send(lines.join('\n'));
+    } catch (err: any) {
+      console.warn('[Weekly Report] Gagal mengirim laporan mingguan:', err.message);
     }
   }
 }
