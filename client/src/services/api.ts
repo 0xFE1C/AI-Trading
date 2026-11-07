@@ -24,6 +24,10 @@ import {
   EntryGateDiagnostics,
   AiMeteringStats,
   SignalsRadarData,
+  MarketRadarResponse,
+  OptimizerStatus,
+  OptimizerRunParams,
+  OptimizerRunSummary,
 } from '../types';
 import {
   mockSystemStatus,
@@ -32,6 +36,7 @@ import {
   mockSubagentDefs,
   mockSubagentLogs,
   mockBacktestResult,
+  mockPortfolioBacktestResult,
   mockAnalytics,
   mockAbMetrics,
   mockRiskProfiles,
@@ -44,6 +49,8 @@ import {
   mockEntryGateDiagnostics,
   mockAiMeteringStats,
   mockSignalsRadar,
+  mockMarketRadar,
+  mockOptimizerStatus,
 } from './mockData';
 
 const BASE_URL = '/api';
@@ -122,7 +129,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     const json = await res.json();
 
     if (res.status === 401 && json.requiresAuth) {
-      window.dispatchEvent(new CustomEvent('AUTH_REQUIRED'));
+      // 401 hanya berarti "sesi kedaluwarsa" bila pemanggil memang membawa
+      // token. Visitor mode observer memang tidak punya token — endpoint
+      // admin-only yang ia sentuh (diagnostik, A/B, model) TIDAK boleh
+      // menyemburkan modal login ke pengunjung yang sekadar melihat-lihat.
+      if (token) {
+        window.dispatchEvent(new CustomEvent('AUTH_REQUIRED'));
+      }
     }
 
     if (!res.ok) {
@@ -585,11 +598,22 @@ export const api = {
   },
 
   async runPortfolioBacktest(params: PortfolioBacktestParams): Promise<PortfolioBacktestResult> {
-    const json: any = await request('/backtest/portfolio', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
-    return json.data;
+    try {
+      const json: any = await request('/backtest/portfolio', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      });
+      return json.data;
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      return {
+        ...mockPortfolioBacktestResult,
+        symbolsRequested: params.symbols?.length ? params.symbols : mockPortfolioBacktestResult.symbolsRequested,
+        symbolsWithData: params.symbols?.length ? params.symbols : mockPortfolioBacktestResult.symbolsWithData,
+        timeframe: params.timeframe || mockPortfolioBacktestResult.timeframe,
+        days: params.days || mockPortfolioBacktestResult.days,
+      };
+    }
   },
 
   async getAbMetrics(): Promise<AbValidationMetrics> {
@@ -789,6 +813,69 @@ export const api = {
     } catch (err) {
       throwUnlessStaticHost(err);
       return mockSignalsRadar;
+    }
+  },
+
+  // Radar Pasar deterministik (screener tahap-1, 0 token LLM)
+  async getMarketRadar(): Promise<MarketRadarResponse> {
+    try {
+      const json: any = await request('/market/radar');
+      return json.data;
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      return mockMarketRadar;
+    }
+  },
+
+  // Optimizer walk-forward (preset profit-side, 0 token LLM)
+  async getOptimizerStatus(): Promise<OptimizerStatus> {
+    try {
+      const json: any = await request('/optimizer/status');
+      return json.data;
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      return mockOptimizerStatus;
+    }
+  },
+
+  async runOptimizer(params: OptimizerRunParams = {}): Promise<OptimizerRunSummary> {
+    try {
+      const json: any = await request('/optimizer/run', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      });
+      return json.data;
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      // Demo mode: 1 simbol robust, preset 6.5/13 ditulis (koheren dgn mock status).
+      const preset = { ...(mockOptimizerStatus.preset as NonNullable<OptimizerStatus['preset']>).meta, testedAt: Date.now() };
+      return {
+        ok: true,
+        startedAt: Date.now(),
+        durationMs: 4200,
+        timeframe: params.timeframe || '1h',
+        days: params.days || 90,
+        presetWritten: true,
+        preset,
+        symbols: mockOptimizerStatus.runs.slice(0, 2).map((r) => ({
+          symbol: r.symbol,
+          timeframe: r.timeframe,
+          barCount: 2160,
+          coveredDays: 90,
+          dataSource: 'cache' as const,
+          verdict: r.verdict,
+          inSamplePF: r.in_sample_pf,
+          outSamplePF: r.out_sample_pf,
+          oosPnlIdr: r.oos_pnl_idr || 0,
+          walkForward: { verdict: r.wf_verdict || 'OVERFIT', oosPnlIdr: r.wf_oos_pnl_idr || 0, oosToIsRatio: 0.8 },
+          chosenConfig: {
+            id: 'cfg_3_wide_room',
+            name: 'Wide Breathing Room (TP 6.5%, SL 4.0%)',
+            takeProfitPercent: 6.5,
+            trailingStopPercent: 4.0,
+          },
+        })),
+      };
     }
   },
 };

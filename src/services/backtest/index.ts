@@ -1,5 +1,9 @@
 import { indodax } from '../indodax/index.js';
 import { getTakerFeePercent } from '../trading/fees.js';
+import { loadCandles } from '../candles/store.js';
+import { calculateTrueATR } from '../../utils/indicators.js';
+import { isBluechipSymbol } from '../signals/features.js';
+import { computeExitPlan, ExitPlan } from '../trading/adaptiveExit.js';
 
 export interface BacktestParams {
   symbol: string; // e.g. 'btcidr', 'ethidr', 'solidr', 'pepeidr'
@@ -9,10 +13,12 @@ export interface BacktestParams {
   allocationPerTradeIdr?: number; // default 100.000 IDR
   trailingStopPercent?: number; // default 2.5%
   takeProfitStep1Percent?: number; // default 5.0%
+  takeProfitTarget2Percent?: number; // default 10.0%, second scale-out (50% of remainder); 0 = off
   minGainThresholdPercent?: number; // default 1.5% for live_momentum / auto-scaled for candle_breakout
   slippagePercent?: number; // default 0.2%
   feePercent?: number; // default: configured Indodax taker fee
   strategyType?: 'live_momentum' | 'candle_breakout'; // default 'live_momentum'
+  adaptiveExit?: boolean; // default false = perilaku legacy persis; true = rencana exit adaptif per entry
 }
 
 export interface BacktestTrade {
@@ -54,6 +60,7 @@ export interface BacktestResult {
   slippagePercent: number;
   feePercent: number;
   strategyUsed: string;
+  dataSource?: 'cache' | 'exchange'; // 'cache' = candle store covered the range, 'exchange' = history_v2 fetch
   trades: BacktestTrade[];
   equityCurve: Array<{ time: string; timestamp: number; equity: number }>;
 }
@@ -65,11 +72,53 @@ export interface BacktestBar {
   low: number;
   close: number;
   volume: number;
+  rawVolume?: number; // volume koin asli (bukan notional IDR) bila tersedia dari feed
+}
+
+const TIMEFRAME_SECONDS: Record<string, number> = {
+  '15m': 900,
+  '1h': 3600,
+  '4h': 14400,
+  '1d': 86400,
+};
+
+/**
+ * Tries the local candle-store research cache FIRST. Returns bars only when
+ * the cache fully covers the requested day range (enough bars for the
+ * timeframe AND both edges of the window), otherwise null so the caller
+ * falls back to the exchange history endpoint.
+ */
+export function loadCachedBars(pair: string, timeframe: string, days: number): BacktestBar[] | null {
+  const tfSeconds = TIMEFRAME_SECONDS[timeframe] || 3600;
+  const neededBars = Math.ceil((days * 86400) / tfSeconds) + 1;
+  const cached = loadCandles(pair, timeframe, neededBars + 10);
+  if (cached.length < neededBars) return null;
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const fromTargetSec = nowSec - days * 86400;
+  const oldestSec = cached[0].timestamp / 1000;
+  const newestSec = cached[cached.length - 1].timestamp / 1000;
+  // Coverage: oldest bar reaches the requested start and the newest bar is
+  // fresh (within ~2 buckets of now — the store only holds observed candles).
+  const coversStart = oldestSec <= fromTargetSec + tfSeconds;
+  const freshEnd = newestSec >= nowSec - 2 * tfSeconds;
+  // Contiguity: the store only holds candles the live engine observed, so a
+  // WebSocket outage leaves holes. Bar count alone cannot detect that —
+  // require the bar count to match the oldest→newest span (small tolerance
+  // for edge buckets), otherwise the backtest would silently simulate across
+  // multi-bucket gaps.
+  const expectedSpanBars = Math.round((newestSec - oldestSec) / tfSeconds) + 1;
+  const gapTolerance = Math.max(2, Math.ceil(expectedSpanBars * 0.02));
+  const contiguous = cached.length >= expectedSpanBars - gapTolerance;
+  return coversStart && freshEnd && contiguous ? cached : null;
 }
 
 export class BacktestEngine {
   /**
-   * Run backtest simulation against real Indodax historical candlestick data with pagination
+   * Run backtest simulation. The local candle-store research cache is tried
+   * first (no network); when it does not cover the requested range, the
+   * undocumented Indodax TradingView history_v2 endpoint is fetched with
+   * pagination as before.
    */
   public async run(params: BacktestParams): Promise<BacktestResult> {
     const symbol = params.symbol.toLowerCase().replace('/', '').replace('_', '');
@@ -77,6 +126,14 @@ export class BacktestEngine {
     const cleanSymbol = cleanPair.toUpperCase();
     const timeframe = params.timeframe || '1h';
     const days = params.days && params.days > 0 ? Math.min(params.days, 180) : 30;
+
+    // 0. Candle-store cache first: saves the history_v2 scrape when the live
+    // engine has already observed and persisted enough of this pair.
+    const cachedBars = loadCachedBars(cleanPair, timeframe, days);
+    if (cachedBars) {
+      console.log(`[Backtest] ${cleanSymbol} ${timeframe}: memakai ${cachedBars.length} candle dari cache lokal (${days} hari).`);
+      return this.simulate(cachedBars, params, 'cache');
+    }
 
     let tfParam = '60';
     if (timeframe === '15m') tfParam = '15';
@@ -149,15 +206,16 @@ export class BacktestEngine {
       throw new Error(`Data historis candlestick tidak cukup (${bars.length} candle) untuk ${cleanSymbol} pada timeframe ${timeframe}.`);
     }
 
-    return this.simulate(bars, params);
+    return this.simulate(bars, params, 'exchange');
   }
 
   /**
    * Deterministic Bar-by-bar Strategy Simulation Engine
    * Includes Realistic Slippage, Exchange Fees, Dynamic Trailing Ratchet,
-   * Partial Take-Profit + Breakeven, and Zero-Lookahead Intra-bar Execution.
+   * Partial Take-Profit + Breakeven, TP2 Second Scale-Out, and Zero-Lookahead
+   * Intra-bar Execution.
    */
-  public simulate(bars: BacktestBar[], params: BacktestParams): BacktestResult {
+  public simulate(bars: BacktestBar[], params: BacktestParams, dataSource: 'cache' | 'exchange' = 'exchange'): BacktestResult {
     const symbol = params.symbol.toUpperCase();
     const cleanSymbol = symbol.endsWith('IDR') ? symbol : `${symbol}IDR`;
     const timeframe = params.timeframe || '1h';
@@ -166,9 +224,51 @@ export class BacktestEngine {
     const allocationPerTrade = params.allocationPerTradeIdr || 100000;
     const trailingStopPercent = params.trailingStopPercent || 2.5;
     const takeProfitStep1Percent = params.takeProfitStep1Percent || 5.0;
+    const takeProfitTarget2Percent = params.takeProfitTarget2Percent !== undefined ? params.takeProfitTarget2Percent : 10.0;
     const slippagePercent = params.slippagePercent !== undefined ? params.slippagePercent : 0.2;
     const feePercent = params.feePercent !== undefined ? params.feePercent : getTakerFeePercent();
     const strategyType = params.strategyType || 'live_momentum';
+    const adaptiveExit = params.adaptiveExit === true;
+
+    /**
+     * Rencana exit adaptif per entry (zero-lookahead: hanya memakai data s/d
+     * bar entry). APPROKSIMASI yang didokumentasikan: backtest tidak punya
+     * konteks BTC global, jadi "rezim" diproksi dari struktur harga koin itu
+     * sendiri (close vs SMA20 + drop dari high 20-bar); depth orderbook tidak
+     * tersedia → null; isBluechip dari daftar blue-chip.
+     */
+    const computeAdaptivePlan = (i: number): ExitPlan => {
+      const bar = bars[i];
+      const window = bars.slice(0, i + 1);
+
+      const atr = calculateTrueATR(window, 14);
+      const atrPct = atr !== null && atr > 0 && bar.close > 0 ? (atr / bar.close) * 100 : null;
+
+      let regime: string | null = null;
+      if (window.length >= 20) {
+        const last20 = window.slice(-20);
+        const sma20 = last20.reduce((sum, b) => sum + b.close, 0) / 20;
+        const high20 = Math.max(...last20.map((b) => b.high));
+        const dropFromHigh20 = high20 > 0 ? ((bar.close - high20) / high20) * 100 : 0;
+        if (bar.close > sma20) regime = 'RISK_ON';
+        else if (bar.close < sma20 && dropFromHigh20 <= -8) regime = 'RISK_OFF';
+        else regime = 'NEUTRAL';
+      }
+
+      const avgVolume = volumeWindow.length > 0 ? volumeWindow.reduce((a, b) => a + b, 0) / volumeWindow.length : 0;
+      const volumeSurgeRatio = avgVolume > 0 ? bar.volume / avgVolume : null;
+
+      return computeExitPlan({
+        atrPct,
+        regime,
+        volumeSurgeRatio,
+        depthImbalance: null, // depth tidak diketahui di backtest
+        isBluechip: isBluechipSymbol(params.symbol),
+        baseTp1Pct: takeProfitStep1Percent,
+        baseTp2Pct: takeProfitTarget2Percent > 0 ? takeProfitTarget2Percent : null,
+        baseTrailingPct: trailingStopPercent,
+      });
+    };
 
     // Effective days & truncation tracking
     const earliestMs = bars[0].timestamp;
@@ -209,6 +309,12 @@ export class BacktestEngine {
     let entryTime = 0;
     let tradeRealizedCash = 0;
 
+    // Target aktif posisi berjalan. adaptiveExit=false → identik nilai legacy;
+    // true → diisi dari rencana adaptif posisi saat entry.
+    let activeTp1 = takeProfitStep1Percent;
+    let activeTp2 = takeProfitTarget2Percent;
+    let activeTrailing = trailingStopPercent;
+
     const trades: BacktestTrade[] = [];
     const equityCurve: Array<{ time: string; timestamp: number; equity: number }> = [];
 
@@ -244,15 +350,23 @@ export class BacktestEngine {
           const pnlPercent = (pnlIdr / initialCost) * 100;
           const holdHours = Math.max(1, Math.round((bar.timestamp - entryTime) / 3600000));
 
-          // Crystal clear, honest exit reason labeling
+          // Crystal clear, honest exit reason labeling (target dari rencana exit posisi)
           let exitReason = '';
-          if (takeProfitStep === 1) {
+          if (takeProfitStep === 2) {
             if (rawExitPrice > entryPrice * 1.002) {
-              exitReason = `Partial TP (+${takeProfitStep1Percent}%) + Trailing Stop (+${(((rawExitPrice - entryPrice) / entryPrice) * 100).toFixed(1)}%)`;
+              exitReason = `Partial TP2 (+${activeTp2}%) + Trailing Stop (+${(((rawExitPrice - entryPrice) / entryPrice) * 100).toFixed(1)}%)`;
             } else if (Math.abs(rawExitPrice - entryPrice) / entryPrice <= 0.002) {
-              exitReason = `Partial TP (+${takeProfitStep1Percent}%) + Breakeven Exit`;
+              exitReason = `Partial TP2 (+${activeTp2}%) + Breakeven Exit`;
             } else {
-              exitReason = `Partial TP (+${takeProfitStep1Percent}%) + Stop Exit (-${(((entryPrice - rawExitPrice) / entryPrice) * 100).toFixed(1)}%)`;
+              exitReason = `Partial TP2 (+${activeTp2}%) + Stop Exit (-${(((entryPrice - rawExitPrice) / entryPrice) * 100).toFixed(1)}%)`;
+            }
+          } else if (takeProfitStep === 1) {
+            if (rawExitPrice > entryPrice * 1.002) {
+              exitReason = `Partial TP (+${activeTp1}%) + Trailing Stop (+${(((rawExitPrice - entryPrice) / entryPrice) * 100).toFixed(1)}%)`;
+            } else if (Math.abs(rawExitPrice - entryPrice) / entryPrice <= 0.002) {
+              exitReason = `Partial TP (+${activeTp1}%) + Breakeven Exit`;
+            } else {
+              exitReason = `Partial TP (+${activeTp1}%) + Stop Exit (-${(((entryPrice - rawExitPrice) / entryPrice) * 100).toFixed(1)}%)`;
             }
           } else {
             if (rawExitPrice >= entryPrice) {
@@ -285,11 +399,11 @@ export class BacktestEngine {
           // Step 2: Position survived stop test. Now check high for new peak and partial take-profit
           highestPrice = Math.max(highestPrice, bar.high);
 
-          // Partial Take-Profit check (+X% threshold)
+          // Partial Take-Profit check (+X% threshold — dari rencana exit posisi)
           const currentGainPercent = ((bar.high - entryPrice) / entryPrice) * 100;
-          if (currentGainPercent >= takeProfitStep1Percent && takeProfitStep === 0) {
+          if (currentGainPercent >= activeTp1 && takeProfitStep === 0) {
             const halfAmount = currentAmount * 0.5;
-            const targetTpPrice = entryPrice * (1 + takeProfitStep1Percent / 100);
+            const targetTpPrice = entryPrice * (1 + activeTp1 / 100);
             const effectiveTpPrice = targetTpPrice * (1 - slippageRate);
             const tpProceeds = halfAmount * effectiveTpPrice * (1 - takerFeeRate);
             cash += tpProceeds;
@@ -299,8 +413,22 @@ export class BacktestEngine {
             trailingStopPrice = Math.max(trailingStopPrice, entryPrice); // Move SL to breakeven!
           }
 
+          // TP2 second scale-out (50% of the remainder), same zero-lookahead
+          // discipline: fills at the TP2 target when this bar's high touched it.
+          if (activeTp2 > 0 && takeProfitStep === 1 && currentGainPercent >= activeTp2) {
+            const halfRemaining = currentAmount * 0.5;
+            const targetTp2Price = entryPrice * (1 + activeTp2 / 100);
+            const effectiveTp2Price = targetTp2Price * (1 - slippageRate);
+            const tp2Proceeds = halfRemaining * effectiveTp2Price * (1 - takerFeeRate);
+            cash += tp2Proceeds;
+            tradeRealizedCash += tp2Proceeds;
+            currentAmount -= halfRemaining;
+            takeProfitStep = 2;
+            trailingStopPrice = Math.max(trailingStopPrice, entryPrice); // Breakeven floor unchanged
+          }
+
           // Step 3: Ratchet dynamic trailing stop for next bar
-          const computedSL = highestPrice * (1 - trailingStopPercent / 100);
+          const computedSL = highestPrice * (1 - activeTrailing / 100);
           if (computedSL > trailingStopPrice) {
             trailingStopPrice = computedSL;
           }
@@ -339,6 +467,12 @@ export class BacktestEngine {
         if (entrySignal && cash >= allocationPerTrade) {
           inPosition = true;
           const rawEntryPrice = bar.close;
+          // Rencana exit adaptif untuk posisi ini (zero-lookahead: data s/d bar
+          // entry). Mode off → null = nilai legacy persis.
+          const plan = adaptiveExit ? computeAdaptivePlan(i) : null;
+          activeTp1 = plan ? plan.tp1Pct : takeProfitStep1Percent;
+          activeTp2 = plan ? (plan.tp2Pct ?? 0) : takeProfitTarget2Percent;
+          activeTrailing = plan ? plan.trailingPct : trailingStopPercent;
           // Apply slippage on entry
           entryPrice = rawEntryPrice * (1 + slippageRate);
           initialCost = Math.min(allocationPerTrade, cash);
@@ -346,7 +480,7 @@ export class BacktestEngine {
           cash -= initialCost;
           tradeRealizedCash = 0;
           highestPrice = rawEntryPrice;
-          trailingStopPrice = rawEntryPrice * (1 - trailingStopPercent / 100);
+          trailingStopPrice = rawEntryPrice * (1 - activeTrailing / 100);
           takeProfitStep = 0;
           entryTime = bar.timestamp;
         }
@@ -440,7 +574,8 @@ export class BacktestEngine {
       averageTradePnlPercent: avgPnlPercent,
       slippagePercent,
       feePercent,
-      strategyUsed: strategyType === 'live_momentum' ? '24h Rolling Momentum (Live Engine Replay)' : 'Single Candlestick Momentum Breakout',
+      strategyUsed: (strategyType === 'live_momentum' ? '24h Rolling Momentum (Live Engine Replay)' : 'Single Candlestick Momentum Breakout') + (adaptiveExit ? ' + Adaptive Exit' : ''),
+      dataSource,
       trades: trades.reverse(), // most recent first
       equityCurve,
     };

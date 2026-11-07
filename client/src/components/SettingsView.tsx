@@ -6,6 +6,7 @@ import {
   Download,
   Upload,
   Key,
+  Server,
   Shield,
   Save,
   CheckCircle2,
@@ -41,6 +42,7 @@ import {
   TokenRotationStatus,
   TokenRotationMode,
   TokenRotationUnit,
+  OptimizerStatus,
 } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { Toast } from './Toast';
@@ -52,11 +54,14 @@ export type SettingsSubTab = 'ai' | 'risk' | 'indodax' | 'security';
 interface SettingsViewProps {
   activeSubTab?: SettingsSubTab;
   onSubTabChange?: (subTab: SettingsSubTab) => void;
+  /** 'simple' hides developer-ish blocks (tunnel, token rotation, export/import). */
+  displayMode?: 'simple' | 'pro';
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   activeSubTab: externalSubTab,
   onSubTabChange,
+  displayMode = 'simple',
 }) => {
   const { l, formatCurrency, formatNumber, language } = useLanguage();
   const [deleteProviderId, setDeleteProviderId] = useState<string | null>(null);
@@ -86,6 +91,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [allModels, setAllModels] = useState<AIModel[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  // Beginner mode: advanced/developer blocks start hidden in 'simple' mode,
+  // visible in 'pro'. Session-scoped component state (per spec).
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(displayMode === 'pro');
   const [importingProviderId, setImportingProviderId] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -130,6 +138,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showRotateConfirmModal, setShowRotateConfirmModal] = useState(false);
   const [showTokenPlain, setShowTokenPlain] = useState(false);
   const [rotationSuccessMessage, setRotationSuccessMessage] = useState<string | null>(null);
+
+  // Optimizer Walk-Forward State (preset profit-side)
+  const [optimizerStatus, setOptimizerStatus] = useState<OptimizerStatus | null>(null);
+  const [optimizerRunning, setOptimizerRunning] = useState(false);
+  const [optimizerFeedback, setOptimizerFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const loadData = async () => {
     try {
@@ -215,7 +228,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   useEffect(() => {
     loadData();
+    // Status optimizer (preset walk-forward) dimuat terpisah: kegagalan tidak
+    // boleh menggagalkan data settings utama.
+    api
+      .getOptimizerStatus()
+      .then(setOptimizerStatus)
+      .catch(() => setOptimizerStatus(null));
   }, []);
+
+  // Keep the advanced switch aligned when the user flips simple/pro mode.
+  useEffect(() => {
+    setShowAdvanced(displayMode === 'pro');
+  }, [displayMode]);
 
   // Handler untuk memulai alur Google OAuth Antigravity
   const handleStartAntigravityConnect = async () => {
@@ -463,6 +487,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const updateSettingField = (key: string, val: string) => {
     setSettings((prev) => ({ ...prev, [key]: val }));
+  };
+
+  // Jalankan optimasi walk-forward sekarang (admin, sinkron & bounded).
+  const handleRunOptimizer = async () => {
+    setOptimizerRunning(true);
+    setOptimizerFeedback(null);
+    try {
+      const summary = await api.runOptimizer({});
+      const robustCount = summary.symbols.filter((s) => s.walkForward.verdict === 'WALK_FORWARD_ROBUST').length;
+      setOptimizerFeedback({
+        type: 'success',
+        message: summary.presetWritten
+          ? l(
+              `Optimization finished (${robustCount} robust symbol(s)). Profit preset saved: TP1 ${summary.preset?.tp1}% / TP2 ${summary.preset?.tp2}%.`,
+              `Optimasi selesai (${robustCount} simbol robust). Preset profit disimpan: TP1 ${summary.preset?.tp1}% / TP2 ${summary.preset?.tp2}%.`
+            )
+          : l(
+              'Optimization finished. No robust symbol passed the gate — no preset was written.',
+              'Optimasi selesai. Tidak ada simbol robust yang lolos gerbang — preset tidak ditulis.'
+            ),
+      });
+      try {
+        const status = await api.getOptimizerStatus();
+        setOptimizerStatus(status);
+      } catch {}
+    } catch (err: any) {
+      setOptimizerFeedback({
+        type: 'error',
+        message: err?.message || l('Optimization failed to run.', 'Optimasi gagal dijalankan.'),
+      });
+    } finally {
+      setOptimizerRunning(false);
+    }
   };
 
   // Export Settings as JSON (H.3 #4)
@@ -1463,6 +1520,97 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Scale-Out Take-Profit Target Stage 2 (%)', 'Scale-Out Take-Profit Target Tahap 2 (%)')}</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={settings.take_profit_target_2_percent || '10.0'}
+                    onChange={(e) => updateSettingField('take_profit_target_2_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    {l('Second scale-out on the remaining coins after TP1 (0 = off)', 'Scale-out kedua pada sisa koin setelah TP1 (0 = mati)')}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('TP2 Sell Fraction (%)', 'Fraksi Jual TP2 (%)')}</label>
+                  <input
+                    type="number"
+                    step="5"
+                    min="1"
+                    max="100"
+                    value={settings.tp2_sell_fraction_percent || '50'}
+                    onChange={(e) => updateSettingField('tp2_sell_fraction_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    {l('Percent of the remaining position sold at TP2', 'Persentase sisa posisi yang dijual saat TP2')}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Max Hold Hours (Capital Rotation)', 'Maks Jam Hold (Rotasi Modal)')}</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={settings.max_hold_hours ?? '48'}
+                    onChange={(e) => updateSettingField('max_hold_hours', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    {l('Rotate capital: exit stagnant positions after X hours (0 = off)', 'Rotasi modal: keluarkan posisi stagnan setelah X jam (0 = mati)')}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Entry Candidate Ranking', 'Pemeringkatan Kandidat Entry')}</label>
+                  <select
+                    value={settings.entry_scoring_mode || 'composite_score'}
+                    onChange={(e) => updateSettingField('entry_scoring_mode', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="composite_score">{l('Composite Score (RSI + volume + depth)', 'Skor Komposit (RSI + volume + depth)')}</option>
+                    <option value="gain_rank">{l('Raw 24h Gain (legacy)', 'Gain 24 Jam Mentah (legacy)')}</option>
+                  </select>
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    {l('How momentum candidates are ranked before the AI gate', 'Cara memeringkat kandidat momentum sebelum gerbang AI')}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Market Breadth Gate (%)', 'Gerbang Lebar Pasar (%)')}</label>
+                  <input
+                    type="number"
+                    step="5"
+                    min="0"
+                    max="100"
+                    value={settings.market_breadth_min_percent ?? '30'}
+                    onChange={(e) => updateSettingField('market_breadth_min_percent', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    {l('Hold altcoin entries when most of the market is falling (0 = off)', 'Tahan entry altcoin saat mayoritas pasar melemah (0 = mati)')}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 block mb-1">{l('Re-entry Cooldown (Hours)', 'Cooldown Entry Ulang (Jam)')}</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={settings.reentry_cooldown_hours ?? '4'}
+                    onChange={(e) => updateSettingField('reentry_cooldown_hours', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-500 block mt-1">
+                    {l('Never chase a coin you just sold; losers cool down 2x longer (0 = off)', 'Jangan kejar koin yang baru dijual; koin rugi mendingin 2x lebih lama (0 = mati)')}
+                  </span>
+                </div>
+
+                <div>
                   <label className="text-xs text-slate-300 block mb-1">{l('Macro Regime Guard: BTC 24h Drop (%)', 'Macro Regime Guard: Drop BTC 24j (%)')}</label>
                   <input
                     type="number"
@@ -1534,6 +1682,185 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
                   />
                   <span className="text-[11px] text-slate-500 block mt-1">Batasi bot hanya pada simbol tertentu (pisahkan dengan koma)</span>
+                </div>
+              </div>
+
+              {/* Adaptive Exit Engine toggle (rencana exit per posisi) */}
+              <div className="flex items-center justify-between gap-3 mt-4 p-3.5 rounded-xl border border-slate-800 bg-slate-950/50">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-200">
+                    {settings.adaptive_exit_enabled === '0'
+                      ? l('Adaptive exits off — classic fixed percentages', 'Exit adaptif mati — persentase tetap klasik')
+                      : l('Adaptive exits (professional)', 'Exit adaptif (profesional)')}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                    {l(
+                      'TP & trailing targets adapt to volatility (ATR), BTC regime, and momentum. Off = classic fixed percentages.',
+                      'Target & trailing menyesuaikan volatilitas (ATR), rezim BTC, dan momentum. Mati = persentase tetap klasik.'
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={(settings.adaptive_exit_enabled ?? '1') === '1'}
+                  onClick={() => updateSettingField('adaptive_exit_enabled', (settings.adaptive_exit_enabled ?? '1') === '1' ? '0' : '1')}
+                  className="flex items-center gap-2 shrink-0"
+                >
+                  <span
+                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                      (settings.adaptive_exit_enabled ?? '1') === '1' ? 'bg-emerald-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        (settings.adaptive_exit_enabled ?? '1') === '1' ? 'translate-x-4.5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </span>
+                  <span className={`text-[11px] font-semibold ${(settings.adaptive_exit_enabled ?? '1') === '1' ? 'text-emerald-300' : 'text-slate-400'}`}>
+                    {(settings.adaptive_exit_enabled ?? '1') === '1' ? l('On', 'Aktif') : l('Off', 'Mati')}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Preset Optimizer (Walk-Forward) — profit-side preset dari riset bot sendiri */}
+            <div className="pt-4">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-sky-400" />
+                {l('Optimizer Preset (Walk-Forward)', 'Preset Optimizer (Walk-Forward)')}
+              </h4>
+              <p className="text-[11px] text-slate-500 mb-3">
+                {l(
+                  'The bot backtests its own research data (out-of-sample walk-forward) and may adopt the winning take-profit targets. Loss-side settings are NEVER touched.',
+                  'Bot menguji data risetnya sendiri (out-of-sample walk-forward) dan boleh mengadopsi target take-profit pemenangnya. Setting sisi rugi TIDAK pernah disentuh.'
+                )}
+              </p>
+
+              <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/50 space-y-3">
+                {/* Info preset saat ini */}
+                {optimizerStatus?.preset ? (
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-slate-200">
+                      {l('Active preset (fresh < 14 days)', 'Preset aktif (segar < 14 hari)')}:{' '}
+                      <span className="text-emerald-300 font-mono">
+                        TP1 {optimizerStatus.preset.tp1}% / TP2 {optimizerStatus.preset.tp2}%
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {l('Verdict', 'Verdict')}: <span className="text-sky-300">{optimizerStatus.preset.meta.verdict}</span> ·{' '}
+                      {l('OOS PF median', 'OOS PF median')}:{' '}
+                      <span className="font-mono">
+                        {optimizerStatus.preset.meta.oosPfMedian !== null ? `${optimizerStatus.preset.meta.oosPfMedian.toFixed(2)}x` : 'N/A'}
+                      </span>{' '}
+                      · {l('Tested on', 'Diuji pada')}:{' '}
+                      <span className="font-mono">
+                        {optimizerStatus.preset.meta.symbols.join(', ')}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {l('Tested at', 'Diuji tanggal')}{' '}
+                      {new Date(optimizerStatus.preset.meta.testedAt).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">{l('No preset yet — run the optimizer to search for one.', 'Belum ada preset — jalankan optimasi untuk mencarinya.')}</p>
+                )}
+
+                {/* Toggle konsumsi preset (profit-side saja) */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-200">{l('Use optimizer preset for take-profit', 'Pakai preset optimizer untuk target profit')}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      {l('Take-profit follows the walk-forward optimization result; your trailing stays yours.', 'Target profit mengikuti hasil optimasi walk-forward; trailing tetap milik Anda.')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={(settings.optimizer_preset_enabled ?? '0') === '1'}
+                    onClick={() => updateSettingField('optimizer_preset_enabled', (settings.optimizer_preset_enabled ?? '0') === '1' ? '0' : '1')}
+                    className="flex items-center gap-2 shrink-0"
+                  >
+                    <span
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        (settings.optimizer_preset_enabled ?? '0') === '1' ? 'bg-emerald-600' : 'bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          (settings.optimizer_preset_enabled ?? '0') === '1' ? 'translate-x-4.5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </span>
+                    <span className={`text-[11px] font-semibold ${(settings.optimizer_preset_enabled ?? '0') === '1' ? 'text-emerald-300' : 'text-slate-400'}`}>
+                      {(settings.optimizer_preset_enabled ?? '0') === '1' ? l('On', 'Aktif') : l('Off', 'Mati')}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Toggle auto-run mingguan */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-200">{l('Auto-run optimizer weekly', 'Jalankan optimasi otomatis mingguan')}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                      {l('Run the optimization automatically every 7 days (0 = off)', 'Jalankan optimasi otomatis tiap 7 hari (0 = mati)')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={(settings.optimizer_auto_run ?? '0') === '1'}
+                    onClick={() => updateSettingField('optimizer_auto_run', (settings.optimizer_auto_run ?? '0') === '1' ? '0' : '1')}
+                    className="flex items-center gap-2 shrink-0"
+                  >
+                    <span
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        (settings.optimizer_auto_run ?? '0') === '1' ? 'bg-emerald-600' : 'bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          (settings.optimizer_auto_run ?? '0') === '1' ? 'translate-x-4.5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </span>
+                    <span className={`text-[11px] font-semibold ${(settings.optimizer_auto_run ?? '0') === '1' ? 'text-emerald-300' : 'text-slate-400'}`}>
+                      {(settings.optimizer_auto_run ?? '0') === '1' ? l('On', 'Aktif') : l('Off', 'Mati')}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Jalankan optimasi sekarang */}
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRunOptimizer}
+                    disabled={optimizerRunning}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-sky-500/40 bg-sky-600/20 text-xs font-semibold text-sky-300 hover:bg-sky-600/30 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {optimizerRunning ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>{l('Optimizing... (walk-forward on 90d data)', 'Mengoptimasi... (walk-forward data 90 hari)')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>{l('Run Optimizer Now', 'Jalankan Optimasi Sekarang')}</span>
+                      </>
+                    )}
+                  </button>
+                  {optimizerFeedback && (
+                    <p className={`text-[11px] leading-snug ${optimizerFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'}`}>
+                      {optimizerFeedback.message}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1776,6 +2103,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
 
+            {/* Plain-language withdrawal-permission warning (funds safety) */}
+            <div className="p-3.5 rounded-xl border border-rose-500/40 bg-rose-950/30 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-rose-200 leading-relaxed">
+                {l(
+                  'Only enable "View" and "Trade" permissions. NEVER enable withdrawal — the bot never needs it and it keeps your funds safe.',
+                  'Aktifkan hanya izin "View" dan "Trade". JANGAN pernah aktifkan withdraw — bot tidak perlu, dan ini menjaga dana Anda tetap aman.'
+                )}
+              </p>
+            </div>
+
             {/* Safe Setup Instructions for Indodax */}
             <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2.5">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
@@ -1808,6 +2146,145 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <LanguageSelector variant="settings" />
           </div>
+
+          {/* Beginner mode gate: one switch for all advanced/developer blocks */}
+          {displayMode === 'simple' && (
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-slate-800 bg-[#0b101b] shadow-sm">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-200">
+                  {l('Show advanced settings', 'Tampilkan pengaturan lanjutan')}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                  {l('Token rotation, public tunnel & configuration export.', 'Rotasi token, tunnel publik & ekspor konfigurasi.')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showAdvanced}
+                onClick={() => setShowAdvanced((prev) => !prev)}
+                className="flex items-center gap-2 shrink-0"
+              >
+                <span
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                    showAdvanced ? 'bg-blue-600' : 'bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      showAdvanced ? 'translate-x-4.5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </span>
+                <span className={`text-[11px] font-semibold ${showAdvanced ? 'text-blue-300' : 'text-slate-400'}`}>
+                  {showAdvanced ? l('On', 'Aktif') : l('Off', 'Mati')}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* --- Server & Runtime: konfigurasi web-first, TANPA file .env --- */}
+          <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-slate-200">{l('Server & Runtime (no .env needed)', 'Server & Runtime (tanpa .env)')}</h3>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              {l(
+                'Everything the server needs is managed right here and stored encrypted in the local database. A .env file is never required — environment variables remain optional overrides. Log level takes effect after a restart. The server port is fixed at 3001 and cannot be changed from the web for stability.',
+                'Semua yang dibutuhkan server dikelola di sini dan tersimpan terenkripsi di database lokal. File .env tidak pernah wajib — variabel environment hanya override opsional. Log level berlaku setelah restart. Port server dikunci di 3001 dan tidak bisa diubah dari web demi stabilitas.'
+              )}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">{l('Log Level (restart to apply)', 'Log Level (restart untuk berlaku)')}</label>
+                <select
+                  value={settings.log_level || ''}
+                  onChange={(e) => updateSettingField('log_level', e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">{l('Default (info)', 'Default (info)')}</option>
+                  <option value="error">error</option>
+                  <option value="warn">warn</option>
+                  <option value="info">info</option>
+                  <option value="debug">debug</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">{l('Watchdog URL (uptime ping)', 'URL Watchdog (ping uptime)')}</label>
+                <input
+                  type="url"
+                  placeholder="https://hc-ping.com/..."
+                  value={settings.watchdog_url || ''}
+                  onChange={(e) => updateSettingField('watchdog_url', e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-[11px] text-slate-500 block mt-1">
+                  {l('https-only; the engine pings it every minute so external monitors notice downtime', 'wajib https; engine meminggunya tiap menit agar monitor eksternal tahu jika bot mati')}
+                </span>
+              </div>
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">{l('Extra RSS Feeds (comma-separated, max 5)', 'RSS Tambahan (dipisah koma, maks 5)')}</label>
+                <input
+                  type="text"
+                  placeholder="https://example.com/feed.xml, https://blog.example/rss"
+                  value={settings.extra_rss_feeds || ''}
+                  onChange={(e) => updateSettingField('extra_rss_feeds', e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-[11px] text-slate-500 block mt-1">
+                  {l('Extra research sources for the 10-agent AI swarm', 'Sumber riset tambahan untuk swarm 10 agen AI')}
+                </span>
+              </div>
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">{l('Antigravity OAuth Client ID (optional)', 'Client ID OAuth Antigravity (opsional)')}</label>
+                <input
+                  type="text"
+                  value={settings.antigravity_client_id || ''}
+                  onChange={(e) => updateSettingField('antigravity_client_id', e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-[11px] text-slate-500 block mt-1">{l('Leave empty to use the built-in client', 'Biarkan kosong untuk memakai klien bawaan')}</span>
+              </div>
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">{l('Antigravity OAuth Client Secret (optional)', 'Client Secret OAuth Antigravity (opsional)')}</label>
+                <input
+                  type="password"
+                  value={settings.antigravity_client_secret || ''}
+                  onChange={(e) => updateSettingField('antigravity_client_secret', e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-[11px] text-slate-500 block mt-1">{l('Stored encrypted at rest', 'Tersimpan terenkripsi at-rest')}</span>
+              </div>
+            </div>
+            <div className="flex items-start justify-between gap-4 p-3 rounded-xl border border-slate-800 bg-slate-900/50">
+              <div className="min-w-0">
+                <span className="text-xs font-semibold text-slate-200 block">
+                  {l('Allow local/private AI endpoints', 'Izinkan endpoint AI lokal/private')}
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-0.5 leading-relaxed">
+                  {l(
+                    'Off (recommended): provider URLs and watchdog must be public. On: localhost/private networks are allowed (e.g. Ollama) — only enable on a trusted machine.',
+                    'Mati (disarankan): URL provider dan watchdog harus publik. Aktif: localhost/jaringan privat diizinkan (mis. Ollama) — aktifkan hanya di mesin tepercaya.'
+                  )}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={(settings.allow_local_fetch || '0') === '1'}
+                onClick={() => updateSettingField('allow_local_fetch', (settings.allow_local_fetch || '0') === '1' ? '0' : '1')}
+                className="shrink-0"
+              >
+                <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${(settings.allow_local_fetch || '0') === '1' ? 'bg-amber-600' : 'bg-slate-700'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${(settings.allow_local_fetch || '0') === '1' ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {showAdvanced && (
+          <>
           {/* Admin Token & Auto-Rotation Management Section */}
           <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
@@ -2219,6 +2696,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </button>
             </div>
           </div>
+          </>
+          )}
 
           {/* Unified Notification Bots Hub Banner */}
           <div className="rounded-2xl border border-sky-500/20 bg-sky-950/10 p-5 space-y-3 shadow-sm">
@@ -2268,7 +2747,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Ekspor & Impor Pengaturan (H.3 #4) */}
+          {/* Ekspor & Impor Pengaturan (H.3 #4) — advanced only */}
+          {showAdvanced && (
           <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-4 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
               <div>
@@ -2308,6 +2788,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </span>
             </div>
           </div>
+          )}
         </div>
       )}
 

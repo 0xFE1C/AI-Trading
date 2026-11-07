@@ -73,6 +73,7 @@ describe('Capital Allocation & Auto-Set Engine', () => {
     assert.strictEqual(getSetting('max_active_trades'), '3');
     assert.strictEqual(getSetting('trailing_stop_percent'), '2.5');
     assert.strictEqual(getSetting('take_profit_target_1_percent'), '5');
+    assert.strictEqual(getSetting('take_profit_target_2_percent'), '10');
 
     // Test /modal 1jt konservatif
     await whatsappService.handleCommand(adminJid, '/modal 1jt konservatif', true);
@@ -83,6 +84,7 @@ describe('Capital Allocation & Auto-Set Engine', () => {
     assert.strictEqual(getSetting('max_active_trades'), '2');
     assert.strictEqual(getSetting('trailing_stop_percent'), '1.8');
     assert.strictEqual(getSetting('take_profit_target_1_percent'), '3.5');
+    assert.strictEqual(getSetting('take_profit_target_2_percent'), '7');
   });
 
   test('WhatsApp /modal with arguments is blocked for non-admin users', () => {

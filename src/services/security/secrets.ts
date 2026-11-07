@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { assertContainedPath } from './urlGuard.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const PREFIX = 'enc:v1:';
@@ -47,7 +48,9 @@ function getKey(): Buffer {
   if (!fs.existsSync(keyDir)) {
     fs.mkdirSync(keyDir, { recursive: true });
   }
-  const keyPath = path.join(keyDir, KEY_FILE_NAME);
+  // Guard path: tolak null-byte dan jamin hasil resolve tetap di dalam
+  // direktori data yang dimaksud (direktori berasal dari env operator).
+  const keyPath = assertContainedPath(keyDir, KEY_FILE_NAME);
 
   try {
     fs.writeFileSync(keyPath, crypto.randomBytes(32).toString('hex'), {

@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import crypto from 'crypto';
 import { scoreHeadline, aggregateCoinSentiment } from '../src/services/signals/lexicon.js';
 import { detectThreats, isSymbolThreatened } from '../src/services/signals/threat.js';
-import { detectBtcRegime } from '../src/services/signals/regime.js';
+import { atrPercentileFromCandles, detectBtcRegime } from '../src/services/signals/regime.js';
 import { scoreOpportunity, SCORE_THRESHOLDS } from '../src/services/signals/scorer.js';
 import {
   checkCircuitBreaker,
@@ -17,7 +17,9 @@ import {
 } from '../src/services/trading/riskGuard.js';
 import { agentBus } from '../src/services/agents/bus.js';
 import { IndodaxAdapter } from '../src/services/adapters/IndodaxAdapter.js';
-import { CoinFeatures, ThreatSignal } from '../src/services/signals/types.js';
+import { CoinFeatures, ScoreResult, ThreatSignal } from '../src/services/signals/types.js';
+import { selectMomentumCandidate } from '../src/services/trading/momentumSelect.js';
+import { getSetting } from '../src/db/index.js';
 
 describe('Section 9 Lexicon Sentiment Scoring & Age Decay', () => {
   test('accurately scores bilingual Indonesian and English sentiment keywords', () => {
@@ -195,6 +197,52 @@ describe('BTC Macro Regime Window Returns (1h & 4h)', () => {
     });
     assert.strictEqual(riskOnVerdict.regime, 'RISK_ON');
     assert.strictEqual(riskOnVerdict.allowNewEntries, true);
+  });
+});
+
+describe('ATR Percentile from Candles (RISK_OFF regime enabler)', () => {
+  function makeCandles(ranges: number[], close = 1000): Array<{ high: number; low: number; close: number }> {
+    // Constant close keeps the true range equal to each given range value
+    return ranges.map((r) => ({ high: close + r / 2, low: close - r / 2, close }));
+  }
+
+  test('a calm series followed by a volatility spike ranks in a high percentile', () => {
+    // 40 calm candles (range 10) then one violent spike (range 400)
+    const ranges = new Array(40).fill(10);
+    ranges.push(400);
+    const pct = atrPercentileFromCandles(makeCandles(ranges));
+    assert.ok(pct !== null);
+    assert.ok(pct >= 90, `spike after calm must rank >= 90, got ${pct}`);
+  });
+
+  test('a spike early in the series followed by calm ranks in a low percentile', () => {
+    // Spike must sit inside the series: true range only starts from the
+    // second candle, so a spike on candle 0 is invisible to ATR.
+    const ranges = [...new Array(5).fill(10), 400, ...new Array(34).fill(10)];
+    const pct = atrPercentileFromCandles(makeCandles(ranges));
+    assert.ok(pct !== null);
+    // Wilder smoothing keeps the spike elevated for a while, but the
+    // latest ATR must sit well below the series maximum.
+    assert.ok(pct <= 30, `calm after spike must rank <= 30, got ${pct}`);
+  });
+
+  test('a perfectly flat series lands at the neutral midpoint (~50)', () => {
+    const pct = atrPercentileFromCandles(makeCandles(new Array(30).fill(10)));
+    assert.ok(pct !== null);
+    assert.ok(Math.abs(pct - 50) < 0.01, `flat series must rank ~50, got ${pct}`);
+  });
+
+  test('returns null when there are fewer than period+2 candles', () => {
+    assert.strictEqual(atrPercentileFromCandles(makeCandles(new Array(15).fill(10))), null); // period+2-1
+    assert.strictEqual(atrPercentileFromCandles([]), null);
+  });
+
+  test('honors a custom period parameter', () => {
+    const candles = makeCandles(new Array(10).fill(10));
+    // period 8 needs 10 candles -> exactly enough
+    assert.ok(atrPercentileFromCandles(candles, 8) !== null);
+    // period 9 needs 11 candles -> not enough
+    assert.strictEqual(atrPercentileFromCandles(candles, 9), null);
   });
 });
 
@@ -388,6 +436,93 @@ describe('Multi-Agent Blackboard Bus & Outbox Persistence', () => {
     const found = recent.find((m) => m.id === msg.id);
     assert.ok(found !== undefined, 'Message should be persisted in agent_messages table');
     assert.strictEqual(found.payload.symbol, 'btc_idr');
+  });
+});
+
+describe('Momentum Candidate Selection (composite_score vs gain_rank)', () => {
+  const base = { volIdr: 500_000_000, last: 1000, dropFromHigh: -1.5 };
+
+  const scored: Array<{ symbol: string; gain24h: number; volIdr: number; last: number; dropFromHigh: number; score: ScoreResult }> = [
+    { symbol: 'aaa', gain24h: 18, ...base, score: { symbol: 'aaa', strategy: 'momentum', score: 62, breakdown: {} } },
+    { symbol: 'bbb', gain24h: 5, ...base, score: { symbol: 'bbb', strategy: 'momentum', score: 85, breakdown: {} } },
+    { symbol: 'ccc', gain24h: 9, ...base, score: { symbol: 'ccc', strategy: 'momentum', score: 40, breakdown: {} } },
+  ];
+
+  test('composite mode prefers the highest score over raw gain and enforces the profile threshold', () => {
+    const sel = selectMomentumCandidate({ mode: 'composite_score', profile: 'balanced', candidates: scored, isAlreadyHoldingMeme: false });
+    assert.equal(sel?.symbol, 'bbb', '85-point candidate must beat the 18% gainer at 62 points');
+    assert.equal(sel?.source, 'composite_score');
+    assert.ok(sel?.reason.includes('Skor: 85/100'));
+
+    // ccc (gain 9%) sits below the balanced threshold (60) and must never win
+    const onlyBelow = [{ ...scored[2] }];
+    const selBelow = selectMomentumCandidate({ mode: 'composite_score', profile: 'balanced', candidates: onlyBelow, isAlreadyHoldingMeme: false });
+    assert.equal(selBelow?.symbol, 'ccc', 'below-threshold candidate must only surface via the fallback');
+    assert.equal(selBelow?.source, 'gain_rank_fallback');
+  });
+
+  test('composite threshold follows the risk profile (aggressive 50 admits what balanced 60 rejects)', () => {
+    const borderline = [{ ...scored[2], score: { ...scored[2].score, score: 55 } }];
+    assert.equal(selectMomentumCandidate({ mode: 'composite_score', profile: 'balanced', candidates: borderline, isAlreadyHoldingMeme: false })?.source, 'gain_rank_fallback');
+    const selAgressive = selectMomentumCandidate({ mode: 'composite_score', profile: 'aggressive', candidates: borderline, isAlreadyHoldingMeme: false });
+    assert.equal(selAgressive?.source, 'composite_score');
+  });
+
+  test('gain_rank mode preserves the legacy pick with the exact legacy reason', () => {
+    const sel = selectMomentumCandidate({ mode: 'gain_rank', profile: 'balanced', candidates: scored, isAlreadyHoldingMeme: false });
+    assert.equal(sel?.symbol, 'aaa');
+    assert.equal(sel?.reason, 'Top Momentum Gainer (+18.0%, Volume: Rp 500 Jt)');
+    assert.equal(sel?.source, 'gain_rank');
+    // Legacy mode ignores the score entirely
+    const unscored = [{ symbol: 'zzz', gain24h: 3, ...base }];
+    const selUnscored = selectMomentumCandidate({ mode: 'gain_rank', profile: 'balanced', candidates: unscored, isAlreadyHoldingMeme: false });
+    assert.equal(selUnscored?.symbol, 'zzz');
+  });
+
+  test('composite falls back to the gain_rank pick when no candidate passes the threshold', () => {
+    const allBelow = scored.map((c) => ({ ...c, score: { ...c.score, score: 10 } }));
+    const sel = selectMomentumCandidate({ mode: 'composite_score', profile: 'balanced', candidates: allBelow, isAlreadyHoldingMeme: false });
+    assert.equal(sel?.symbol, 'aaa', 'fallback must pick the top hard-filtered gainer');
+    assert.equal(sel?.source, 'gain_rank_fallback');
+  });
+
+  test('composite tie-breaks equal scores by the higher gain24h', () => {
+    const tied = [
+      { symbol: 'low', gain24h: 4, ...base, score: { symbol: 'low', strategy: 'momentum' as const, score: 70, breakdown: {} } },
+      { symbol: 'high', gain24h: 15, ...base, score: { symbol: 'high', strategy: 'momentum' as const, score: 70, breakdown: {} } },
+    ];
+    const sel = selectMomentumCandidate({ mode: 'composite_score', profile: 'balanced', candidates: tied, isAlreadyHoldingMeme: false });
+    assert.equal(sel?.symbol, 'high');
+  });
+
+  test('meme single-exposure guard is respected in both modes', () => {
+    const memeFirst = [
+      { symbol: 'doge', gain24h: 19, ...base, score: { symbol: 'doge', strategy: 'momentum' as const, score: 90, breakdown: {} } },
+      { symbol: 'eth', gain24h: 3, ...base, score: { symbol: 'eth', strategy: 'momentum' as const, score: 70, breakdown: {} } },
+    ];
+    // Holding a meme: doge must be skipped even though it dominates both rankings
+    const selComposite = selectMomentumCandidate({ mode: 'composite_score', profile: 'balanced', candidates: memeFirst, isAlreadyHoldingMeme: true });
+    assert.equal(selComposite?.symbol, 'eth');
+    const selRank = selectMomentumCandidate({ mode: 'gain_rank', profile: 'balanced', candidates: memeFirst, isAlreadyHoldingMeme: true });
+    assert.equal(selRank?.symbol, 'eth');
+
+    // Not holding a meme: legacy ranking picks doge again
+    const selFree = selectMomentumCandidate({ mode: 'gain_rank', profile: 'balanced', candidates: memeFirst, isAlreadyHoldingMeme: false });
+    assert.equal(selFree?.symbol, 'doge');
+  });
+
+  test('returns null when every remaining candidate is an already-held meme', () => {
+    const sel = selectMomentumCandidate({
+      mode: 'gain_rank',
+      profile: 'balanced',
+      candidates: [{ symbol: 'pepe', gain24h: 10, ...base }],
+      isAlreadyHoldingMeme: true,
+    });
+    assert.equal(sel, null);
+  });
+
+  test('entry_scoring_mode setting defaults to composite_score', () => {
+    assert.equal(getSetting('entry_scoring_mode', 'composite_score'), 'composite_score');
   });
 });
 

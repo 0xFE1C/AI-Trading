@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { PanicModal } from './components/PanicModal';
@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { GlossaryModal } from './components/GlossaryModal';
 import { NotificationCenter, AppNotification } from './components/NotificationCenter';
 import { LiveModeModal } from './components/LiveModeModal';
+import { SetupWizard } from './components/SetupWizard';
 import { Toast } from './components/Toast';
 import { api, authStorage, isStaticHost, apiConnectionState } from './services/api';
 import { SystemStatus } from './types';
@@ -87,6 +88,7 @@ export function App() {
   });
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('ai');
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   // Notifications History
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -150,6 +152,94 @@ export function App() {
     }
   }, [isAdmin]);
 
+  // Auto-open the Setup Wizard ONCE: only when admin, never completed before,
+  // and the bot looks unconfigured (0 active AI providers OR 0 imported models).
+  // Checked a single time after auth resolves, with a small delay so the
+  // dashboard data settles first. Deliberately skipped while the first-run
+  // tutorial is still pending — the tutorial owns the fresh-install moment;
+  // the wizard becomes available right after it is dismissed.
+  const setupWizardCheckedRef = useRef(false);
+  const [tutorialDismissed, setTutorialDismissed] = useState(false);
+  useEffect(() => {
+    if (!isAdmin || setupWizardCheckedRef.current) return;
+    if (localStorage.getItem('ai_trading_setup_done')) {
+      setupWizardCheckedRef.current = true;
+      return;
+    }
+    if (!tutorialDismissed && !localStorage.getItem('ai_trading_tutorial_completed')) {
+      // First-run tutorial is still ahead; do not burn the one-shot check yet.
+      return;
+    }
+    setupWizardCheckedRef.current = true;
+    const timer = setTimeout(async () => {
+      if (showSetupWizard) return;
+      try {
+        const [provs, models] = await Promise.all([api.getProviders(), api.getModels()]);
+        const activeProviderCount = (provs || []).filter((p) => p.is_active === 1).length;
+        if (activeProviderCount === 0 || (models || []).length === 0) {
+          setShowSetupWizard(true);
+        }
+      } catch {
+        // Never block the app on the wizard: silently skip auto-open.
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [isAdmin, showSetupWizard, tutorialDismissed]);
+
+  // Every exit path from the wizard (X, ESC, backdrop, "Nanti", finish)
+  // consistently marks setup as done so it auto-opens at most once.
+  const handleCloseSetupWizard = useCallback(() => {
+    try {
+      localStorage.setItem('ai_trading_setup_done', '1');
+    } catch {}
+    setShowSetupWizard(false);
+  }, []);
+
+  const handleWizardOpenSettings = useCallback(
+    (subTab: SettingsSubTab) => {
+      handleCloseSetupWizard();
+      handleSwitchTab('settings', subTab);
+    },
+    [handleCloseSetupWizard]
+  );
+
+  const handleWizardOpenBots = useCallback(() => {
+    handleCloseSetupWizard();
+    handleSwitchTab('bots');
+  }, [handleCloseSetupWizard]);
+
+  const handleOpenSetupWizard = useCallback(() => setShowSetupWizard(true), []);
+
+  // Wizard finish button: start (never stop) the engine in paper mode.
+  const handleWizardStartPaperTrading = useCallback(async () => {
+    if (!isAdmin) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (status?.isAutoTradingActive) {
+      setToast({
+        message: l('Auto-Trading is already running — it always starts in safe PAPER mode.', 'Auto-Trading sudah berjalan — selalu dimulai dalam mode PAPER yang aman.'),
+        type: 'info',
+      });
+      return;
+    }
+    try {
+      const res = await api.toggleAutoTrading();
+      if (status) {
+        setStatus({ ...status, isAutoTradingActive: res.isActive });
+      }
+      setToast({
+        message: res.isActive
+          ? l('Paper Trading STARTED — virtual IDR 10,000,000, zero risk.', 'Paper Trading DIMULAI — saldo virtual Rp 10.000.000, tanpa risiko.')
+          : l('Auto-Trading could not start (still PAUSED).', 'Auto-Trading belum bisa dimulai (masih DIJEDA).'),
+        type: res.isActive ? 'success' : 'info',
+      });
+    } catch (err: any) {
+      // e.g. backend setup guard: shows the friendly deep-link modal to Settings → AI.
+      setSetupError(err.message);
+    }
+  }, [isAdmin, status, l]);
+
   const handleStartTutorial = () => {
     setShowTutorial(true);
   };
@@ -157,6 +247,9 @@ export function App() {
   const handleCompleteTutorial = () => {
     localStorage.setItem('ai_trading_tutorial_completed', 'true');
     setShowTutorial(false);
+    // Unblock the one-shot Setup Wizard auto-open that waits for the
+    // fresh-install tutorial to be dismissed.
+    setTutorialDismissed(true);
   };
 
   const handleSetDisplayMode = (mode: 'simple' | 'pro') => {
@@ -454,6 +547,7 @@ export function App() {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onStartTutorial={handleStartTutorial}
         onOpenGlossary={() => setShowGlossaryModal(true)}
+        onOpenSetupWizard={handleOpenSetupWizard}
       />
 
       {/* 2. Main Content Area */}
@@ -564,6 +658,7 @@ export function App() {
                 <SettingsView
                   activeSubTab={settingsSubTab}
                   onSubTabChange={setSettingsSubTab}
+                  displayMode={displayMode}
                 />
               )}
             </Suspense>
@@ -727,7 +822,7 @@ export function App() {
               <div className="space-y-2 text-xs text-slate-400">
                 <div className="flex items-start gap-2">
                   <span className="text-amber-400 font-bold">•</span>
-                  <span>{setupError}</span>
+                  <span className="whitespace-pre-wrap">{setupError}</span>
                 </div>
               </div>
             </div>
@@ -784,6 +879,17 @@ export function App() {
           onSwitchTab={(tab) => handleSwitchTab(tab)}
         />
       )}
+
+      {/* Guided First-Run Setup Wizard (auto-opens once; Sidebar re-opens it) */}
+      <SetupWizard
+        isOpen={showSetupWizard}
+        isAdmin={isAdmin}
+        onClose={handleCloseSetupWizard}
+        onOpenSettings={handleWizardOpenSettings}
+        onOpenBots={handleWizardOpenBots}
+        onOpenAuthModal={() => setShowAuthModal(true)}
+        onStartPaperTrading={handleWizardStartPaperTrading}
+      />
 
       {/* Educational Glossary & FAQ Modal */}
       <GlossaryModal

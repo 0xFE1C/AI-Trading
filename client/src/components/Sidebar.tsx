@@ -21,6 +21,7 @@ import {
   Gamepad2,
   BookOpen,
   Bot,
+  Rocket,
 } from 'lucide-react';
 import { SystemStatus } from '../types';
 import { isStaticHost } from '../services/api';
@@ -42,6 +43,7 @@ interface SidebarProps {
   onCloseMobile: () => void;
   onStartTutorial?: () => void;
   onOpenGlossary?: () => void;
+  onOpenSetupWizard?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -59,8 +61,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   onStartTutorial,
   onOpenGlossary,
+  onOpenSetupWizard,
 }) => {
-  const { t, formatCurrency } = useLanguage();
+  const { t, l, formatCurrency } = useLanguage();
   const isAuto = status?.isAutoTradingActive ?? false;
   const mode = status?.mode ?? 'paper';
   const balance = status?.balanceIdr ?? null;
@@ -277,6 +280,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Security & Access Box */}
         <div className="p-3 border-t border-slate-800/80 bg-[#060910] space-y-1.5">
+          {/* Setup Wizard Button (always visible; wizard handles non-admin itself) */}
+          {onOpenSetupWizard && (
+            <button
+              onClick={() => {
+                if (isOpenMobile) onCloseMobile();
+                onOpenSetupWizard();
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-emerald-500/30 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 hover:text-emerald-100 text-xs font-semibold transition-all shadow-sm"
+            >
+              <Rocket className="h-4 w-4 text-emerald-400" />
+              <span>🚀 {l('Setup Guide', 'Panduan Setup')}</span>
+            </button>
+          )}
+
           {/* Glossary Button */}
           {onOpenGlossary && (
             <button

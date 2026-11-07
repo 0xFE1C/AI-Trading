@@ -1,13 +1,19 @@
-import type { BacktestBar } from './index.js';
+import type { BacktestBar, BacktestParams } from './index.js';
+import { loadCachedBars } from './index.js';
 import { getTakerFeePercent } from '../trading/fees.js';
+import { calculateTrueATR } from '../../utils/indicators.js';
+import { isBluechipSymbol } from '../signals/features.js';
+import { computeExitPlan, ExitPlan } from '../trading/adaptiveExit.js';
 
 /**
  * Portfolio-level backtest: multiple symbols, concurrent position slots and a
  * shared cash pool, mirroring how the live engine actually trades (max
- * active trades, per-trade allocation, trailing-stop ratchet, partial TP1).
+ * active trades, per-trade allocation, trailing-stop ratchet, partial TP1+TP2).
  * The single-symbol engine answers "is this strategy good on this coin";
  * this answers "is this strategy good for the PORTFOLIO the bot would run".
  */
+
+export type PortfolioDataSource = 'cache' | 'exchange';
 
 export interface PortfolioBacktestParams {
   symbols: string[]; // e.g. ['btcidr', 'ethidr', 'solidr']
@@ -18,9 +24,11 @@ export interface PortfolioBacktestParams {
   maxActiveTrades?: number;
   trailingStopPercent?: number;
   takeProfitStep1Percent?: number;
+  takeProfitTarget2Percent?: number; // default 10.0%, second scale-out (50% of remainder); 0 = off
   minGainThresholdPercent?: number;
   slippagePercent?: number;
   feePercent?: number;
+  adaptiveExit?: boolean; // default false = perilaku legacy persis; true = rencana exit adaptif per entry
 }
 
 export interface PortfolioTrade {
@@ -61,6 +69,7 @@ export interface PortfolioBacktestResult {
   slotUtilizationPercent: number;
   slippagePercent: number;
   feePercent: number;
+  dataSource?: PortfolioDataSource; // 'cache' only when EVERY symbol resolved from the candle store
   perSymbol: PortfolioSymbolStat[];
   equityCurve: Array<{ timestamp: number; equity: number }>;
   trades: PortfolioTrade[];
@@ -76,6 +85,10 @@ interface OpenPosition {
   trailingStopPrice: number;
   takeProfitStep: number;
   realizedCash: number;
+  // Rencana exit adaptif posisi (hanya diisi saat adaptiveExit aktif)
+  planTp1?: number;
+  planTp2?: number; // 0 = TP2 nonaktif untuk posisi ini
+  planTrailing?: number;
 }
 
 export class PortfolioBacktestEngine {
@@ -88,7 +101,15 @@ export class PortfolioBacktestEngine {
     }
 
     const barsBySymbol = new Map<string, BacktestBar[]>();
+    const cachedSymbols = new Set<string>();
     for (const symbol of symbols) {
+      // Candle-store research cache first; fall back to the history_v2 scrape
+      const cached = loadCachedBars(symbol, timeframe, days);
+      if (cached) {
+        barsBySymbol.set(symbol, cached);
+        cachedSymbols.add(symbol);
+        continue;
+      }
       const bars = await this.fetchBars(symbol, timeframe, days);
       if (bars.length >= 10) {
         barsBySymbol.set(symbol, bars);
@@ -99,7 +120,16 @@ export class PortfolioBacktestEngine {
       throw new Error('Tidak ada simbol dengan data historis yang cukup untuk backtest portofolio.');
     }
 
-    return this.simulate(barsBySymbol, params, timeframe, days);
+    // Label 'cache' only when every simulated symbol actually came from the
+    // cache. Symbols that resolved from neither source are dropped above, so
+    // compare against symbols-with-data rather than the requested list — a
+    // dropped symbol must not let an 'exchange'-less run claim 'cache'.
+    const dataSource: PortfolioDataSource = cachedSymbols.size === barsBySymbol.size ? 'cache' : 'exchange';
+    const droppedSymbols = symbols.filter((symbol) => !barsBySymbol.has(symbol));
+    if (droppedSymbols.length > 0) {
+      console.warn(`[Portfolio Backtest] ${droppedSymbols.length} simbol dilewati karena data historis tidak cukup: ${droppedSymbols.join(', ')}`);
+    }
+    return this.simulate(barsBySymbol, params, timeframe, days, dataSource);
   }
 
   /** Fetches paginated 1h/15m/4h/1D history from the Indodax TradingView endpoint. */
@@ -150,19 +180,62 @@ export class PortfolioBacktestEngine {
     barsBySymbol: Map<string, BacktestBar[]>,
     params: PortfolioBacktestParams,
     timeframe = '1h',
-    days = 30
+    days = 30,
+    dataSource: PortfolioDataSource = 'exchange'
   ): PortfolioBacktestResult {
     const initialBalance = params.initialBalanceIdr || 10_000_000;
     const allocationPerTrade = params.allocationPerTradeIdr || 100_000;
     const maxActiveTrades = Math.max(1, params.maxActiveTrades || 3);
     const trailingStopPercent = params.trailingStopPercent || 2.5;
     const takeProfitStep1Percent = params.takeProfitStep1Percent || 5.0;
+    const takeProfitTarget2Percent = params.takeProfitTarget2Percent !== undefined ? params.takeProfitTarget2Percent : 10.0;
     const slippagePercent = params.slippagePercent !== undefined ? params.slippagePercent : 0.2;
     const feePercent = params.feePercent !== undefined ? params.feePercent : getTakerFeePercent();
     const minGainThreshold = params.minGainThresholdPercent || 1.5;
+    const adaptiveExit = params.adaptiveExit === true;
 
     const slippageRate = slippagePercent / 100;
     const takerFeeRate = feePercent / 100;
+
+    /**
+     * Rencana exit adaptif per entry (zero-lookahead: data s/d bar entry).
+     * APPROKSIMASI terdokumentasi: backtest tidak punya konteks BTC — rezim
+     * diproksi dari struktur harga koin (close vs SMA20 + drop dari high
+     * 20-bar); depth orderbook tidak tersedia → null.
+     */
+    const computeAdaptivePlan = (symbol: string, bar: BacktestBar, idx: number): ExitPlan => {
+      const bars = barsBySymbol.get(symbol)!;
+      const window = bars.slice(0, idx + 1);
+
+      const atr = calculateTrueATR(window, 14);
+      const atrPct = atr !== null && atr > 0 && bar.close > 0 ? (atr / bar.close) * 100 : null;
+
+      let regime: string | null = null;
+      if (window.length >= 20) {
+        const last20 = window.slice(-20);
+        const sma20 = last20.reduce((sum, b) => sum + b.close, 0) / 20;
+        const high20 = Math.max(...last20.map((b) => b.high));
+        const dropFromHigh20 = high20 > 0 ? ((bar.close - high20) / high20) * 100 : 0;
+        if (bar.close > sma20) regime = 'RISK_ON';
+        else if (bar.close < sma20 && dropFromHigh20 <= -8) regime = 'RISK_OFF';
+        else regime = 'NEUTRAL';
+      }
+
+      const volWindow = volumeWindows.get(symbol) || [bar.volume];
+      const avgVolume = volWindow.reduce((a, b) => a + b, 0) / volWindow.length;
+      const volumeSurgeRatio = avgVolume > 0 ? bar.volume / avgVolume : null;
+
+      return computeExitPlan({
+        atrPct,
+        regime,
+        volumeSurgeRatio,
+        depthImbalance: null, // depth tidak diketahui di backtest
+        isBluechip: isBluechipSymbol(symbol),
+        baseTp1Pct: takeProfitStep1Percent,
+        baseTp2Pct: takeProfitTarget2Percent > 0 ? takeProfitTarget2Percent : null,
+        baseTrailingPct: trailingStopPercent,
+      });
+    };
 
     // Unified chronological timeline: one step per distinct timestamp so
     // cross-symbol concurrency is honored exactly like the live engine.
@@ -232,11 +305,22 @@ export class PortfolioBacktestEngine {
         const bar = freshBars.get(pos.symbol);
         if (!bar) continue;
 
+        // Target dari rencana exit posisi (fallback legacy persis saat tanpa plan)
+        const posTp1 = pos.planTp1 ?? takeProfitStep1Percent;
+        const posTp2 = pos.planTp2 ?? takeProfitTarget2Percent;
+        const posTrailing = pos.planTrailing ?? trailingStopPercent;
+
         // Trailing stop checked against the level carried from the previous bar
         if (bar.low <= pos.trailingStopPrice) {
           const rawExit = Math.min(bar.open, pos.trailingStopPrice);
           let reason: string;
-          if (pos.takeProfitStep === 1) {
+          if (pos.takeProfitStep === 2) {
+            reason = rawExit > pos.entryPrice * 1.002
+              ? 'Partial TP2 + Trailing Stop Profit'
+              : Math.abs(rawExit - pos.entryPrice) / pos.entryPrice <= 0.002
+                ? 'Partial TP2 + Breakeven Exit'
+                : 'Partial TP2 + Stop Exit';
+          } else if (pos.takeProfitStep === 1) {
             reason = rawExit > pos.entryPrice * 1.002
               ? 'Partial TP + Trailing Stop Profit'
               : Math.abs(rawExit - pos.entryPrice) / pos.entryPrice <= 0.002
@@ -253,9 +337,9 @@ export class PortfolioBacktestEngine {
 
         pos.highestPrice = Math.max(pos.highestPrice, bar.high);
         const gainPercent = ((bar.high - pos.entryPrice) / pos.entryPrice) * 100;
-        if (gainPercent >= takeProfitStep1Percent && pos.takeProfitStep === 0) {
+        if (gainPercent >= posTp1 && pos.takeProfitStep === 0) {
           const half = pos.amount * 0.5;
-          const tpPrice = pos.entryPrice * (1 + takeProfitStep1Percent / 100) * (1 - slippageRate);
+          const tpPrice = pos.entryPrice * (1 + posTp1 / 100) * (1 - slippageRate);
           const proceeds = half * tpPrice * (1 - takerFeeRate);
           cash += proceeds;
           pos.realizedCash += proceeds;
@@ -264,7 +348,19 @@ export class PortfolioBacktestEngine {
           pos.trailingStopPrice = Math.max(pos.trailingStopPrice, pos.entryPrice);
         }
 
-        const computedSL = pos.highestPrice * (1 - trailingStopPercent / 100);
+        // TP2 second scale-out (50% of the remainder), zero-lookahead like TP1
+        if (posTp2 > 0 && pos.takeProfitStep === 1 && gainPercent >= posTp2) {
+          const halfRemaining = pos.amount * 0.5;
+          const tp2Price = pos.entryPrice * (1 + posTp2 / 100) * (1 - slippageRate);
+          const proceeds = halfRemaining * tp2Price * (1 - takerFeeRate);
+          cash += proceeds;
+          pos.realizedCash += proceeds;
+          pos.amount -= halfRemaining;
+          pos.takeProfitStep = 2;
+          pos.trailingStopPrice = Math.max(pos.trailingStopPrice, pos.entryPrice);
+        }
+
+        const computedSL = pos.highestPrice * (1 - posTrailing / 100);
         if (computedSL > pos.trailingStopPrice) {
           pos.trailingStopPrice = computedSL;
         }
@@ -302,6 +398,10 @@ export class PortfolioBacktestEngine {
           const initialCost = Math.min(allocationPerTrade, cash);
           const amount = (initialCost * (1 - takerFeeRate)) / entryPrice;
           cash -= initialCost;
+          // Rencana exit adaptif per entry (zero-lookahead); mode off → tanpa plan (legacy)
+          const plan = adaptiveExit
+            ? computeAdaptivePlan(candidate.symbol, candidate.bar, barIndexBySymbol.get(candidate.symbol)!)
+            : null;
           openPositions.push({
             symbol: candidate.symbol,
             entryTime: ts,
@@ -309,9 +409,12 @@ export class PortfolioBacktestEngine {
             amount,
             initialCost,
             highestPrice: rawEntry,
-            trailingStopPrice: rawEntry * (1 - trailingStopPercent / 100),
+            trailingStopPrice: rawEntry * (1 - (plan ? plan.trailingPct : trailingStopPercent) / 100),
             takeProfitStep: 0,
             realizedCash: 0,
+            planTp1: plan ? plan.tp1Pct : undefined,
+            planTp2: plan ? (plan.tp2Pct ?? 0) : undefined,
+            planTrailing: plan ? plan.trailingPct : undefined,
           });
         }
       }
@@ -383,6 +486,7 @@ export class PortfolioBacktestEngine {
       slotUtilizationPercent: slotSamples > 0 ? parseFloat(((concurrentSlotSum / slotSamples / maxActiveTrades) * 100).toFixed(1)) : 0,
       slippagePercent,
       feePercent,
+      dataSource,
       perSymbol,
       equityCurve,
       trades: trades.reverse(),

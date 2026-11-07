@@ -6,6 +6,14 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// Koin likuid utama Indodax — dipakai features & backtest adaptive exit.
+export const BLUECHIP_SYMBOLS = ['btc', 'eth', 'sol', 'bnb', 'xrp'];
+
+export function isBluechipSymbol(symbol: string): boolean {
+  const cleanSym = String(symbol || '').toLowerCase().replace('_idr', '').replace(/idr$/, '');
+  return BLUECHIP_SYMBOLS.includes(cleanSym);
+}
+
 export function computeDepthImbalance(depth: IndodaxDepth, layers = 10): number {
   if (!depth || !depth.buy || !depth.sell || depth.buy.length === 0 || depth.sell.length === 0) {
     return 1.0;
@@ -54,7 +62,7 @@ export function extractFeatures(
   const depthImbalance = depth ? computeDepthImbalance(depth, 10) : 1.0;
 
   const cleanSym = summary.symbol.toLowerCase().replace('_idr', '');
-  const isBluechip = ['btc', 'eth', 'sol', 'bnb', 'xrp'].includes(cleanSym);
+  const isBluechip = BLUECHIP_SYMBOLS.includes(cleanSym);
 
   return {
     symbol: cleanSym,

@@ -6,10 +6,10 @@
 
 [![Language: English](https://img.shields.io/badge/Language-English-38bdf8?style=for-the-badge)](README.md)
 [![Dokumentasi: Bahasa Indonesia](https://img.shields.io/badge/Dokumentasi-Bahasa%20Indonesia-10b981?style=for-the-badge)](docs/PANDUAN_PENGGUNA.md)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-177%2F177%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-306%2F306%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x%20Strict-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-18%20%2B%20Vite%20%2B%20Tailwind-61dafb?style=for-the-badge&logo=react)](client/)
+[![React](https://img.shields.io/badge/React-19%20%2B%20Vite%20%2B%20Tailwind-61dafb?style=for-the-badge&logo=react)](client/)
 [![Indodax](https://img.shields.io/badge/Exchange-Indodax%20API%20v2-0284c7?style=for-the-badge)](https://indodax.com)
 [![Bots](https://img.shields.io/badge/Remote%20Bots-WhatsApp%20%2B%20Telegram-25d366?style=for-the-badge&logo=whatsapp)](client/src/components/BotsView.tsx)
 [![Security](https://img.shields.io/badge/Security-Zero--Trust%20Token-e11d48?style=for-the-badge)](src/services/auth/)
@@ -20,6 +20,8 @@
 
 [Key Features](#-key-features--advantages) • [System Architecture](#-end-to-end-system-architecture) • [9 Risk Gates Pipeline](#-pure-risk-guard-9-sequential-defense-gates) • [AI Swarm Research](#-multi-agent-ai-research-swarm-10-analytical-lenses) • [Quickstart Guide](#-quickstart-guide-1-click-launchers) • [Remote Bots](#-unified-remote-bots-whatsapp--telegram) • [Capital Auto-Set](#-intelligent-capital-allocation-auto-set-engine)
 
+📄 **Dokumentasi:** [Panduan Pengguna (Bahasa Indonesia)](docs/PANDUAN_PENGGUNA.md) • [Laporan Implementasi](docs/LAPORAN-IMPLEMENTASI.md) • [Verifikasi](docs/VERIFIKASI.md) • [Galeri Screenshot](docs/assets/screenshots/README.md)
+
 </div>
 
 ---
@@ -28,6 +30,7 @@
 
 - [1. Executive Summary & Design Philosophy](#-executive-summary--design-philosophy)
 - [2. Key Features & Advantages](#-key-features--advantages)
+- [📸 App Screenshots (Tampilan Aplikasi)](#-app-screenshots-tampilan-aplikasi)
 - [3. End-to-End System Architecture](#-end-to-end-system-architecture)
 - [4. Deterministic Section 9 Signal Engine](#-deterministic-section-9-signal-engine)
 - [5. Pure Risk Guard: 9 Sequential Defense Gates](#-pure-risk-guard-9-sequential-defense-gates)
@@ -41,7 +44,7 @@
 - [13. Quickstart Guide: 1-Click Launchers](#-quickstart-guide-1-click-launchers)
 - [14. Production Deployment via Docker](#-production-deployment-via-docker)
 - [15. Project Directory Architecture](#-project-directory-architecture)
-- [16. Quality Assurance & Test Suite (177/177 Passing)](#-quality-assurance--test-suite)
+- [16. Quality Assurance & Test Suite (306/306 Passing)](#-quality-assurance--test-suite)
 - [17. Frequently Asked Questions (FAQ) & Troubleshooting](#-frequently-asked-questions-faq--troubleshooting)
 - [18. Financial Risk Disclaimer](#-financial-risk-disclaimer)
 
@@ -74,14 +77,64 @@ Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psy
 | **Capital Defense** | **9 Risk Defense Gates + Institutional Protection Layer** | Daily circuit breaker, bid-ask spread trap filter, anti-FOMO RSI guard, and BTC flash crash veto — wrapped in a drawdown kill switch, exit guard, and floored exit execution. |
 | **Financial Sizing** | **Capital Auto-Set** | Intelligent dynamic position sizing scaled to available balance (from micro IDR 10,000 up to tens of millions), with an optional max-allocation-per-trade cap as a percentage of current equity. |
 | **Profit Locking** | **Trailing Ratchet** | Dynamic monotonic stop-loss escalation prevents open profits from turning into catastrophic losses. Live exits use **floored limit orders** so they can never fill below the stop level. |
+| **Profit Locking** | **Second Scale-Out (TP2)** | After TP1 banks the first 50%, a second take-profit rung (default 10%, per profile 7/10/15%) sells a configurable fraction of the *remainder* while preserving the ratcheted breakeven-or-better stop (`take_profit_target_2_percent`, `tp2_sell_fraction_percent`). |
+| **Entry Strategy** | **Composite Entry Scoring** | Momentum candidates (balanced/aggressive) are ranked with the deterministic `scoreOpportunity` engine over extracted 15m features instead of raw 24h gain alone (`entry_scoring_mode=composite_score`); the legacy `gain_rank` ordering remains available as an exact toggle. |
 | **UI Observability** | **Entry Diagnostics** | Transparent live observability table explaining why coins were approved or vetoed at each gate. |
+| **UI Observability** | **Guided Setup Wizard & Live-Readiness Score** | A 6-step first-run onboarding wizard ("Panduan Setup") plus a dashboard readiness card (0–100) that scores paper-trading performance across 5 beginner-friendly criteria before considering live mode. |
+| **Market Intelligence** | **Whole-Market Radar (0 Token)** | Deterministic screener ranks every liquid Indodax pair each cycle (volume percentile + momentum band), a market-breadth gate reads the advancing share of the top-20 pairs to pause altcoin entries on weak tape, and re-entry cooldowns force rotation instead of chasing the same coin. |
+| **Exit Intelligence** | **Adaptive Exit Engine** | Per-position exit plans computed at entry from ATR volatility, BTC regime, and momentum strength — profit targets stretch in healthy trends while the trailing (loss side) stays anchored to the user's own setting (never more than 2×); stagnant positions are rotated out after a configurable hold window. |
 | **Ops Observability** | **Prometheus Metrics & Watchdog** | `GET /api/metrics` exposition (positions, drawdown state, pending order intents, loop latency), structured pino logging, and an external uptime-watchdog ping (`WATCHDOG_URL`). |
 | **Remote Control** | **Unified Bots View** | Centralized bot management for WhatsApp & Telegram with 4 modes: *Both*, *WhatsApp Only*, *Telegram Only*, or *Disabled*. Conversational AI actions are guarded by a two-step confirmation code. |
 | **Zero-Trust Security** | **Admin Access Token** | Constant-time token verification (`crypto.timingSafeEqual`) with automated background rotation schedules. |
 | **AI Validation** | **A/B Ghost Positions** | Real-time counterfactual simulation benchmarking AI vetoes against market prices to compute empirical AI Alpha. |
 | **Strategy Research** | **Portfolio Backtest & Walk-Forward** | Multi-symbol backtester with concurrent position slots and a shared cash pool, a 90-day local candle cache, and walk-forward optimization with an explicit OVERFIT verdict. |
+| **Strategy Research** | **Backtest Candle Cache** | Both backtest engines read the local candle store first (with count, edge-freshness and contiguity checks) and report `dataSource: 'cache'` vs `'exchange'` so every result discloses where its candles came from; the portfolio engine warns about dropped symbols. |
+| **Self-Optimization** | **Walk-Forward Presets & Strategy Kelly** | A built-in optimizer (candle-cache first) runs in/out-of-sample plus expanding walk-forward per symbol; only `WALK_FORWARD_ROBUST` runs with OOS profit factor ≥ 1.0 may write a **profit-side** preset (TP1/TP2 — trailing is never machine-written) consumed opt-in via `optimizer_preset_enabled`; a per-strategy Kelly governor scales allocation by each `entry_strategy`'s last-20 win rate. Zero LLM tokens. |
+| **Web-First Configuration** | **Zero .env Required** | Every runtime setting — log level, watchdog URL, extra research RSS, Antigravity OAuth client, local-endpoint permission — is managed from the Settings tab (the server port is fixed at 3001 and intentionally not web-changeable) and stored encrypted in the local database; a `.env` file is never required (environment variables remain optional overrides). |
 | **Internationalization** | **Multi-Language (i18n)** | Full bilingual English (default) and Indonesian support across UI, tables, and reporting. |
 | **Portability** | **PWA & Offline Shell** | Installable Progressive Web App (PWA) with responsive mobile layouts and modern dark mode styling. |
+
+---
+
+## 📸 App Screenshots (Tampilan Aplikasi)
+
+Tangkapan layar asli aplikasi (mode PAPER, bahasa Indonesia). Semua gambar tersimpan di
+[`docs/assets/screenshots/`](docs/assets/screenshots/) — **untuk memakai screenshot Anda sendiri,
+cukup timpa file dengan nama yang sama**, tidak perlu mengubah README. Panduan lengkap:
+[docs/assets/screenshots/README.md](docs/assets/screenshots/README.md).
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/assets/screenshots/dashboard.png" alt="Dashboard Terminal Trading" />
+      <br><sub><b>Dashboard</b> — KPI modal, Proteksi Modal berlapis, Skor Kesiapan Live</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/assets/screenshots/scanner-radar.png" alt="Radar Pasar Deterministik" />
+      <br><sub><b>Radar Pasar (0 token)</b> — market breadth + ranking seluruh pair Indodax</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/assets/screenshots/setup-wizard.png" alt="Panduan Setup" />
+      <br><sub><b>Panduan Setup</b> — wizard 6 langkah dengan pratinjau alokasi real-time</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/assets/screenshots/backtest.png" alt="Backtest Strategi" />
+      <br><sub><b>Backtest Strategi</b> — single & portofolio, Exit Adaptif, sumber data cache/bursa</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/assets/screenshots/bots.png" alt="Bots WhatsApp dan Telegram" />
+      <br><sub><b>Bots</b> — WhatsApp & Telegram terpadu, 4 mode kanal, konfirmasi 2 langkah</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/assets/screenshots/reports.png" alt="Laporan dan Kinerja" />
+      <br><sub><b>Laporan & Kinerja</b> — KPI eksekutif, Atribusi Strategi, ekspor CSV/PDF</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -107,7 +160,7 @@ flowchart TD
         Feat[features.ts: RSI14, EMA21, True ATR, Depth Imbalance]
         Lex[lexicon.ts: Bilingual ID/EN Financial Lexicon + Tanh Scaling]
         Threat[threat.ts: Scoped Threat Blocker 30m Freshness]
-        Regime[regime.ts: BTC Macro Window 1h & 4h Drop Returns]
+        Regime[regime.ts: BTC Macro Window 1h & 4h Drop Returns + ATR Percentile]
         Scorer[scorer.ts: Blue-Chip Pullback & Momentum Scoring]
     end
 
@@ -154,8 +207,8 @@ flowchart TD
     subgraph UI_Bots [6. Observability, Bots & Client UI]
         SQLiteDB[(SQLite Database WAL Mode)]
         UnifiedBots[Unified Bots: WhatsApp Baileys + Telegram Bot API]
-        ReactUI[React 18 Dashboard + Tailwind CSS + PWA]
-        PDFReport[Executive PDF & Tax Report Generator]
+        ReactUI[React 19 Dashboard + Tailwind CSS + PWA]
+        PDFReport[Executive PDF Report (client-side jsPDF) & Tax CSV Export]
         MetricsEndpoint[Prometheus /api/metrics + External Watchdog Ping]
     end
 
@@ -187,6 +240,7 @@ Unlike conventional cryptocurrency bots that exhaust costly LLM tokens on every 
    - Features a **30-Minute Freshness Window**, ensuring markets do not remain permanently blocked after false alarms clear.
 4. **BTC Macro Regime Window Returns ([`regime.ts`](src/services/signals/regime.ts)):**
    - Tracks Bitcoin price velocity across rolling **1-hour (`<= -3%`)** and **4-hour (`<= -5%`)** windows.
+   - Includes an **ATR-percentile volatility input** (computed over the available 15m candle window) — a close below the 1h EMA21 combined with top-quintile volatility (percentile ≥ 80) yields the **RISK_OFF** verdict, which applies the scorer's −10 penalty instead of only blocking on raw price drops.
    - Accurately detects acute flash dumps without interrupting trades during normal sideways consolidations.
 5. **Conservative Blue-Chip Pullback Scorer ([`scorer.ts`](src/services/signals/scorer.ts)):**
    - Enables Conservative profiles to safely capture high-cap assets (BTC, ETH, SOL) during healthy pullbacks to the EMA21 support line when RSI is in cool territory (< 48).
@@ -214,9 +268,9 @@ graph TD
     G5 -- Passed --> G6{Gate 6: Scoped Threat?}
     G6 -- Exploit / Hack Detected --> V6[VETO: Coin Security Threat]
     G6 -- Passed --> G7{Gate 7: Slippage Budget?}
-    G7 -- Depth Slippage &gt; 0.5% --> V7[VETO: Orderbook Slippage Exceeded]
+    G7 -- Depth Slippage &gt; tolerance --> V7[VETO: Orderbook Slippage Exceeded]
     G7 -- Passed --> G8{Gate 8: Tech & Setup Score?}
-    G8 -- Score &lt; 70 --> V8[VETO: Setup Score Sub-Threshold]
+    G8 -- Score &lt; threshold --> V8[VETO: Setup Score Sub-Threshold]
     G8 -- Passed --> G9{Gate 9: Min IDR 10,000 Floor?}
     G9 -- Order &lt; 10k IDR --> V9[VETO: Below Indodax Minimum Size]
     G9 -- Passed --> ACC[✓ 100% PASSED: ORDER DISPATCHED TO EXCHANGE]
@@ -224,13 +278,13 @@ graph TD
 
 ### Gate-by-Gate Specification:
 1. **Gate 1 — Daily Circuit Breaker:** Sums total realized losses for the day. If losses exceed the risk profile limit (e.g., 5%), auto-trading is immediately halted for 24 hours. Employs decoupled state ratcheting to prevent execution deadlocks.
-2. **Gate 2 — Portfolio Exposure Limit:** Enforces concurrency limits on active positions (1 to 5 coins based on risk profile and balance tier).
-3. **Gate 3 — BTC Macro Regime:** Vetoes all buy entries across the board if Bitcoin experiences an acute flash dump (> 3% drop in 1 hour or > 5% in 4 hours).
-4. **Gate 4 — Spread Trap Guard:** Rejects assets with excessive bid-ask spreads (> 0.8% - 1.5%), safeguarding capital against illiquid traps.
+2. **Gate 2 — Portfolio Exposure Limit:** Enforces concurrency limits on active positions (2 to 3 coins based on risk profile and capital tier — see the [Risk Profiles](#-investment-risk-profiles) table).
+3. **Gate 3 — BTC Macro Regime:** Vetoes all buy entries across the board if Bitcoin experiences an acute flash dump (> 3% drop in 1 hour or > 5% in 4 hours). Without a crash, a close below the 1h EMA21 combined with top-quintile ATR-percentile volatility yields **RISK_OFF** — entries stay technically allowed, but the scorer applies a −10 penalty.
+4. **Gate 4 — Spread Trap Guard:** Rejects assets with excessive bid-ask spreads (> 0.8%, a hard-coded tolerance applied to all profiles), safeguarding capital against illiquid traps.
 5. **Gate 5 — RSI Guard (Anti-Top FOMO):** Prevents entering tokens whose 14-period RSI is already overbought (> 70-75).
 6. **Gate 6 — Scoped Threat Scoping:** Confirms the specific target coin has had zero exploit disclosures, contract hacks, or delisting announcements within the past 30 minutes.
-7. **Gate 7 — Slippage Budget:** Simulates full order execution against the top 5 levels of the Indodax orderbook, ensuring effective slippage does not exceed 0.5%.
-8. **Gate 8 — Technical Score Threshold:** Mandates that the composite technical setup score meets or exceeds the required threshold (default 70/100).
+7. **Gate 7 — Slippage Budget:** Simulates full order execution against the top 5 levels of the Indodax orderbook, ensuring effective slippage does not exceed the `slippage_tolerance_percent` setting (default 0.8%; the conservative profile applies 0.5%).
+8. **Gate 8 — Technical Score Threshold:** Mandates that the composite technical setup score meets or exceeds the required threshold (per profile: 65 conservative / 60 balanced / 50 aggressive).
 9. **Gate 9 — Indodax Minimum Floor:** Verifies that after subtracting cash reserves, the net order value is **at least IDR 10,000**, fully satisfying Indodax exchange regulations.
 
 ### Institutional Protection Layer (wraps the 9 gates)
@@ -243,6 +297,18 @@ The 9 gates decide *whether to enter*. A second, independent layer protects capi
 4. **Order-Intent Journal & Crash Recovery:** Every live order is journaled in `order_intents` with an official `newClientOrderId` **before** the request leaves the process. After a crash between "order sent" and "fill recorded", the engine recovers the truth by querying the exchange with `origClientOrderId`; critical findings pause auto-trading and alert the admin.
 5. **Resilient API access:** Private GET/DELETE calls retry with exponential backoff honoring `Retry-After` (POSTs are never blindly retried — order intents cover crash recovery instead), and account reads are deduplicated to respect rate limits.
 6. **Shutdown warning:** If the process stops while live positions are open, admins receive a WhatsApp/Telegram warning that exit protection is offline until restart.
+
+---
+
+### Rotation & Market-Health Gates (Deterministic, 0 Token)
+
+Three newer gates govern *how the bot rotates across the whole market*, all pure math on data the engine already holds:
+
+1. **Market Breadth (`market_breadth`):** the advancing share of the 20 most liquid pairs (last price vs 24h-ago, from `prices_24h` the summaries API already returns). Below `market_breadth_min_percent` (default 30), *momentum* and *new-listing* entries pause for the cycle while blue-chip pullbacks stay available. Fails open when the data is absent.
+2. **Re-Entry Cooldown (`reentry_cooldown`):** a just-closed symbol cannot be re-bought for `reentry_cooldown_hours` (default 4) — **doubled after a losing trade** — so the bot rotates to fresh opportunities instead of chasing what it just sold.
+3. **Multi-Timeframe Alignment (`mtf_alignment`):** a 15m setup is only tradable when the 1h trend agrees (close ≥ EMA21 with a non-falling EMA). Candle-store first; at most 8 bounded fetches per cycle; missing data → pass with a warning, never a block.
+
+The whole-market ranking behind these gates is published live at `GET /api/market/radar` and rendered as the "Radar Pasar (Deterministik)" card in the Scanner tab — the dashboard's entry diagnostics now shows **12 gate cards** with plain-language explainers.
 
 ---
 
@@ -309,7 +375,7 @@ The **Capital Allocation Auto-Set Engine** in [`src/services/trading/index.ts`](
 | **IDR 1M - 10M** | **Medium** | **3 - 5 Coins** | 17% - 28% | 15% - 20% | Full multi-coin diversification with deep orderbook slippage budgeting. |
 | **> IDR 10,000,000** | **Large** | **5 Coins** | Risk-adjusted | 20% - 25% | Prioritizes deep liquidity pools and EMA21 structural support pullbacks. |
 
-> 💡 **Instant Remote Adjustment:** Capital limits and risk profiles can be updated on the fly via the Web Dashboard or by messaging the bot: `/capital 500000 moderate`.
+> 💡 **Instant Remote Adjustment:** Capital limits and risk profiles can be updated on the fly via the Web Dashboard or by messaging the bot: `/modal 500000 seimbang` (Indonesian shorthand such as `500k` or `1.5jt` is accepted).
 
 ---
 
@@ -321,11 +387,13 @@ Tailor the bot's execution style with a single click in **Settings &rarr; Risk P
 
 | Strategy Parameter | 🛡️ Conservative | ⚖️ Moderate *(Recommended)* | 🚀 Aggressive |
 | :--- | :--- | :--- | :--- |
-| **Take Profit Target (TP)** | 3.5% | 5.0% | 7.5% |
+| **Take Profit Target 1 (TP1)** | 3.5% | 5.0% | 7.5% |
+| **Take Profit Target 2 (TP2)** | 7.0% | 10.0% | 15.0% |
 | **Trailing Stop Ratchet** | 1.8% (Tight) | 2.5% (Balanced) | 3.5% (Wide) |
-| **Simultaneous Positions** | Maximum 2 Coins | Maximum 3 Coins | Maximum 5 Coins |
+| **Simultaneous Positions** | Maximum 2 Coins (3 when capital ≥ Rp 5.000.000) | Maximum 3 Coins | 2–3 Coins by capital tier (3 when ≥ Rp 500.000) |
 | **Asset Universe** | Tier 1 Blue-Chips (BTC, ETH, SOL) | Top 20 Indodax Liquidity | Momentum Breakouts & New Listings |
-| **Daily Circuit Breaker** | 3.0% Maximum Loss | 5.0% Maximum Loss | 7.0% Maximum Loss |
+| **Daily Circuit Breaker** | 3.0% Maximum Loss | 5.0% Maximum Loss | 8.0% Maximum Loss |
+| **Slippage Tolerance** | 0.5% | 0.8% | 1.2% |
 | **Target Trader Persona** | Capital preservation & beginners | Standard balanced crypto traders | High-conviction traders in Bull Runs |
 
 ---
@@ -369,9 +437,9 @@ Remote control and automated notification feeds are unified inside a **single ce
 | Command | Permission | Description |
 | :--- | :---: | :--- |
 | `/status` | Public / Admin | Displays bot operational health, exchange connectivity, and open positions. |
-| `/profit` | Public / Admin | Reports today's realized profit, win rate, and total net performance. |
+| `/pnl` (alias `/profit`) | Public / Admin | Reports today's realized profit, win rate, and total net performance. |
 | `/coins` | Public / Admin | Lists top 5 trending gainers on Indodax. |
-| `/capital <amount> [profile]` | **Admin Only** | Dynamically reconfigures trading capital and risk profile from your phone. |
+| `/modal <amount> [profile]` | **Admin Only** | Dynamically reconfigures trading capital and risk profile from your phone (`k`/`jt` shorthand supported, e.g. `/modal 500k agresif`). |
 | `/start` | **Admin Only** | Resumes or enables autonomous spot trading remotely. |
 | `/stop` | **Admin Only** | Pauses automated entry signal execution. |
 | `/panic` | **Admin Only** | Triggers an immediate sub-second market liquidation of all open coins to IDR. |
@@ -408,7 +476,7 @@ The WhatsApp assistant can also execute actions from free-form chat (e.g., *"bel
    - Runs in **WAL (Write-Ahead Logging)** mode for crash resilience and concurrency.
    - Automated timestamped database snapshots are preserved in `backups/` and can be downloaded from the Reports UI.
 6. **Official Audit PDF & CSV Export:**
-   - Enables one-click exports of trade histories to formatted spreadsheet **CSV** files and audit-ready **PDF Reports**.
+   - Enables one-click exports of trade histories to formatted spreadsheet **CSV** files (generated server-side by the reporting service) and audit-ready **PDF Reports** (assembled client-side in the browser via jsPDF).
 7. **Conversational AI Action Guard:**
    - Destructive actions requested through WhatsApp free-form chat require a 6-digit two-step confirmation code that is consumed outside the LLM, with a 5-minute expiry (see [Remote Bots](#-unified-remote-bots-whatsapp--telegram)).
 
@@ -494,21 +562,21 @@ Scrape `GET /api/metrics` with Prometheus for positions by mode, unprotected liv
 
 | Directory / Module | Path | Primary Role & Responsibilities |
 | :--- | :--- | :--- |
-| **Frontend Web (PWA)** | `client/` | React 18, Tailwind CSS, Vite, Lucide Icons, service worker, & PWA manifest. |
+| **Frontend Web (PWA)** | `client/` | React 19, Tailwind CSS, Vite, Lucide Icons, service worker, & PWA manifest. |
 | **Internationalization** | `client/src/i18n/` | Bilingual dictionaries (`translations.ts`), context provider (`LanguageContext.tsx`), and switchers. |
-| **UI Components** | `client/src/components/` | `DashboardView`, `BotsView`, `EntryDiagnosticsSection`, `QuotaView`, `ReportView`. |
+| **UI Components** | `client/src/components/` | `DashboardView`, `BotsView`, `EntryDiagnosticsSection`, `SetupWizard`, `LiveReadinessCard`, `QuotaView`, `ReportView`. |
 | **Documentation & Assets** | `docs/` | `docs/assets/` (Vector SVGs), `PANDUAN_PENGGUNA.md` (Indonesian User Guide), and audit logs. |
 | **Quantitative Signals** | `src/services/signals/` | Deterministic Section 9 (`features`, `lexicon`, `threat`, `regime`, `scorer`). |
 | **Trading & Risk Guard** | `src/services/trading/` | 9 Risk Defense Gates (`riskGuard`), institutional protection layer (drawdown kill switch, exit guard, floored exits), order-intent journal, trailing ratchet, & capital auto-set engine. |
 | **AI Swarm Intelligence** | `src/services/agents/` | 10 specialized intelligence analysts, read-only Portfolio Advisor, SQLite outbox Blackboard bus, & SHA-256 deduplication. |
 | **AI Prompt Registry** | `src/services/ai/prompts.ts` | Versioned prompts for every LLM role with per-call version audit trail (`ai_call_logs.prompt_version`) and the `npm run ai:eval` golden-scenario harness. |
-| **Research & Backtesting** | `src/services/backtest/`, `src/services/candles/`, `scripts/` | Single-symbol & portfolio backtest engines (concurrent slots, zero-lookahead stops), 90-day candle cache in SQLite, grid-search optimizer with walk-forward analysis. |
+| **Research & Backtesting** | `src/services/backtest/`, `src/services/candles/`, `scripts/` | Single-symbol & portfolio backtest engines (concurrent slots, zero-lookahead stops, TP1+TP2 scale-outs) that prefer the local SQLite candle cache and tag each result `dataSource: 'cache'` or `'exchange'`, plus grid-search optimizer with walk-forward analysis. |
 | **Indodax Market Adapter** | `src/services/indodax/` | REST v2 wrapper & WebSocket client with 6-second in-flight promise deduplication, retry/backoff on private endpoints, & write-through candle persistence. |
 | **Remote Bot Services** | `src/services/whatsapp/` & `telegram/` | Baileys WhatsApp Multi-Device engine & Telegram Official Bot API integration. |
 | **Security & Auth** | `src/services/auth/` | Token rotation manager & constant-time `timingSafeEqual` authentication verification. |
 | **Database & Snapshots** | `src/db/` & `src/services/backup/` | SQLite WAL engine, relational schemas, migrations, and automated snapshot backup services. |
 | **REST API Server** | `src/api/` & `src/server.ts` | Express REST routes, exchange webhooks, zero-trust token protection middleware, `/api/metrics` Prometheus exposition, & lifecycle hooks. |
-| **Automated Test Suite** | `tests/` | 177 unit and integration tests across 45 suites, covering critical quantitative algorithms, execution safety, institutional protection, API security, and risk barriers. |
+| **Automated Test Suite** | `tests/` | 303 unit and integration tests across 70 suites, covering critical quantitative algorithms, execution safety, institutional protection, API security, and risk barriers. |
 | **Process Supervision** | `deploy/ai-trading.service` | systemd unit with `Restart=always` for always-on VPS operation (seconds-to-minutes downtime). |
 | **1-Click Launchers** | `start.bat`, `start.ps1`, `start.sh` | Automated zero-configuration launchers for Windows, Linux, and macOS. |
 | **Containerization** | `Dockerfile`, `docker-compose.yml` | Multi-stage production Docker container configuration for continuous 24/7 cloud hosting. |
@@ -523,7 +591,7 @@ Scrape `GET /api/metrics` with Prometheus for positions by mode, unprotected liv
 
 ## 🧪 Quality Assurance & Test Suite
 
-All critical business logic, token security routines, quantitative indicators, and risk defense gates are safeguarded by **177 unit & integration tests** located in [`tests/`](tests/):
+All critical business logic, token security routines, quantitative indicators, and risk defense gates are safeguarded by **303 unit & integration tests** located in [`tests/`](tests/):
 
 ```bash
 # Execute the entire automated test suite:
@@ -554,21 +622,22 @@ npm test
 ✔ Institutional protection: floored exits, dust handling, drawdown kill switch & de-risk modes
 ✔ Order-intent journal crash recovery & safety-status telemetry
 ✔ Portfolio backtest simulator (concurrent slots, shared cash, zero-lookahead stops)
+✔ Composite momentum entry scoring, TP2 scale-out & cache-first backtests
 ✔ Candle store round-trip & new indicators (MACD, Bollinger width, volume z-score)
 ✔ Prompt version invariants & AI verdict parser golden cases
 ---------------------------------------------------------------------------------
-ℹ tests 177 | suites 45 | pass 177 | fail 0 | cancelled 0
+ℹ tests 306 | suites 71 | pass 306 | fail 0 | cancelled 0
 ---------------------------------------------------------------------------------
 ```
 
-Coverage on critical modules (`riskGuard`, `secrets`, indicators, signals) is enforced at **80% lines** — currently ~89%:
+Coverage on critical modules (`riskGuard`, `secrets`, indicators, signals) is enforced at **80% lines** — currently ~89.9%:
 
 ```bash
 npm run test:coverage            # full report (lcov + text)
 npm run test:coverage:critical   # hard 80% gate on critical modules
 ```
 
-The client ships its own vitest suite (`npm test` inside `client/`) covering token storage, connection-state events, and EN/ID translation parity.
+The client ships its own vitest suite (`npm test` inside `client/`, 25 tests) covering token storage, connection-state events, live-readiness scoring, and EN/ID translation parity.
 
 Production Build Verification:
 ```bash
@@ -581,7 +650,7 @@ Continuous Integration:
 # .github/workflows/ci.yml runs on every push/PR:
 npm ci && npm --prefix client ci
 npm run typecheck
-npm test                                 # backend suite (177 tests)
+npm test                                 # backend suite (306 tests)
 npm run test:coverage:critical           # 80% coverage gate on critical modules
 npm --prefix client test                 # client vitest suite
 npm --prefix client run build

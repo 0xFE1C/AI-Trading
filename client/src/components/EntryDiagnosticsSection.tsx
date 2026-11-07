@@ -16,6 +16,7 @@ import {
   Cpu,
   BarChart2,
   Filter,
+  Lightbulb,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { EntryGateDiagnostics, SignalsRadarData } from '../types';
@@ -28,6 +29,88 @@ interface GateMeta {
   description: string;
 }
 
+/**
+ * Plain-language (jargon-free) explainers per entry-gate name, shown beneath
+ * each recent rejection row behind the "Penjelasan sederhana" toggle.
+ * Bilingual pairs are rendered through l() at render time.
+ */
+const GATE_PLAIN_LANGUAGE: Record<string, { en: string; id: string }> = {
+  rsi: {
+    en: 'The asset is overbought (too hot). The bot waits for the price to cool down before entering.',
+    id: 'Aset sedang overbought (panas). Bot menunggu harga lebih dingin sebelum masuk.',
+  },
+  spread: {
+    en: 'The gap between buy and sell prices is too wide — entering now is risky.',
+    id: 'Selisih harga beli–jual terlalu lebar; masuk sekarang berisiko.',
+  },
+  slippage: {
+    en: 'Orderbook depth is not enough for this order size without pushing the price.',
+    id: 'Kedalaman orderbook tidak cukup untuk ukuran order tanpa menggeser harga.',
+  },
+  btc_regime: {
+    en: 'BTC is falling sharply — all entries are paused to protect your capital.',
+    id: 'BTC sedang turun tajam — semua entry dijeda untuk melindungi modal.',
+  },
+  circuit_breaker: {
+    en: 'The daily loss limit was reached. The bot pauses until tomorrow to protect capital.',
+    id: 'Batas rugi harian tercapai. Bot berhenti sementara sampai besok untuk melindungi modal.',
+  },
+  drawdown_kill_switch: {
+    en: 'Loss from the equity peak crossed the safety limit — new entries stop automatically.',
+    id: 'Kerugian dari puncak equity melewati batas aman — entry baru dihentikan otomatis.',
+  },
+  exit_guard: {
+    en: 'An open position has no guaranteed exit plan yet — new entries are on hold.',
+    id: 'Ada posisi yang belum punya rencana exit terjamin — entry baru ditahan.',
+  },
+  threat_scope: {
+    en: 'There is a security news alert about this specific asset.',
+    id: 'Ada berita keamanan terkait aset ini.',
+  },
+  exposure: {
+    en: 'All position slots are full — wait for one to close.',
+    id: 'Slot posisi penuh — tunggu salah satu selesai.',
+  },
+  ai_gate: {
+    en: 'The research AI vetoed this signal.',
+    id: 'AI riset memveto sinyal ini.',
+  },
+  candidate_filter: {
+    en: 'No setup strong enough yet — the bot stays patient.',
+    id: 'Belum ada setup yang cukup kuat — bot bersabar menunggu.',
+  },
+  score_threshold: {
+    en: 'No setup strong enough yet — the bot stays patient.',
+    id: 'Belum ada setup yang cukup kuat — bot bersabar menunggu.',
+  },
+  indicators: {
+    en: 'Not enough candle data yet for a reliable analysis.',
+    id: 'Data candle belum cukup untuk analisis.',
+  },
+  allocation_cap: {
+    en: 'The order size was reduced so it stays within the equity cap.',
+    id: 'Ukuran order diperkecil agar tidak melebihi batas ekuitas.',
+  },
+  order_executed: {
+    en: 'Order sent successfully — the bot bought this coin.',
+    id: 'Order berhasil dikirim — bot membeli koin ini.',
+  },
+  market_breadth: {
+    en: 'Most of the market is weakening — the bot holds altcoin entries to protect capital.',
+    id: 'Mayoritas pasar sedang melemah — bot menahan entry altcoin untuk melindungi modal.',
+  },
+  reentry_cooldown: {
+    en: 'This coin was just closed — the bot lets it cool down and looks for other opportunities (anti-chasing).',
+    id: 'Koin ini baru saja ditutup — bot menunggu dingin dan mencari peluang lain (anti mengejar harga).',
+  },
+  mtf_alignment: {
+    en: 'The 1-hour trend is still down — waiting for direction alignment.',
+    id: 'Tren timeframe 1 jam masih turun — menunggu keselarasan arah.',
+  },
+};
+
+const PLAIN_LANGUAGE_STORAGE_KEY = 'ai_trading_plain_diagnostics';
+
 export const EntryDiagnosticsSection: React.FC = () => {
   const { l, language } = useLanguage();
   const [diagnostics, setDiagnostics] = useState<EntryGateDiagnostics | null>(null);
@@ -35,6 +118,24 @@ export const EntryDiagnosticsSection: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'gates' | 'radar'>('gates');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  // "Penjelasan sederhana" toggle — default ON, persisted in localStorage.
+  const [showPlainLanguage, setShowPlainLanguage] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(PLAIN_LANGUAGE_STORAGE_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+
+  const togglePlainLanguage = () => {
+    setShowPlainLanguage((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(PLAIN_LANGUAGE_STORAGE_KEY, next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+  };
 
   const gateMetas = useMemo<GateMeta[]>(() => [
     {
@@ -116,6 +217,33 @@ export const EntryDiagnosticsSection: React.FC = () => {
       description: l(
         'Sanity check from AI model (or automatically bypassed in deterministic mode).',
         'Sanity check 1x model AI (atau otomatis bypass jika mode deterministik aktif).'
+      ),
+    },
+    {
+      key: 'market_breadth',
+      name: l('10. Market Breadth (Whole-Market Health)', '10. Market Breadth (Kesehatan Pasar)'),
+      category: 'macro',
+      description: l(
+        'Share of the 20 most liquid pairs trading above their 24h-ago price. Weak breadth pauses altcoin entries.',
+        'Porsi dari 20 pair paling likuid yang harga di atasnya harga 24 jam lalu. Breadth lemah menahan entry altcoin.'
+      ),
+    },
+    {
+      key: 'reentry_cooldown',
+      name: l('11. Re-Entry Cooldown (Anti-Chase)', '11. Cooldown Re-Entry (Anti-Kedaruitan)'),
+      category: 'risk',
+      description: l(
+        'Blocks re-buying a coin that was just closed — doubled after a loss — and pushes the bot to rotate to fresh opportunities.',
+        'Memblokir pembelian ulang koin yang baru ditutup — berlipat setelah rugi — dan mendorong rotasi ke peluang baru.'
+      ),
+    },
+    {
+      key: 'mtf_alignment',
+      name: l('12. Multi-Timeframe Alignment (1h Trend)', '12. Keselarasan Multi-Timeframe (Tren 1 Jam)'),
+      category: 'strategy',
+      description: l(
+        'Requires the 1-hour trend to agree with the 15m entry setup; downtrends on the higher timeframe veto the candidate.',
+        'Mewajibkan tren 1 jam searah dengan setup 15 menit; tren turun di timeframe besar memveto kandidat.'
       ),
     },
   ], [l]);
@@ -377,16 +505,41 @@ export const EntryDiagnosticsSection: React.FC = () => {
 
           {/* Recent Rejections Log */}
           <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-400" />
                 <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide">
                   {l('Recent Rejection Logs — Why Weren\'t Coins Entered?', 'Log Penolakan Terakhir — Mengapa Koin Belum Dibeli?')}
                 </h4>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {recentRejections.length} {l('logged rejections', 'penolakan tercatat')}
-              </span>
+              <div className="flex items-center gap-3">
+                {/* Plain-language toggle (default ON, persisted) */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showPlainLanguage}
+                  onClick={togglePlainLanguage}
+                  className="flex items-center gap-2 group"
+                >
+                  <span className="text-[11px] font-semibold text-slate-400 group-hover:text-slate-200 transition-colors">
+                    {l('Simple explanation', 'Penjelasan sederhana')}
+                  </span>
+                  <span
+                    className={`relative inline-flex h-4.5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                      showPlainLanguage ? 'bg-blue-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                        showPlainLanguage ? 'translate-x-4' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </span>
+                </button>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {recentRejections.length} {l('logged rejections', 'penolakan tercatat')}
+                </span>
+              </div>
             </div>
 
             {recentRejections.length === 0 ? (
@@ -401,6 +554,7 @@ export const EntryDiagnosticsSection: React.FC = () => {
                 {recentRejections.map((rej, idx) => {
                   const gateInfo = gateMetas.find((g) => g.key === rej.gate_name);
                   const gateTitle = gateInfo ? gateInfo.name : rej.gate_name;
+                  const plainExplainer = GATE_PLAIN_LANGUAGE[rej.gate_name];
 
                   return (
                     <div
@@ -420,6 +574,13 @@ export const EntryDiagnosticsSection: React.FC = () => {
                           <p className="text-[11px] text-slate-400 leading-snug mt-0.5">
                             {formatRejectionReason(rej.gate_name, rej.values)}
                           </p>
+                          {/* Plain-language explainer (toggleable, default ON) */}
+                          {showPlainLanguage && plainExplainer && (
+                            <p className="text-[11px] text-blue-200 bg-blue-950/40 border border-blue-500/20 rounded-md px-2 py-1.5 mt-1.5 leading-snug flex items-start gap-1.5">
+                              <Lightbulb className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                              <span>{l(plainExplainer.en, plainExplainer.id)}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
 

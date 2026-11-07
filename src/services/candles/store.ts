@@ -17,15 +17,15 @@ export function saveCandles(pair: string, timeframe: string, bars: BacktestBar[]
   try {
     const cleanPair = pair.toLowerCase().replace('/', '').replace('_', '');
     const insert = db.prepare(`
-      INSERT OR REPLACE INTO candles (pair, timeframe, ts, open, high, low, close, volume)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO candles (pair, timeframe, ts, open, high, low, close, volume, raw_volume)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const cutoff = Date.now() - RETENTION_DAYS * 86400 * 1000;
 
     const tx = db.transaction(() => {
       for (const bar of bars) {
         if (!(bar.timestamp > 0 && bar.close > 0)) continue;
-        insert.run(cleanPair, timeframe, bar.timestamp, bar.open, bar.high, bar.low, bar.close, bar.volume);
+        insert.run(cleanPair, timeframe, bar.timestamp, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.rawVolume ?? null);
       }
       db.prepare('DELETE FROM candles WHERE ts < ?').run(cutoff);
     });
@@ -42,7 +42,7 @@ export function loadCandles(pair: string, timeframe: string, limit = 5000): Back
   try {
     const cleanPair = pair.toLowerCase().replace('/', '').replace('_', '');
     return db.prepare(`
-      SELECT ts, open, high, low, close, volume FROM candles
+      SELECT ts, open, high, low, close, volume, raw_volume FROM candles
       WHERE pair = ? AND timeframe = ?
       ORDER BY ts DESC LIMIT ?
     `).all(cleanPair, timeframe, limit)
@@ -53,6 +53,7 @@ export function loadCandles(pair: string, timeframe: string, limit = 5000): Back
         low: row.low,
         close: row.close,
         volume: row.volume || 0,
+        rawVolume: row.raw_volume ?? undefined,
       }))
       .reverse();
   } catch {

@@ -38,3 +38,7 @@ yarn-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# ZCode tooling (lokal)
+.mimosa/
+.zcode/

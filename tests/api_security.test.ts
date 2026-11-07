@@ -55,6 +55,13 @@ async function getJson(path: string, token?: string) {
   return { status: res.status, body: (await res.json()) as any };
 }
 
+async function postJson(path: string, payload: any, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${baseUrl}${path}`, { method: 'POST', headers, body: JSON.stringify(payload) });
+  return { status: res.status, body: (await res.json()) as any };
+}
+
 test('observer status hides balance, positions, trades, and WhatsApp identity', async () => {
   const { status, body } = await getJson('/api/status');
 
@@ -124,4 +131,24 @@ test('the configured admin token is stored encrypted at rest', () => {
   const raw = db.prepare('SELECT value FROM settings WHERE key = ?').get('admin_access_token') as { value: string };
   assert.ok(raw.value.startsWith('enc:v1:'));
   assert.equal(getSetting('admin_access_token'), ADMIN_TOKEN);
+});
+
+test('auto-set-capital persists the profile-specific TP2 target alongside the other risk params', async () => {
+  const originalProfile = getSetting('risk_profile', 'balanced');
+  const originalTp2 = getSetting('take_profit_target_2_percent', '10.0');
+
+  try {
+    const { status, body } = await postJson(
+      '/api/settings/auto-set-capital',
+      { capital: 1_000_000, profile: 'conservative' },
+      ADMIN_TOKEN
+    );
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    assert.equal(body.plan.takeProfitTarget2Percent, 7.0);
+    assert.equal(getSetting('take_profit_target_2_percent'), '7', 'conservative profile must persist TP2 target 7.0');
+  } finally {
+    setSetting('risk_profile', originalProfile);
+    setSetting('take_profit_target_2_percent', originalTp2);
+  }
 });

@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { db, getSetting, setSetting, applyRiskProfile, RISK_PROFILES, DATA_DIR } from '../../db/index.js';
 import { tradingEngine, PositionRecord } from '../trading/index.js';
+import { formatStoredExitPlanLine } from '../trading/adaptiveExit.js';
 import { calculateCapitalAllocation } from '../trading/riskGuard.js';
 import { indodax } from '../indodax/index.js';
 import { buildWhatsappSystemPrompt } from '../ai/prompts.js';
@@ -408,6 +409,8 @@ Kirim pesan biasa tanpa tanda "/" untuk berdiskusi atau menanyakan analisis pasa
             ? Math.max(1, Math.round((Date.now() - targetPos.opened_at) / 60000))
             : 0;
           const holdHours = (holdMinutes / 60).toFixed(1);
+          // Rencana exit adaptif yang dibekukan saat entry (bila ada)
+          const exitPlanLine = formatStoredExitPlanLine(targetPos.exit_plan_json);
           await this.sendMessage(
             jid,
             `📋 *AUDIT & ALASAN POSISI AKTIF*
@@ -416,7 +419,7 @@ Kirim pesan biasa tanpa tanda "/" untuk berdiskusi atau menanyakan analisis pasa
 • Durasi Hold: *${holdMinutes} menit (${holdHours} jam)*
 • Harga Masuk: Rp ${targetPos.entry_price.toLocaleString('id-ID')}
 • Harga Saat Ini: Rp ${targetPos.current_price.toLocaleString('id-ID')}
-• Trailing Stop Level: Rp ${targetPos.trailing_stop_price.toLocaleString('id-ID')} (Kunci Profit)
+• Trailing Stop Level: Rp ${targetPos.trailing_stop_price.toLocaleString('id-ID')} (Kunci Profit)${exitPlanLine ? `\n• ${exitPlanLine}` : ''}
 • Alasan Entry: *${targetPos.exit_reason || 'Momentum breakout & konfirmasi AI Risk Evaluator'}*
 • Safety Loop: *Tidak melanggar batas circuit breaker & grounded data.*`
           );
@@ -428,13 +431,14 @@ Kirim pesan biasa tanpa tanda "/" untuk berdiskusi atau menanyakan analisis pasa
               ? Math.max(1, Math.round((Date.now() - targetTrade.opened_at) / 60000))
               : 0;
           const holdHours = (holdMinutes / 60).toFixed(1);
+          const closedPlanLine = formatStoredExitPlanLine((targetTrade as any).exit_plan_json);
           await this.sendMessage(
             jid,
             `📋 *AUDIT POSISI TERAKHIR*
 • Koin: *${targetTrade.symbol.toUpperCase()}*
 • Status: *TELAH DITUTUP*
 • PnL Akhir: *${targetTrade.pnl_percent >= 0 ? '+' : ''}${targetTrade.pnl_percent.toFixed(2)}% (Rp ${targetTrade.pnl_idr.toLocaleString('id-ID')})*
-• Durasi Hold: *${holdMinutes} menit (${holdHours} jam)*
+• Durasi Hold: *${holdMinutes} menit (${holdHours} jam)*${closedPlanLine ? `\n• ${closedPlanLine}` : ''}
 • Alasan Exit: *${targetTrade.exit_reason || 'Trailing stop loss tersentuh'}*`
           );
         } else {
@@ -565,6 +569,7 @@ Contoh:
         setSetting('daily_loss_limit_percent', String(plan.dailyLossLimitPercent));
         setSetting('slippage_tolerance_percent', String(plan.slippageTolerancePercent));
         setSetting('take_profit_target_1_percent', String(plan.takeProfitStep1Percent));
+        setSetting('take_profit_target_2_percent', String(plan.takeProfitTarget2Percent));
         setSetting('allow_new_listings', plan.allowNewListings ? '1' : '0');
         setSetting('allowed_coins_only', plan.allowedCoinsOnly);
         setSetting('min_24h_volume_idr', String(plan.minVolumeIdr));
@@ -785,7 +790,7 @@ ${posText}`
           const amount = nominalInput / price;
           const mode = (getSetting('trading_mode', 'paper') as 'paper' | 'live');
 
-          await tradingEngine.executeBuy(pair, price, amount, nominalInput, mode, 'Manual command via WhatsApp');
+          await tradingEngine.executeBuy(pair, price, amount, nominalInput, mode, 'Manual command via WhatsApp', null, 'manual');
 
           await this.sendMessage(
             jid,
@@ -1231,7 +1236,9 @@ ${lessonsList}
             amount,
             amountIdr,
             mode,
-            'Order beli dieksekusi melalui instruksi AI Assistant'
+            'Order beli dieksekusi melalui instruksi AI Assistant',
+            null,
+            'manual'
           );
 
           if (success) {

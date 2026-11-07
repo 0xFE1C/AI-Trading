@@ -3,6 +3,14 @@
 
 **Peran:** Senior Engineering Auditor  
 **Tanggal Audit:** 23 Oktober 2026  
+
+> **📌 Catatan Pembaca (2026-11-07):** dokumen ini adalah **audit historis** dari fase
+> peningkatan awal (saat suite masih 90 test). Verifikasi untuk seluruh fase berikutnya —
+> TP2 & entry scoring komposit, Adaptive Exit Engine, rotasi pasar menyeluruh, sistem
+> swa-optimasi — terdokumentasi dalam [`LAPORAN-IMPLEMENTASI.md`](LAPORAN-IMPLEMENTASI.md) §4–§7,
+> termasuk laporan verifikator independen (VERDICT PASS_WITH_FINDINGS) dan uji GUI browser nyata.
+> Kondisi suite saat ini: **303/303 test lulus (70 suites)**.
+
 **Status Audit:** **LULUS (PASS)** — *dengan catatan penyelesaian arsitektur modular pada AgentBus dan MarketAdapter (Partial)*.
 
 ---

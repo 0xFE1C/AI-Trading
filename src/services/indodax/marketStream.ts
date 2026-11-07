@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { saveCandles } from '../candles/store.js';
+import type { BacktestBar } from '../backtest/index.js';
 
 export interface RealCandle {
   time: string;
@@ -10,6 +11,28 @@ export interface RealCandle {
   close: number;
   volume: number; // Volume in IDR
   rawVolume?: number; // Volume in traded coin
+}
+
+/**
+ * Mengubah bar mentah TradingView history_v2 menjadi baris candle store.
+ * Volume disimpan sebagai NOTIONAL IDR (rawVolume * close, dibulatkan) agar
+ * konsisten dengan semantik candle in-memory di getRealCandles; volume koin
+ * asli tetap dipertahankan di rawVolume.
+ */
+export function historyBarsToCandleRows(rawBars: any[]): BacktestBar[] {
+  return (Array.isArray(rawBars) ? rawBars : []).map((b: any) => {
+    const close = typeof b.Close === 'number' ? b.Close : parseFloat(b.Close);
+    const rawVolume = typeof b.Volume === 'number' ? b.Volume : parseFloat(b.Volume || '0');
+    return {
+      timestamp: (typeof b.Time === 'number' ? b.Time : parseInt(b.Time, 10)) * 1000,
+      open: typeof b.Open === 'number' ? b.Open : parseFloat(b.Open),
+      high: typeof b.High === 'number' ? b.High : parseFloat(b.High),
+      low: typeof b.Low === 'number' ? b.Low : parseFloat(b.Low),
+      close,
+      volume: Math.round(rawVolume * close),
+      rawVolume,
+    };
+  });
 }
 
 export interface IndodaxTrade {
@@ -534,18 +557,7 @@ export class IndodaxMarketStream {
     this.lastPersistAt.set(key, now);
 
     try {
-      saveCandles(
-        pair,
-        timeframe,
-        rawBars.map((b: any) => ({
-          timestamp: (typeof b.Time === 'number' ? b.Time : parseInt(b.Time, 10)) * 1000,
-          open: typeof b.Open === 'number' ? b.Open : parseFloat(b.Open),
-          high: typeof b.High === 'number' ? b.High : parseFloat(b.High),
-          low: typeof b.Low === 'number' ? b.Low : parseFloat(b.Low),
-          close: typeof b.Close === 'number' ? b.Close : parseFloat(b.Close),
-          volume: typeof b.Volume === 'number' ? b.Volume : parseFloat(b.Volume || '0'),
-        }))
-      );
+      saveCandles(pair, timeframe, historyBarsToCandleRows(rawBars));
     } catch {
       // Best-effort; saveCandles already logs and swallows.
     }

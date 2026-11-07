@@ -16,6 +16,8 @@ export interface Position {
   closed_at: number | null;
   pnl_idr: number;
   pnl_percent: number;
+  exit_plan_json?: string | null;
+  entry_strategy?: string | null;
   exit_reason: string | null;
   mode: 'paper' | 'live';
 }
@@ -176,6 +178,7 @@ export interface BacktestParams {
   minGainThresholdPercent?: number;
   slippagePercent?: number;
   strategyType?: 'live_momentum' | 'candle_breakout';
+  adaptiveExit?: boolean;
 }
 
 export interface BacktestTrade {
@@ -217,6 +220,7 @@ export interface BacktestResult {
   slippagePercent: number;
   feePercent: number;
   strategyUsed: string;
+  dataSource?: 'cache' | 'exchange';
   trades: BacktestTrade[];
   equityCurve: Array<{ time: string; timestamp: number; equity: number }>;
 }
@@ -232,6 +236,7 @@ export interface PortfolioBacktestParams {
   takeProfitStep1Percent?: number;
   minGainThresholdPercent?: number;
   slippagePercent?: number;
+  adaptiveExit?: boolean;
 }
 
 export interface PortfolioBacktestTrade {
@@ -265,6 +270,7 @@ export interface PortfolioBacktestResult {
   slotUtilizationPercent: number;
   slippagePercent: number;
   feePercent: number;
+  dataSource?: 'cache' | 'exchange';
   perSymbol: Array<{ symbol: string; candles: number; trades: number; netPnlIdr: number }>;
   equityCurve: Array<{ timestamp: number; equity: number }>;
   trades: PortfolioBacktestTrade[];
@@ -437,6 +443,15 @@ export interface PerformanceReport {
     totalPnlIdr: number;
     avgPnlPercent: number;
   }>;
+  strategyBreakdown?: Array<{
+    strategy: string;
+    closedTrades: number;
+    wins: number;
+    losses: number;
+    winRatePercent: number;
+    netPnlIdr: number;
+    avgHoldMinutes: number | null;
+  }>;
   aiEfficacy: {
     evaluationsCount: number;
     approvedCount: number;
@@ -560,4 +575,91 @@ export interface SignalsRadarData {
   activeThreats: any[];
   threatCount: number;
   averageSentiment: number;
+}
+
+export interface MarketRadarCandidate {
+  rank: number;
+  symbol: string;
+  cheapScore: number;
+  gain24h: number;
+  volIdr: number;
+  reasons: string[];
+}
+
+export interface MarketRadarResponse {
+  ts: number;
+  breadth: {
+    percent: number;
+    sampleSize: number;
+  };
+  candidates: MarketRadarCandidate[];
+}
+
+// --- Optimizer Walk-Forward (preset profit-side, 0 token LLM) ---
+
+export interface OptimizerPresetMeta {
+  testedAt: number;
+  symbols: string[];
+  verdict: 'WALK_FORWARD_ROBUST';
+  oosPfMedian: number | null;
+  oosPnlIdrTotal: number;
+  tp1: number;
+  tp2: number;
+}
+
+export interface OptimizerRunRow {
+  id: string;
+  ts: number;
+  symbol: string;
+  timeframe: string;
+  verdict: string;
+  in_sample_pf: number | null;
+  out_sample_pf: number | null;
+  oos_pnl_idr: number | null;
+  wf_verdict: string | null;
+  wf_oos_pnl_idr: number | null;
+  chosen_config_json: string | null;
+}
+
+export interface OptimizerStatus {
+  isOptimizing: boolean;
+  runs: OptimizerRunRow[];
+  preset: {
+    tp1: number;
+    tp2: number | null;
+    meta: OptimizerPresetMeta;
+    fresh: boolean;
+  } | null;
+  autoRun: boolean;
+  presetEnabled: boolean;
+  lastRunAt: number;
+}
+
+export interface OptimizerRunParams {
+  symbols?: string[];
+  timeframe?: '15m' | '1h' | '4h' | '1d';
+  days?: number;
+}
+
+export interface OptimizerRunSummary {
+  ok: boolean;
+  startedAt: number;
+  durationMs: number;
+  timeframe: string;
+  days: number;
+  presetWritten: boolean;
+  preset: OptimizerPresetMeta | null;
+  symbols: Array<{
+    symbol: string;
+    timeframe: string;
+    barCount: number;
+    coveredDays: number;
+    dataSource: 'cache' | 'exchange';
+    verdict: string;
+    inSamplePF: number | null;
+    outSamplePF: number | null;
+    oosPnlIdr: number;
+    walkForward: { verdict: string; oosPnlIdr: number; oosToIsRatio: number | null };
+    chosenConfig: { id: string; name: string; takeProfitPercent: number; trailingStopPercent: number };
+  }>;
 }

@@ -19,11 +19,13 @@ import {
   Activity,
   HardDrive,
   Layers,
+  Target,
   ArrowDownToLine,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { PerformanceReport, BackupItem, SystemHealth } from '../types';
 import { generatePdfReport } from '../utils/pdfGenerator';
+import { strategyLabel } from '../utils/strategy';
 import { Toast } from './Toast';
 import { useLanguage } from '../i18n/LanguageContext';
 
@@ -488,6 +490,78 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* 5.5 Atribusi Strategi (Performance by Entry Strategy) */}
+      {report && (
+        <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-5 space-y-3 shadow-sm">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wide flex items-center gap-2">
+              <Target className="w-4 h-4 text-fuchsia-400" />
+              <span>{l('Strategy Attribution', 'Atribusi Strategi')}</span>
+            </h3>
+            <span className="text-xs text-slate-400 font-mono">
+              {report.strategyBreakdown?.length || 0} {l('strategies used', 'strategi dipakai')}
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed">
+            {l(
+              'Which entry pipeline actually makes money: blue-chip pullback, momentum, new listings, or manual buys.',
+              'Jalur entry mana yang benar-benar menghasilkan: blue-chip pullback, momentum, koin baru listing, atau beli manual.'
+            )}
+          </p>
+
+          {(report.strategyBreakdown || []).length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl space-y-1">
+              <p>
+                {report.strategyBreakdown === undefined
+                  ? l('Strategy attribution is not available from this server version.', 'Atribusi strategi belum tersedia di versi server ini.')
+                  : l('No closed trades yet for this period.', 'Belum ada trade yang selesai pada periode ini.')}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {l(
+                  'Strategy attribution appears after positions are opened and closed.',
+                  'Atribusi strategi muncul setelah ada posisi yang dibuka dan ditutup.'
+                )}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400 font-mono text-[11px] uppercase">
+                    <th scope="col" className="py-2.5 px-3">{l('Strategy', 'Strategi')}</th>
+                    <th scope="col" className="py-2.5 px-3">{l('Trades', 'Trade')}</th>
+                    <th scope="col" className="py-2.5 px-3">{l('Win Rate %', 'Win Rate %')}</th>
+                    <th scope="col" className="py-2.5 px-3">{l('Net PnL (IDR)', 'Net PnL (IDR)')}</th>
+                    <th scope="col" className="py-2.5 px-3">{l('Avg Hold (minutes)', 'Rata-rata Hold (menit)')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 font-mono">
+                  {(report.strategyBreakdown || []).map((s) => {
+                    const isProfit = s.netPnlIdr >= 0;
+                    const winRateClass =
+                      s.winRatePercent >= 50 ? 'text-emerald-400' : s.winRatePercent < 40 ? 'text-rose-400' : 'text-slate-300';
+                    return (
+                      <tr key={s.strategy} className="hover:bg-slate-850/40 transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-slate-200 font-sans">{strategyLabel(s.strategy, l)}</td>
+                        <td className="py-2.5 px-3 text-slate-300">{s.closedTrades}</td>
+                        <td className={`py-2.5 px-3 font-semibold ${winRateClass}`}>{s.winRatePercent.toFixed(1)}%</td>
+                        <td className={`py-2.5 px-3 font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : ''}{formatCurrency(s.netPnlIdr)}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-400">
+                          {s.avgHoldMinutes !== null ? `${s.avgHoldMinutes} ${l('min', 'mnt')}` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

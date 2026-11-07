@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import dns from 'dns';
+import { getSetting } from '../../db/index.js';
 
 try {
   dns.setDefaultResultOrder('ipv4first');
@@ -11,14 +12,31 @@ function unpackClientValue(hex: string, key = 0x5a): string {
   return bytes.map((h) => String.fromCharCode(parseInt(h, 16) ^ key)).join('');
 }
 
-// Google Cloud Code desktop client public identifiers (de-obfuscated at runtime to avoid push protection regex false-positives)
-export const ANTIGRAVITY_CLIENT_ID =
-  process.env.ANTIGRAVITY_CLIENT_ID ||
-  unpackClientValue('6b6a6d6b6a6a6c6a6c6a6f636b772e3732292933346832686b3639283f68696f2c2e35363530326e3d6e6a693f2a743b2a2a29743d35353d363f2f293f283935342e3f342e74393537');
+// Google Cloud Code desktop client public identifiers (de-obfuscated at runtime to avoid push protection regex false-positives).
+// Web-first: identitas klien kini dapat dioverride dari tab Pengaturan
+// (setting antigravity_client_id / antigravity_client_secret — terenkripsi
+// at-rest). Urutan prioritas: setting web → env → bawaan bawaan-baked.
+const BAKED_CLIENT_ID = unpackClientValue('6b6a6d6b6a6a6c6a6c6a6f636b772e3732292933346832686b3639283f68696f2c2e35363530326e3d6e6a693f2a743b2a2a29743d35353d363f2f293f283935342e3f342e74393537');
+const BAKED_CLIENT_SECRET = unpackClientValue('1d1519090a0277116f621c0d086e626c163e16106b371618622902196e206c2b1e1b3c');
 
-export const ANTIGRAVITY_CLIENT_SECRET =
-  process.env.ANTIGRAVITY_CLIENT_SECRET ||
-  unpackClientValue('1d1519090a0277116f621c0d086e626c163e16106b371618622902196e206c2b1e1b3c');
+export function resolveAntigravityCredentials(): { clientId: string; clientSecret: string } {
+  let idSetting = '';
+  let secretSetting = '';
+  try {
+    idSetting = getSetting('antigravity_client_id', '');
+    secretSetting = getSetting('antigravity_client_secret', '');
+  } catch {
+    // DB belum siap (mis. skrip offline) → lanjut ke env/baked default.
+  }
+  return {
+    clientId: idSetting || process.env.ANTIGRAVITY_CLIENT_ID || BAKED_CLIENT_ID,
+    clientSecret: secretSetting || process.env.ANTIGRAVITY_CLIENT_SECRET || BAKED_CLIENT_SECRET,
+  };
+}
+
+// Kompatibilitas untuk pemanggil lama yang mengimpor konstanta.
+export const ANTIGRAVITY_CLIENT_ID = process.env.ANTIGRAVITY_CLIENT_ID || BAKED_CLIENT_ID;
+export const ANTIGRAVITY_CLIENT_SECRET = process.env.ANTIGRAVITY_CLIENT_SECRET || BAKED_CLIENT_SECRET;
 export const ANTIGRAVITY_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const ANTIGRAVITY_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 export const ANTIGRAVITY_USERINFO_URL = 'https://www.googleapis.com/oauth2/v1/userinfo';
@@ -171,8 +189,9 @@ export function isDiscoverableAntigravityModel(modelId: string): boolean {
  */
 export function buildAntigravityAuthUrl(redirectUri: string, state?: string): { authUrl: string; state: string } {
   const finalState = state || crypto.randomBytes(16).toString('hex');
+  const { clientId } = resolveAntigravityCredentials();
   const params = new URLSearchParams({
-    client_id: ANTIGRAVITY_CLIENT_ID,
+    client_id: clientId,
     response_type: 'code',
     redirect_uri: redirectUri,
     scope: ANTIGRAVITY_SCOPES.join(' '),
@@ -194,7 +213,13 @@ export function extractCodeFromUrlOrInput(input: string): string {
   const trimmed = input.trim();
   if (trimmed.includes('code=')) {
     try {
-      const parsed = new URL(trimmed.startsWith('http') ? trimmed : `http://localhost/${trimmed.replace(/^\?/, '')}`);
+      // Guard: input yang berbentuk URL penuh harus https (balasan callback
+      // Google) — input query-only diparsing sebagai relative localhost.
+      const isFullUrl = /^https:\/\//i.test(trimmed);
+      if (trimmed.startsWith('http') && !isFullUrl) {
+        return trimmed; // http:// ditempel? kembalikan apa adanya — bukan URL callback yang valid.
+      }
+      const parsed = new URL(isFullUrl ? trimmed : `http://localhost/${trimmed.replace(/^\?/, '')}`);
       const code = parsed.searchParams.get('code');
       if (code) return decodeURIComponent(code);
     } catch {
@@ -217,10 +242,11 @@ export async function exchangeCodeForTokens(
     throw new Error('Kode otorisasi Google OAuth tidak ditemukan.');
   }
 
+  const { clientId, clientSecret } = resolveAntigravityCredentials();
   const tokenParams = new URLSearchParams({
     grant_type: 'authorization_code',
-    client_id: ANTIGRAVITY_CLIENT_ID,
-    client_secret: ANTIGRAVITY_CLIENT_SECRET,
+    client_id: clientId,
+    client_secret: clientSecret,
     code,
     redirect_uri: redirectUri,
   });
@@ -359,10 +385,11 @@ export async function refreshAntigravityToken(refreshToken: string): Promise<{ a
     throw new Error('Refresh token Antigravity tidak tersedia.');
   }
 
+  const { clientId, clientSecret } = resolveAntigravityCredentials();
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
-    client_id: ANTIGRAVITY_CLIENT_ID,
-    client_secret: ANTIGRAVITY_CLIENT_SECRET,
+    client_id: clientId,
+    client_secret: clientSecret,
     refresh_token: refreshToken,
   });
 

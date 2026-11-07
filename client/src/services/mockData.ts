@@ -20,6 +20,9 @@ import {
   AIProvider,
   AIModel,
   SignalsRadarData,
+  MarketRadarResponse,
+  PortfolioBacktestResult,
+  OptimizerStatus,
 } from '../types';
 
 export const mockPositions: Position[] = [
@@ -41,6 +44,8 @@ export const mockPositions: Position[] = [
     closed_at: null,
     pnl_idr: 96250,
     pnl_percent: 5.0,
+    exit_plan_json: '{"tp1Pct":7.5,"tp1Fraction":50,"tp2Pct":15,"tp2Fraction":50,"trailingPct":3.75,"atrPct":3.1,"regime":"RISK_ON","rationale":[],"legacy":false}',
+    entry_strategy: 'bluechip_pullback',
     exit_reason: null,
     mode: 'paper',
   },
@@ -62,6 +67,8 @@ export const mockPositions: Position[] = [
     closed_at: null,
     pnl_idr: 371200,
     pnl_percent: 8.0,
+    exit_plan_json: '{"tp1Pct":6,"tp1Fraction":50,"tp2Pct":12,"tp2Fraction":50,"trailingPct":2.5,"atrPct":null,"regime":null,"rationale":[],"legacy":true}',
+    entry_strategy: 'momentum',
     exit_reason: null,
     mode: 'paper',
   },
@@ -83,6 +90,8 @@ export const mockPositions: Position[] = [
     closed_at: null,
     pnl_idr: 1150000,
     pnl_percent: 15.86,
+    exit_plan_json: '{"tp1Pct":10,"tp1Fraction":50,"tp2Pct":20,"tp2Fraction":50,"trailingPct":4.5,"atrPct":5.4,"regime":"RISK_ON","rationale":[],"legacy":false}',
+    entry_strategy: 'new_listing',
     exit_reason: null,
     mode: 'paper',
   },
@@ -341,6 +350,7 @@ export const mockBacktestResult: BacktestResult = {
   slippagePercent: 0.1,
   feePercent: 0.3,
   strategyUsed: 'Breakout + Decoupled Trailing Stop Ratchet',
+  dataSource: 'cache',
   trades: mockBacktestTrades,
   equityCurve: [
     { time: '2026-09-20', timestamp: 1758326400000, equity: 10000000 },
@@ -350,6 +360,63 @@ export const mockBacktestResult: BacktestResult = {
     { time: '2026-10-10', timestamp: 1760054400000, equity: 11840000 },
     { time: '2026-10-15', timestamp: 1760486400000, equity: 12150000 },
     { time: '2026-10-20', timestamp: 1760918400000, equity: 12450000 },
+  ],
+};
+
+export const mockPortfolioBacktestResult: PortfolioBacktestResult = {
+  timeframe: '1h',
+  days: 30,
+  symbolsRequested: ['BTCIDR', 'ETHIDR', 'SOLIDR'],
+  symbolsWithData: ['BTCIDR', 'ETHIDR', 'SOLIDR'],
+  totalCandles: 2160,
+  initialBalance: 10000000,
+  finalBalance: 11890000,
+  netPnlIdr: 1890000,
+  netPnlPercent: 18.9,
+  totalTrades: 9,
+  winningTrades: 7,
+  losingTrades: 2,
+  winRatePercent: 77.78,
+  profitFactor: 3.4,
+  maxDrawdownPercent: 4.2,
+  maxConcurrentPositions: 3,
+  slotUtilizationPercent: 64.5,
+  slippagePercent: 0.2,
+  feePercent: 0.3,
+  dataSource: 'cache',
+  perSymbol: [
+    { symbol: 'BTCIDR', candles: 720, trades: 3, netPnlIdr: 780000 },
+    { symbol: 'ETHIDR', candles: 720, trades: 4, netPnlIdr: 860000 },
+    { symbol: 'SOLIDR', candles: 720, trades: 2, netPnlIdr: 250000 },
+  ],
+  equityCurve: [
+    { timestamp: 1758326400000, equity: 10000000 },
+    { timestamp: 1759017600000, equity: 10480000 },
+    { timestamp: 1759708800000, equity: 10920000 },
+    { timestamp: 1760400000000, equity: 11310000 },
+    { timestamp: 1761091200000, equity: 11890000 },
+  ],
+  trades: [
+    {
+      symbol: 'BTCIDR',
+      entryTime: Date.now() - 86400 * 6 * 1000,
+      exitTime: Date.now() - 86400 * 4.5 * 1000,
+      entryPrice: 1540000000,
+      exitPrice: 1625000000,
+      pnlIdr: 550000,
+      pnlPercent: 5.52,
+      exitReason: 'TP1 Scale-Out (50%) + Trailing Stop Exit',
+    },
+    {
+      symbol: 'ETHIDR',
+      entryTime: Date.now() - 86400 * 4 * 1000,
+      exitTime: Date.now() - 86400 * 2.5 * 1000,
+      entryPrice: 46000000,
+      exitPrice: 48500000,
+      pnlIdr: 420000,
+      pnlPercent: 5.43,
+      exitReason: 'TP1 Scale-Out (50%) + Trailing Stop Exit',
+    },
   ],
 };
 
@@ -389,6 +456,12 @@ export const mockAnalytics: PerformanceReport = {
     { symbol: 'SOL', tradesCount: 9, wins: 8, losses: 1, winRatePercent: 88.89, totalPnlIdr: 1120000, avgPnlPercent: 7.2 },
     { symbol: 'BTC', tradesCount: 7, wins: 5, losses: 2, winRatePercent: 71.43, totalPnlIdr: 680000, avgPnlPercent: 4.8 },
     { symbol: 'DOGE', tradesCount: 4, wins: 3, losses: 1, winRatePercent: 75.0, totalPnlIdr: 260000, avgPnlPercent: 5.1 },
+  ],
+  strategyBreakdown: [
+    { strategy: 'momentum', closedTrades: 15, wins: 12, losses: 3, winRatePercent: 80.0, netPnlIdr: 2450000, avgHoldMinutes: 512 },
+    { strategy: 'bluechip_pullback', closedTrades: 7, wins: 5, losses: 2, winRatePercent: 71.4, netPnlIdr: 680000, avgHoldMinutes: 880 },
+    { strategy: 'new_listing', closedTrades: 4, wins: 3, losses: 1, winRatePercent: 75.0, netPnlIdr: 260000, avgHoldMinutes: 240 },
+    { strategy: 'manual', closedTrades: 2, wins: 1, losses: 1, winRatePercent: 50.0, netPnlIdr: 120000, avgHoldMinutes: 95 },
   ],
   aiEfficacy: {
     evaluationsCount: 142,
@@ -804,4 +877,91 @@ export const mockSignalsRadar: SignalsRadarData = {
   activeThreats: [],
   threatCount: 0,
   averageSentiment: 0.45,
+};
+
+// Radar Pasar deterministik (0 token LLM): breadth ~62% (tape sehat) dengan
+// kandidat tahap-1 yang koheren. Angka reproduksi-formula: cheapScore =
+// 0.6*volPercentile (peringkat volume dalam pool: eth 1.0, sol 0.889, bnb
+// 0.778, sui 0.667, apt 0.556, avax 0.444, near 0.333, rndr 0.222, arca
+// 0.111, agenda 0) + 0.4*bandPos ((gain-2)/18). Urutan tampil = cheapScore
+// desc, bukan urutan volume.
+export const mockMarketRadar: MarketRadarResponse = {
+  ts: Date.now() - 20000,
+  breadth: { percent: 62.5, sampleSize: 20 },
+  candidates: [
+    { rank: 1, symbol: 'sol', cheapScore: 0.696, gain24h: 9.3, volIdr: 12850000000, reasons: ['momentum sehat', 'volume besar', 'spread sempit'] },
+    { rank: 2, symbol: 'sui', cheapScore: 0.645, gain24h: 13, volIdr: 5120000000, reasons: ['momentum sehat', 'gain kuat di dalam pita'] },
+    { rank: 3, symbol: 'eth', cheapScore: 0.64, gain24h: 3.8, volIdr: 32400000000, reasons: ['momentum sehat', 'volume besar', 'spread sempit'] },
+    { rank: 4, symbol: 'bnb', cheapScore: 0.525, gain24h: 4.6, volIdr: 9800000000, reasons: ['momentum sehat', 'volume besar', 'spread sempit'] },
+    { rank: 5, symbol: 'apt', cheapScore: 0.456, gain24h: 7.5, volIdr: 3100000000, reasons: ['momentum sehat', 'spread sempit'] },
+    { rank: 6, symbol: 'avax', cheapScore: 0.36, gain24h: 6.2, volIdr: 2450000000, reasons: ['momentum sehat'] },
+    { rank: 7, symbol: 'near', cheapScore: 0.353, gain24h: 8.9, volIdr: 1870000000, reasons: ['momentum sehat'] },
+    { rank: 8, symbol: 'arca', cheapScore: 0.271, gain24h: 11.2, volIdr: 980000000, reasons: ['momentum sehat'] },
+    { rank: 9, symbol: 'rndr', cheapScore: 0.209, gain24h: 5.4, volIdr: 1420000000, reasons: ['momentum sehat', 'spread sempit'] },
+    { rank: 10, symbol: 'agenda', cheapScore: 0.047, gain24h: 4.1, volIdr: 640000000, reasons: ['momentum sehat'] },
+  ],
+};
+
+// Optimizer walk-forward (mock koheren): 2 simbol robust, preset TP1 6.5% /
+// TP2 13% (aturan 2x dari service), OOS PF median 1.24, testedAt segar (<14d).
+export const mockOptimizerStatus: OptimizerStatus = {
+  isOptimizing: false,
+  autoRun: false,
+  presetEnabled: true,
+  lastRunAt: Date.now() - 2 * 24 * 3600 * 1000,
+  runs: [
+    {
+      id: 'opt_demo_btcidr',
+      ts: Date.now() - 2 * 24 * 3600 * 1000,
+      symbol: 'BTCIDR',
+      timeframe: '1h',
+      verdict: 'ROBUST_PROFITABLE',
+      in_sample_pf: 1.42,
+      out_sample_pf: 1.31,
+      oos_pnl_idr: 84200,
+      wf_verdict: 'WALK_FORWARD_ROBUST',
+      wf_oos_pnl_idr: 129500,
+      chosen_config_json: '{"id":"cfg_3_wide_room","name":"Wide Breathing Room (TP 8%, SL 4.0%)","takeProfitPercent":6.5,"trailingStopPercent":4.0}',
+    },
+    {
+      id: 'opt_demo_ethidr',
+      ts: Date.now() - 2 * 24 * 3600 * 1000,
+      symbol: 'ETHIDR',
+      timeframe: '1h',
+      verdict: 'ROBUST_PROFITABLE',
+      in_sample_pf: 1.28,
+      out_sample_pf: 1.17,
+      oos_pnl_idr: 61800,
+      wf_verdict: 'WALK_FORWARD_ROBUST',
+      wf_oos_pnl_idr: 96400,
+      chosen_config_json: '{"id":"cfg_2_baseline_early_gain","name":"Baseline Early (TP 5%, SL 2.5%)","takeProfitPercent":6.5,"trailingStopPercent":2.5}',
+    },
+    {
+      id: 'opt_demo_dogeidr',
+      ts: Date.now() - 2 * 24 * 3600 * 1000,
+      symbol: 'DOGEIDR',
+      timeframe: '1h',
+      verdict: 'OVERFITTED',
+      in_sample_pf: 1.51,
+      out_sample_pf: 0.62,
+      oos_pnl_idr: -74300,
+      wf_verdict: 'OVERFIT',
+      wf_oos_pnl_idr: -112000,
+      chosen_config_json: '{"id":"cfg_5_consolidation_runner","name":"Consolidation Breakout (TP 15%, SL 5.0%)","takeProfitPercent":15,"trailingStopPercent":5.0}',
+    },
+  ],
+  preset: {
+    tp1: 6.5,
+    tp2: 13,
+    fresh: true,
+    meta: {
+      testedAt: Date.now() - 2 * 24 * 3600 * 1000,
+      symbols: ['BTCIDR', 'ETHIDR'],
+      verdict: 'WALK_FORWARD_ROBUST',
+      oosPfMedian: 1.24,
+      oosPnlIdrTotal: 146000,
+      tp1: 6.5,
+      tp2: 13,
+    },
+  },
 };

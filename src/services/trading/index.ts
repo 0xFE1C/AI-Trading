@@ -5,6 +5,7 @@ import { agentSwarm } from '../agents/index.js';
 import { aiClient } from '../ai/index.js';
 import { calculateRSI, calculateEMA, calculateTrueATR } from '../../utils/indicators.js';
 import {
+  atrPercentileFromCandles,
   detectBtcRegime,
   extractFeatures,
   scoreOpportunity,
@@ -14,6 +15,13 @@ import {
   ScoreResult,
   MarketSummary,
 } from '../signals/index.js';
+import {
+  computeMarketBreadth,
+  screenMarket,
+  marketSummariesFromTickers,
+} from '../signals/screener.js';
+import { loadCandles } from '../candles/store.js';
+import type { BacktestBar } from '../backtest/index.js';
 import {
   checkExposure,
   checkBtcRegime,
@@ -29,6 +37,24 @@ import { agentBus } from '../agents/bus.js';
 import { getTakerFeeRate } from './fees.js';
 import { allowsDeterministicFallback } from './aiPolicy.js';
 import { buildMasterEntryPrompt } from '../ai/prompts.js';
+import {
+  selectMomentumCandidate,
+  MOMENTUM_MEME_TOKENS,
+  EntryScoringMode,
+  MomentumCandidateInput,
+} from './momentumSelect.js';
+import {
+  buildLegacyPlan,
+  formatExitPlanLine,
+  parseStoredExitPlan,
+  resolveEntryExitPlan,
+  ExitPlan,
+} from './adaptiveExit.js';
+import { strategyKellyFactor } from './strategyKelly.js';
+import {
+  getFreshOptimizerPreset,
+  OPTIMIZER_PRESET_RATIONALE,
+} from '../optimizer/index.js';
 
 export interface AbValidationMetrics {
   totalEvaluations: number;
@@ -112,6 +138,8 @@ export interface PositionRecord {
   pnl_idr: number;
   pnl_percent: number;
   realized_pnl_idr?: number;
+  exit_plan_json?: string | null; // rencana exit adaptif (JSON); NULL/korup = fallback setting global
+  entry_strategy?: string | null; // 'bluechip_pullback' | 'momentum' | 'new_listing' | 'manual'; NULL = baris legacy
   exit_reason: string | null;
   mode: 'paper' | 'live';
   exit_claimed_at?: number | null;
@@ -140,6 +168,16 @@ interface SellExecutionResult {
   fullyFilled: boolean;
   pendingReview: boolean;
   historyRecorded: boolean;
+}
+
+/** Hasil konfirmasi multi-timeframe 1 jam (gate mtf_alignment). */
+interface MtfAlignmentResult {
+  status: 'pass' | 'veto' | 'warn';
+  close?: number;
+  ema21?: number;
+  ema21Prev?: number;
+  bars: number;
+  source: 'store' | 'fetch' | 'none';
 }
 
 const failedSell = (pendingReview = false): SellExecutionResult => ({
@@ -215,7 +253,43 @@ export class TradingEngine {
       exit_claimed_at = NULL
     WHERE id = ? AND status = 'open'
   `);
+  private stmtUpdatePosTp2 = db.prepare(`
+    UPDATE positions SET
+      amount = ?,
+      initial_cost_idr = ?,
+      current_price = ?,
+      highest_price = ?,
+      trailing_stop_price = ?,
+      take_profit_step = 2,
+      pnl_idr = ?,
+      pnl_percent = ?,
+      realized_pnl_idr = COALESCE(realized_pnl_idr, 0) + ?,
+      exit_claimed_at = NULL
+    WHERE id = ? AND status = 'open'
+  `);
   private stmtCountOpenPositionsByMode = db.prepare("SELECT COUNT(*) as count FROM positions WHERE status = 'open' AND mode = ?");
+  // Satu prepared statement untuk cooldown entry-ulang: posisi TERTUTUP
+  // TERAKHIR per simbol (closed_at, pnl_idr). Idiom SQLite MAX() menjamin
+  // kolom bare (pnl_idr) berasal dari baris yang memenangkan MAX(closed_at).
+  // Sengaja mode-agnostic (paper & live digabung): cooldown konservatif —
+  // trade paper yang buruk tetap mendinginkan simbol tersebut untuk entry
+  // live. Arah blokirnya hanya satu: lebih banyak blokir, tidak pernah lebih
+  // sedikit.
+  private stmtLastClosedPerSymbol = db.prepare(`
+    SELECT symbol, MAX(closed_at) AS closed_at, pnl_idr
+    FROM positions
+    WHERE status = 'closed' AND closed_at IS NOT NULL
+    GROUP BY symbol
+  `);
+  // Strategy-level Kelly governor: 20 posisi tertutup TERAKHIR untuk SATU
+  // entry_strategy. Tanda pnl_percent identik dengan pnl_idr untuk posisi
+  // tertutup (keduanya dari PnL net yang sama), konsisten dengan winRate
+  // Kelly global yang memakai pnl_idr > 0.
+  private stmtClosedTradesByStrategy = db.prepare(`
+    SELECT pnl_percent FROM positions
+    WHERE entry_strategy = ? AND status = 'closed' AND closed_at IS NOT NULL
+    ORDER BY closed_at DESC LIMIT 20
+  `);
 
   constructor() {
     // Initial consumer on Agent Bus: listens for opportunity signals from scouts/scanners
@@ -657,8 +731,15 @@ export class TradingEngine {
         }
 
         const currentPrice = tick.price;
-        const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
-        const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
+        // Rencana exit adaptif per posisi (dibekukan saat entry). JSON hilang/
+        // korup → fallback ke setting global persis seperti perilaku lama.
+        const exitPlan = parseStoredExitPlan(pos.exit_plan_json);
+        const trailingStopPercent = exitPlan ? exitPlan.trailingPct : parseFloat(getSetting('trailing_stop_percent', '2.5'));
+        const targetTp1 = exitPlan ? exitPlan.tp1Pct : parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
+        // Plan dengan tp2Pct null berarti TP2 sengaja dinonaktifkan utk posisi ini
+        const targetTp2Raw = exitPlan ? (exitPlan.tp2Pct ?? 0) : parseFloat(getSetting('take_profit_target_2_percent', '10.0'));
+        // TP2 aktif hanya bila targetnya > 0 ('0' / nilai tidak valid = nonaktif)
+        const targetTp2 = Number.isFinite(targetTp2Raw) && targetTp2Raw > 0 ? targetTp2Raw : 0;
 
         const highestPrice = Math.max(pos.highest_price, currentPrice);
         let trailingStopPrice = pos.trailing_stop_price;
@@ -681,6 +762,12 @@ export class TradingEngine {
         // Sub-second Partial TP check (threshold is a gross price move)
         if (grossPnlPercent >= targetTp1 && pos.take_profit_step === 0) {
           await this.executePartialTakeProfit(pos, currentPrice, targetTp1);
+          return;
+        }
+
+        // Sub-second TP2 scale-out check (tahap kedua, hanya setelah TP1)
+        if (targetTp2 > 0 && pos.take_profit_step === 1 && grossPnlPercent >= targetTp2) {
+          await this.executePartialTakeProfit2(pos, currentPrice, targetTp2);
           return;
         }
 
@@ -767,6 +854,11 @@ export class TradingEngine {
         }
       } catch {}
 
+      // 2.8. Radar Pasar deterministik (0 token): persistensi snapshot
+      // screener SEBELUM gerbang auto-trading agar radar tetap hidup saat
+      // bot di-pause. Memakai cache getSummaries — nol HTTP tambahan.
+      await this.persistMarketRadar();
+
       // 3. New Entry Gates: Check if Auto-Trading is active
       const isAutoActive = getSetting('is_auto_trading_active', '0') === '1';
       if (!isAutoActive) return;
@@ -795,8 +887,18 @@ export class TradingEngine {
    * the bot stopped protecting positions. Configure via the WATCHDOG_URL env.
    */
   private pingExternalWatchdog() {
-    const url = process.env.WATCHDOG_URL;
-    if (!url || !/^https?:\/\//i.test(url)) return;
+    // Web-first: URL watchdog dikelola dari tab Pengaturan (setting
+    // `watchdog_url`); env WATCHDOG_URL tetap jadi fallback opsional.
+    const url = getSetting('watchdog_url', '') || process.env.WATCHDOG_URL || '';
+    // Anti-SSRF (allowlist): hanya https, hostname publik berbentuk nama
+    // (bukan IP-literal privat, tanpa userinfo) — cocok untuk layanan ping
+    // eksternal (healthchecks.io dkk.). Localhost sengaja tidak diizinkan.
+    if (!url || !/^https:\/\/[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::\d{2,5})?(?:\/|$)/.test(url)) return;
+    const watchdogHost = new URL(url).hostname.toLowerCase();
+    const isLocalOrIpLiteral =
+      /^(localhost|\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-f:]+\]|.*\.local)$/i.test(watchdogHost) ||
+      /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.)/.test(watchdogHost);
+    if (isLocalOrIpLiteral) return;
     const now = Date.now();
     if (now - this.lastWatchdogPingAt < 60_000) return;
     this.lastWatchdogPingAt = now;
@@ -844,8 +946,15 @@ export class TradingEngine {
     const positions = db.prepare("SELECT * FROM positions WHERE status = 'open'").all() as PositionRecord[];
     if (positions.length === 0) return;
 
+    // Fallback legacy (posisi tanpa exit plan / JSON korup) — dibaca sekali di
+    // awal; posisi BER-PLAN memakai nilai dari rencananya masing-masing.
     const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
     const targetTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
+    const targetTp2Raw = parseFloat(getSetting('take_profit_target_2_percent', '10.0'));
+    // TP2 aktif hanya bila targetnya > 0 ('0' / nilai tidak valid = nonaktif)
+    const targetTp2 = Number.isFinite(targetTp2Raw) && targetTp2Raw > 0 ? targetTp2Raw : 0;
+    // Rotasi modal: exit penuh posisi stagnan; '0' = nonaktif
+    const maxHoldHours = parseFloat(getSetting('max_hold_hours', '48'));
     const { coinSentiments } = agentSwarm.getAggregatedSentiment();
 
     for (const snapshot of positions) {
@@ -868,11 +977,18 @@ export class TradingEngine {
           const pos = this.getOpenPosition(snapshot.id);
           if (!pos || pos.exit_claimed_at) return;
 
+          // Rencana exit adaptif per posisi; hilang/korup → fallback setting global
+          const exitPlan = parseStoredExitPlan(pos.exit_plan_json);
+          const posTrailingPct = exitPlan ? exitPlan.trailingPct : trailingStopPercent;
+          const posTp1Target = exitPlan ? exitPlan.tp1Pct : targetTp1;
+          // Plan dengan tp2Pct null berarti TP2 sengaja dinonaktifkan utk posisi ini
+          const posTp2Target = exitPlan ? (exitPlan.tp2Pct ?? 0) : targetTp2;
+
           const highestPrice = Math.max(pos.highest_price, currentPrice);
           let trailingStopPrice = pos.trailing_stop_price;
 
           // Recalculate dynamic trailing stop level (with post-TP1 decoupling)
-          const computedTrailingStop = highestPrice * (1 - trailingStopPercent / 100);
+          const computedTrailingStop = highestPrice * (1 - posTrailingPct / 100);
           if (pos.take_profit_step >= 1) {
             const postTpFloor = Math.max(pos.entry_price, computedTrailingStop);
             if (postTpFloor > trailingStopPrice) {
@@ -887,10 +1003,19 @@ export class TradingEngine {
           const { pnlIdr, pnlPercent } = markToMarket(pos, currentPrice, feeRate);
 
           // Scale-Out Partial Take-Profit (Target 1 threshold reached)
-          if (grossPnlPercent >= targetTp1 && pos.take_profit_step === 0) {
-            const sellOk = await this.executePartialTakeProfit(pos, currentPrice, targetTp1);
+          if (grossPnlPercent >= posTp1Target && pos.take_profit_step === 0) {
+            const sellOk = await this.executePartialTakeProfit(pos, currentPrice, posTp1Target);
             if (!sellOk) {
               console.warn(`[Partial TP Aborted] Order jual parsial gagal atau posisi sudah diproses untuk ${pos.symbol}.`);
+            }
+            return;
+          }
+
+          // Scale-Out TP2 (Target 2 threshold reached setelah TP1)
+          if (posTp2Target > 0 && pos.take_profit_step === 1 && grossPnlPercent >= posTp2Target) {
+            const sellOk = await this.executePartialTakeProfit2(pos, currentPrice, posTp2Target);
+            if (!sellOk) {
+              console.warn(`[Partial TP2 Aborted] Order jual parsial TP2 gagal atau posisi sudah diproses untuk ${pos.symbol}.`);
             }
             return;
           }
@@ -911,6 +1036,19 @@ export class TradingEngine {
           if (tokenSentiment !== undefined && tokenSentiment < -0.35) {
             shouldExit = true;
             exitReason = `Pembalikan sentimen negatif terdeteksi oleh Subagents (${tokenSentiment})`;
+          }
+
+          // 3. Stagnation exit (rotasi modal): posisi berumur > max_hold_hours
+          // dengan PnL NETRAL (bukan winner yang layak ditunggu, bukan loss
+          // yang panik-dicut) dieksit penuh agar modal berputar. Posisi
+          // drawdown <-1% tetap menunggu trailing stop; winner terus berlari.
+          // Hanya di jalur polling — tick realtime tidak menilai umur posisi.
+          if (!shouldExit && Number.isFinite(maxHoldHours) && maxHoldHours > 0) {
+            const holdHours = (Date.now() - pos.opened_at) / 3600000;
+            if (holdHours >= maxHoldHours && pnlPercent >= -1.0 && pnlPercent <= 1.5) {
+              shouldExit = true;
+              exitReason = `Stagnasi >${maxHoldHours} jam — realokasi modal (PnL ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`;
+            }
           }
 
           if (shouldExit) {
@@ -1087,6 +1225,7 @@ export class TradingEngine {
     try {
       const thirtyDaysAgo = Date.now() - (30 * 24 * 3600 * 1000);
       const sevenDaysAgo = Date.now() - (7 * 24 * 3600 * 1000);
+      const ninetyDaysAgo = Date.now() - (90 * 24 * 3600 * 1000);
 
       db.prepare("DELETE FROM ghost_positions WHERE status = 'closed' AND closed_at < ?").run(thirtyDaysAgo);
       db.prepare("DELETE FROM ai_ab_evaluations WHERE timestamp < ? AND id NOT IN (SELECT evaluation_id FROM ghost_positions WHERE status = 'open')").run(thirtyDaysAgo);
@@ -1098,6 +1237,9 @@ export class TradingEngine {
       db.prepare("DELETE FROM regime_log WHERE ts < ?").run(sevenDaysAgo);
       db.prepare("DELETE FROM opportunity_shortlist WHERE ts < ?").run(sevenDaysAgo);
       db.prepare("DELETE FROM agent_messages WHERE ts < ?").run(sevenDaysAgo);
+      db.prepare("DELETE FROM market_screener WHERE ts < ?").run(sevenDaysAgo);
+      // Retensi 90 hari untuk audit trail optimizer walk-forward
+      db.prepare("DELETE FROM optimizer_runs WHERE ts < ?").run(ninetyDaysAgo);
 
       console.log('[Maintenance] Pembersihan berkala database selesai (30 hari posisi, 7 hari log sinyal & AI).');
     } catch (err: any) {
@@ -1105,7 +1247,278 @@ export class TradingEngine {
     }
   }
 
+  // --- Gate Deterministik Pasar Menyeluruh (0 token LLM) ---
+
+  private static normalizeSymbol(symbol: string): string {
+    return String(symbol || '').toLowerCase().replace('_idr', '').replace('/', '');
+  }
+
+  /**
+   * Statistik posisi tertutup terakhir per simbol (satu prepared statement).
+   * Dipakai untuk (a) cooldown entry-ulang dan (b) set rotasi 24 jam.
+   */
+  private getClosedPositionStats(now = Date.now()): Array<{ symbol: string; closedAgoHours: number; pnlIdr: number }> {
+    try {
+      const rows = this.stmtLastClosedPerSymbol.all() as Array<{ symbol: string; closed_at: number; pnl_idr: number }>;
+      return rows
+        .filter((r) => Number.isFinite(r.closed_at))
+        .map((r) => ({
+          symbol: TradingEngine.normalizeSymbol(r.symbol),
+          closedAgoHours: (now - r.closed_at) / 3_600_000,
+          pnlIdr: Number(r.pnl_idr) || 0,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Re-entry cooldown (anti-fixasi): JANGAN mengejar koin yang baru saja
+   * dijual — apalagi koin yang baru saja RUGI. Aturan deterministik: entry
+   * pada simbol diblokir bila posisi tertutup terakhirnya lebih baru dari
+   * `reentry_cooldown_hours`, dan jendela itu diduakan (x2) bila trade
+   * tersebut rugi (pnl_idr < 0) — loser butuh waktu dingin dua kali lebih
+   * lama sebelum layak dipertimbangkan lagi. '0' = nonaktif (fail-open).
+   */
+  public getReentryCooldownBlockedSymbols(now = Date.now()): Map<string, { closedAgoHours: number; lossMultiplier: number }> {
+    const blocked = new Map<string, { closedAgoHours: number; lossMultiplier: number }>();
+    const cooldownHours = parseFloat(getSetting('reentry_cooldown_hours', '4'));
+    if (!Number.isFinite(cooldownHours) || cooldownHours <= 0) return blocked;
+
+    for (const stat of this.getClosedPositionStats(now)) {
+      const lossMultiplier = stat.pnlIdr < 0 ? 2 : 1;
+      const windowHours = cooldownHours * lossMultiplier;
+      if (stat.closedAgoHours < windowHours) {
+        blocked.set(stat.symbol, { closedAgoHours: stat.closedAgoHours, lossMultiplier });
+      }
+    }
+    return blocked;
+  }
+
+  /** Simbol yang ditradingkan dalam 24 jam terakhir (untuk tie-break rotasi). */
+  public getRecentlyTradedSymbols(now = Date.now()): Set<string> {
+    const recent = new Set<string>();
+    for (const stat of this.getClosedPositionStats(now)) {
+      if (stat.closedAgoHours < 24) recent.add(stat.symbol);
+    }
+    return recent;
+  }
+
+  /**
+   * Konfirmasi multi-timeframe (mtf_alignment): tren 1 jam.
+   * Veto HANYA bila close < EMA21(1h) DAN EMA21 sekarang < EMA21 tiga bar
+   * lalu (downtrend di timeframe tinggi). Data 1h dibaca dari candle STORE
+   * dulu; fetch getRealCandles hanya untuk kandidat momentum top-8 (bounded),
+   * dan jalur bluechip TIDAK pernah fetch (store kosong → pass). Data < 22
+   * bar → PASS dengan status 'warn' (fail-open; tidak pernah memblokir
+   * karena data hilang).
+   */
+  private async checkMtfAlignment1h(
+    symbol: string,
+    allowFetch: boolean
+  ): Promise<MtfAlignmentResult> {
+    let bars1h: BacktestBar[] = loadCandles(symbol, '1h', 30);
+    let source: 'store' | 'fetch' | 'none' = bars1h.length > 0 ? 'store' : 'none';
+
+    if (bars1h.length < 22 && allowFetch) {
+      try {
+        const fetched = await indodaxMarketStream.getRealCandles(symbol, '1h');
+        if (Array.isArray(fetched) && fetched.length > bars1h.length) {
+          bars1h = fetched;
+          source = 'fetch';
+        }
+      } catch {
+        // Fetch gagal → biarkan evaluasi store; jika tetap kurang → warn.
+      }
+    }
+
+    if (!bars1h || bars1h.length < 22) {
+      return { status: 'warn', bars: bars1h?.length ?? 0, source };
+    }
+
+    const closes = bars1h.map((c) => c.close);
+    const close = closes[closes.length - 1];
+    const ema21 = calculateEMA(closes, 21);
+    const ema21Prev = calculateEMA(closes.slice(0, closes.length - 3), 21);
+    if (ema21 === null || ema21Prev === null) {
+      return { status: 'warn', close, bars: closes.length, source };
+    }
+
+    const veto = close < ema21 && ema21 < ema21Prev;
+    return { status: veto ? 'veto' : 'pass', close, ema21, ema21Prev, bars: closes.length, source };
+  }
+
+  private logMtfGate(symbol: string, mtf: MtfAlignmentResult, extra: Record<string, any> = {}) {
+    logEntryGate(symbol, 'mtf_alignment', mtf.status !== 'veto', {
+      status: mtf.status,
+      close: mtf.close,
+      ema21: mtf.ema21,
+      ema21Prev: mtf.ema21Prev,
+      bars: mtf.bars,
+      source: mtf.source,
+      ...extra,
+    });
+  }
+
+  /**
+   * Radar Pasar: persistensi snapshot screener tahap-1 SEBELUM gerbang
+   * auto-trading — radar tetap hidup meskipun bot di-pause. Memakai respons
+   * getSummaries yang SUDAH di-cache (TTL 6s) sehingga NOL HTTP tambahan dan
+   * NOL token LLM. Snapshot identik (breadth + daftar simbol top sama dengan
+   * snapshot terakhir di DB) tidak ditulis ulang agar tabel tidak spam.
+   */
+  private async persistMarketRadar() {
+    try {
+      const summaries = await indodax.getSummaries();
+      if (!summaries || !summaries.tickers) return;
+
+      const ts = Date.now();
+      const marketSummaries = marketSummariesFromTickers(summaries.tickers);
+      const breadth = computeMarketBreadth(marketSummaries, summaries.prices_24h || {});
+
+      const minVolumeIdr = parseFloat(getSetting('min_24h_volume_idr', '200000000'));
+      const { activeThreats } = agentSwarm.getAggregatedSentiment();
+      const heldSymbols = (
+        db.prepare("SELECT symbol FROM positions WHERE status = 'open'").all() as Array<{ symbol: string }>
+      ).map((r) => TradingEngine.normalizeSymbol(r.symbol));
+      const ghostSymbols = (
+        db.prepare("SELECT symbol FROM ghost_positions WHERE status = 'open'").all() as Array<{ symbol: string }>
+      ).map((r) => TradingEngine.normalizeSymbol(r.symbol));
+      const threatSymbols = activeThreats
+        .filter((t) => t.coin)
+        .map((t) => TradingEngine.normalizeSymbol(t.coin as string));
+      const cooldownSymbols = Array.from(this.getReentryCooldownBlockedSymbols().keys());
+
+      const candidates = screenMarket(marketSummaries, {
+        minVolumeIdr,
+        excludeSymbols: [...heldSymbols, ...ghostSymbols, ...threatSymbols, ...cooldownSymbols],
+      });
+
+      // Anti-spam: lewati penulisan bila breadth + daftar simbol top-12
+      // identik dengan snapshot terakhir yang sudah tersimpan di DB.
+      // Catatan kosmetik: saat pool kandidat kosong (pasar tak layak trade),
+      // 0 baris tertulis sehingga breadth terbaru tidak terpersist — API radar
+      // tetap menampilkan snapshot non-kosong terakhir. Diterima: ketika pool
+      // kosong, tidak ada keputusan trading yang bergantung padanya.
+      const lastRow = db.prepare(
+        'SELECT breadth_percent, breadth_sample FROM market_screener ORDER BY ts DESC LIMIT 1'
+      ).get() as { breadth_percent: number; breadth_sample: number } | undefined;
+      const lastSymbols = db.prepare(
+        'SELECT symbol FROM market_screener WHERE ts = (SELECT MAX(ts) FROM market_screener) ORDER BY rank ASC'
+      ).all() as Array<{ symbol: string }>;
+      if (
+        lastRow &&
+        lastRow.breadth_percent === breadth.percent &&
+        lastRow.breadth_sample === breadth.sampleSize &&
+        lastSymbols.map((r) => r.symbol).join(',') === candidates.map((c) => c.symbol).join(',')
+      ) {
+        return;
+      }
+
+      const insert = db.prepare(`
+        INSERT INTO market_screener (id, ts, symbol, rank, cheap_score, gain24h, vol_idr, breadth_percent, breadth_sample, reasons_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const tx = db.transaction(() => {
+        candidates.forEach((c, i) => {
+          insert.run(`radar_${ts}_${i + 1}`, ts, c.symbol, i + 1, c.cheapScore, c.gain24h, c.volIdr, breadth.percent, breadth.sampleSize, JSON.stringify(c.reasons));
+        });
+      });
+      tx();
+    } catch {
+      // Radar adalah observability: kegagalan (bursa down, schema lama) tidak
+      // boleh mengganggu siklus trading.
+    }
+  }
+
   // --- Market Scanner & Entry Decision ---
+
+  /**
+   * Strategy-level Kelly governor — saudara per-strategi dari faktor Kelly
+   * global (20 trade tertutup terakhir, winRate < 0.35 → x0.6, >= 0.65 → x1.2,
+   * selainnya 1.0; threshold dicerminkan persis via strategyKellyFactor).
+   * Dipanggil SETELAH faktor global; floor Rp 10.000 tetap dihormati dan
+   * gerbang-gerbang sizing selanjutnya tetap berjalan. 'manual' dan strategi
+   * tak dikenal TIDAK PERNAH ditune (faktor tepat 1.0 — beli manual milik
+   * user, bukan hipotesis strategi).
+   */
+  public applyStrategyKelly(
+    baseAllocationIdr: number,
+    entryStrategy: string | null | undefined
+  ): { allocationIdr: number; factor: number } {
+    const strategy = String(entryStrategy || '').trim().toLowerCase();
+    if (getSetting('strategy_kelly_enabled', '1') !== '1' || !strategy || strategy === 'manual') {
+      return { allocationIdr: baseAllocationIdr, factor: 1.0 };
+    }
+    try {
+      const rows = this.stmtClosedTradesByStrategy.all(strategy) as Array<{ pnl_percent: number }>;
+      const factor = strategyKellyFactor(rows.map((r) => ({ pnlPercent: Number(r.pnl_percent) })));
+      if (factor === 1.0) {
+        return { allocationIdr: baseAllocationIdr, factor };
+      }
+      const allocationIdr = Math.max(10000, Math.round(baseAllocationIdr * factor));
+      console.log(
+        `[Strategy Kelly] ${strategy}: faktor ${factor} dari 20 trade tertutup terakhir → alokasi Rp ${Math.round(baseAllocationIdr).toLocaleString('id-ID')} → Rp ${allocationIdr.toLocaleString('id-ID')}`
+      );
+      return { allocationIdr, factor };
+    } catch {
+      // DB gagal → faktor netral; sizing tidak boleh crash karena governor.
+      return { allocationIdr: baseAllocationIdr, factor: 1.0 };
+    }
+  }
+
+  /**
+   * Rencana exit adaptif di saat entry (profit = setting user ATAU preset
+   * optimizer; risiko = SELALU setting user):
+   *  - Preset optimizer profit-side SAJA: bila optimizer_preset_enabled='1'
+   *    DAN preset walk-forward masih segar (< 14 hari) → baseTp1/baseTp2
+   *    diganti nilai preset. baseTrailingPct tetap trailing_stop_percent user
+   *    (clamp <= 2x base di adaptiveExit tidak diubah).
+   *  - adaptive_exit_enabled='0' → fallback legacy persis nilai base.
+   * Rasional preset ditambahkan murni lewat JS pada objek plan (modul
+   * adaptiveExit tidak diedit) sebelum plan dipersist ke posisi.
+   */
+  public buildAdaptiveExitPlan(args: {
+    atrPct: number | null;
+    regime: string | null;
+    volumeSurgeRatio: number | null;
+    depthImbalance: number | null;
+    isBluechip: boolean;
+  }): ExitPlan {
+    const adaptiveEnabled = getSetting('adaptive_exit_enabled', '1') === '1';
+    let baseTp1 = parseFloat(getSetting('take_profit_target_1_percent', '5.0'));
+    let baseTp2Raw = parseFloat(getSetting('take_profit_target_2_percent', '10.0'));
+
+    let presetApplied = false;
+    if (getSetting('optimizer_preset_enabled', '0') === '1') {
+      const preset = getFreshOptimizerPreset();
+      if (preset) {
+        baseTp1 = preset.tp1;
+        // tp2 null dari preset = TP2 nonaktif untuk posisi berikutnya.
+        baseTp2Raw = preset.tp2 !== null ? preset.tp2 : 0;
+        presetApplied = true;
+      }
+    }
+
+    const exitPlan = resolveEntryExitPlan({
+      adaptiveEnabled,
+      atrPct: args.atrPct,
+      regime: args.regime,
+      volumeSurgeRatio: args.volumeSurgeRatio,
+      depthImbalance: args.depthImbalance,
+      isBluechip: args.isBluechip,
+      baseTp1Pct: baseTp1,
+      baseTp2Pct: Number.isFinite(baseTp2Raw) && baseTp2Raw > 0 ? baseTp2Raw : null,
+      baseTrailingPct: parseFloat(getSetting('trailing_stop_percent', '2.5')),
+      tp1SellFractionPct: parseFloat(getSetting('tp1_sell_fraction_percent', '50')),
+      tp2SellFractionPct: parseFloat(getSetting('tp2_sell_fraction_percent', '50')),
+    });
+
+    if (presetApplied) {
+      exitPlan.rationale = [...exitPlan.rationale, OPTIMIZER_PRESET_RATIONALE];
+    }
+    return exitPlan;
+  }
 
   private async scanAndExecuteEntries() {
     // 0. Auto-Trading State Verification
@@ -1186,6 +1599,33 @@ export class TradingEngine {
     const summaries = await indodax.getSummaries();
     if (!summaries || !summaries.tickers) return;
 
+    // 3.7 Whole-market breadth gate (deterministik, 0 token): bila mayoritas
+    // koin paling likuid melemah vs harga 24 jam lalu, tape lemah — altcoin
+    // di luar favorit. Veto HANYA jalur 'momentum' & 'new_listing'; jalur
+    // 'bluechip_pullback' tetap BOLEH (major bisa tetap di-pullback-traded).
+    // Fail-open: tanpa data harga 24j (sampleSize 0) gate LOLOS dengan catatan
+    // 'fail_open' — kehilangan data tidak boleh mengubah perilaku trading.
+    const breadthThreshold = parseFloat(getSetting('market_breadth_min_percent', '30'));
+    const breadth = computeMarketBreadth(marketSummariesFromTickers(summaries.tickers), summaries.prices_24h || {});
+    const breadthFailOpen = breadth.sampleSize === 0;
+    const breadthBlocked =
+      !breadthFailOpen && Number.isFinite(breadthThreshold) && breadthThreshold > 0 && breadth.percent < breadthThreshold;
+    logEntryGate('*', 'market_breadth', !breadthBlocked, {
+      percent: breadth.percent,
+      sampleSize: breadth.sampleSize,
+      advancing: breadth.advancing,
+      declining: breadth.declining,
+      threshold: Number.isFinite(breadthThreshold) ? breadthThreshold : 0,
+      action: breadthBlocked ? 'veto_momentum_new_listing' : breadthFailOpen ? 'fail_open' : 'allow',
+    });
+    if (breadthBlocked) {
+      console.log(`[Market Breadth] Breadth ${breadth.percent}% < ambang ${breadthThreshold}% (${breadth.sampleSize} sampel). Entry momentum/koin baru ditahan; bluechip pullback tetap diizinkan.`);
+    }
+
+    // Cooldown entry-ulang (anti-fixasi): dihitung SEKALI per siklus dan
+    // diperiksa di SEMUA jalur kandidat sebelum deep scoring.
+    const cooldownBlocked = this.getReentryCooldownBlockedSymbols();
+
     // 4. Macro BTC Regime Filter (1h and 4h window returns - P0-A 3.3.2 Fix)
     let btcRegimeVerdict: RegimeVerdict = { regime: 'NEUTRAL', allowNewEntries: true, reasons: [] };
     let btcChange1h = 0;
@@ -1202,11 +1642,17 @@ export class TradingEngine {
         const closes = btcCandles.map((c) => c.close);
         const ema21 = calculateEMA(closes, 21);
 
+        // Persentil ATR terkini dihitung dari candle 15m BTC yang sama (window
+        // = riwayat candle yang tersedia, +-2 hari pada feed produksi). Tanpa
+        // ini cabang RISK_OFF (EMA21 bawah + volatilitas tinggi) tak terjangkau.
+        const atrPercentile = atrPercentileFromCandles(btcCandles) ?? undefined;
+
         btcRegimeVerdict = detectBtcRegime({
           change1hPct: btcChange1h,
           change4hPct: btcChange4h,
           close: curClose,
           ema21_1h: ema21,
+          atrPercentile30d: atrPercentile,
         });
 
         db.prepare(`
@@ -1252,9 +1698,12 @@ export class TradingEngine {
     let candidateAlertId: string | null = null;
     let candidateReason = '';
     let candidateScore: ScoreResult | null = null;
+    // Atribusi strategi: identik dengan nilai `strategy` di opportunity_shortlist
+    let candidateStrategy: 'bluechip_pullback' | 'momentum' | 'new_listing' | null = null;
 
     // Candidate 1: NEW COIN ALERTS (Pump hunter - disabled for Conservative profile)
-    if (allowNewListings && riskProfile !== 'conservative' && allowedCoins.length === 0) {
+    // Breadth lemah memveto koin baru juga (tape turun = pump koin baru rapuh).
+    if (allowNewListings && riskProfile !== 'conservative' && allowedCoins.length === 0 && !breadthBlocked) {
       const newAlerts = db.prepare(`
         SELECT * FROM new_coin_alerts
         WHERE status = 'monitoring'
@@ -1267,6 +1716,17 @@ export class TradingEngine {
         logEntryGate(alert.symbol, 'threat_scope', threatCheck.passed, threatCheck.values);
         if (!threatCheck.passed) continue;
 
+        // Re-entry cooldown: jangan langsung masuk lagi ke koin yang baru dijual.
+        const cooldownHit = cooldownBlocked.get(TradingEngine.normalizeSymbol(alert.symbol));
+        if (cooldownHit) {
+          logEntryGate(alert.symbol, 'reentry_cooldown', false, {
+            symbol: alert.symbol,
+            closedAgoHours: Math.round(cooldownHit.closedAgoHours * 100) / 100,
+            lossMultiplier: cooldownHit.lossMultiplier,
+          });
+          continue;
+        }
+
         const tickerKey = `${alert.symbol}_idr`;
         const ticker = summaries.tickers[tickerKey];
         if (ticker) {
@@ -1275,6 +1735,7 @@ export class TradingEngine {
             candidateSymbol = alert.symbol;
             candidateAlertId = alert.id;
             candidateReason = `Koin Baru Listing Indodax (${alert.name}) - Momentum Pump Awal`;
+            candidateStrategy = 'new_listing';
             break;
           }
         }
@@ -1298,6 +1759,18 @@ export class TradingEngine {
           if (existing) continue;
           const existingGhost = db.prepare("SELECT id FROM ghost_positions WHERE symbol = ? AND status = 'open'").get(symbol);
           if (existingGhost) continue;
+
+          // Re-entry cooldown: koin yang baru ditutup (terutama rugi) harus
+          // mendingin dulu — anti mengejar harga di jalur bluechip juga.
+          const cooldownHit = cooldownBlocked.get(TradingEngine.normalizeSymbol(symbol));
+          if (cooldownHit) {
+            logEntryGate(symbol, 'reentry_cooldown', false, {
+              symbol,
+              closedAgoHours: Math.round(cooldownHit.closedAgoHours * 100) / 100,
+              lossMultiplier: cooldownHit.lossMultiplier,
+            });
+            continue;
+          }
 
           const tickerKey = `${symbol}_idr`;
           const ticker = summaries.tickers[tickerKey];
@@ -1360,6 +1833,12 @@ export class TradingEngine {
           });
 
           if (passed) {
+            // MTF store-only (TANPA fetch): tren 1 jam dari candle store.
+            // Store kosong/kurang dari 22 bar → warn → pass (fail-open).
+            const mtf = await this.checkMtfAlignment1h(symbol, false);
+            this.logMtfGate(symbol, mtf, { strategy: 'bluechip_pullback' });
+            if (mtf.status === 'veto') continue;
+
             if (!bestCandidate || scoreRes.score > bestCandidate.score) {
               bestCandidate = {
                 symbol,
@@ -1375,12 +1854,16 @@ export class TradingEngine {
           candidateSymbol = bestCandidate.symbol;
           candidateReason = bestCandidate.reason;
           candidateScore = bestCandidate.scoreRes;
+          candidateStrategy = 'bluechip_pullback';
         }
       } else {
         // --- BALANCED & AGGRESSIVE: Momentum Band Strategy ---
         const eligibleTickers: Array<{ symbol: string; gain24h: number; volIdr: number; last: number; dropFromHigh: number }> = [];
 
         for (const [key, ticker] of Object.entries(summaries.tickers)) {
+          // Breadth lemah memveto SELURUH jalur momentum siklus ini (gate
+          // market_breadth sudah dilog di atas; bluechip tetap boleh lewat).
+          if (breadthBlocked) break;
           if (!key.endsWith('_idr')) continue;
           const symbol = key.replace('_idr', '');
           const last = parseFloat(ticker.last);
@@ -1410,26 +1893,108 @@ export class TradingEngine {
           const existingGhost = db.prepare("SELECT id FROM ghost_positions WHERE symbol = ? AND status = 'open'").get(symbol);
           if (existingGhost) continue;
 
+          // Re-entry cooldown (anti-fixasi): blokir sebelum deep scoring.
+          const cooldownHit = cooldownBlocked.get(TradingEngine.normalizeSymbol(symbol));
+          if (cooldownHit) {
+            logEntryGate(symbol, 'reentry_cooldown', false, {
+              symbol,
+              closedAgoHours: Math.round(cooldownHit.closedAgoHours * 100) / 100,
+              lossMultiplier: cooldownHit.lossMultiplier,
+            });
+            continue;
+          }
+
           if (gain24h >= 2.0 && gain24h <= 20.0) {
             eligibleTickers.push({ symbol, gain24h, volIdr, last, dropFromHigh });
           }
         }
 
-        const MEME_TOKENS = new Set(['doge', 'pepe', 'shib', 'floki', 'bonk', 'wif', 'bome', 'neiro', 'pnut', 'turb']);
+        const MEME_TOKENS = MOMENTUM_MEME_TOKENS;
         const openSymbols = (db.prepare("SELECT symbol FROM positions WHERE status = 'open'").all() as Array<{ symbol: string }>).map((p) =>
           p.symbol.toLowerCase().replace('_idr', '')
         );
         const isAlreadyHoldingMeme = openSymbols.some((s) => MEME_TOKENS.has(s));
 
-        eligibleTickers.sort((a, b) => b.gain24h - a.gain24h);
-        for (const t of eligibleTickers) {
-          if (isAlreadyHoldingMeme && MEME_TOKENS.has(t.symbol.toLowerCase())) {
-            continue;
+        // Mode skoring entry: 'composite_score' (default) menskor kandidat
+        // memakai fitur 15m + scoreOpportunity; 'gain_rank' memulihkan perilaku
+        // legacy (ranking gain24h mentah) persis seperti sebelumnya.
+        const scoringMode: EntryScoringMode =
+          getSetting('entry_scoring_mode', 'composite_score') === 'gain_rank' ? 'gain_rank' : 'composite_score';
+
+        let momentumCandidates: MomentumCandidateInput[] = eligibleTickers;
+        if (scoringMode === 'composite_score') {
+          // Skor 8 kandidat teratas berdasarkan gain24h. Pola fetch candle 15m
+          // identik dengan jalur bluechip konservatif; TANPA arg depth sehingga
+          // depth imbalance bernilai netral (1.0), sama seperti jalur konservatif.
+          const top8 = [...eligibleTickers].sort((a, b) => b.gain24h - a.gain24h).slice(0, 8);
+          const enriched: MomentumCandidateInput[] = [];
+          for (const t of top8) {
+            let candles15m: any[] = [];
+            try {
+              candles15m = (await indodaxMarketStream.getRealCandles(t.symbol, '15m')) || [];
+            } catch {}
+
+            const tickerKey = `${t.symbol}_idr`;
+            const ticker = summaries.tickers[tickerKey];
+            const summaryItem: MarketSummary = {
+              symbol: t.symbol,
+              pair: tickerKey,
+              last: t.last || parseFloat(ticker?.last ?? '0') || 0,
+              high24h: parseFloat(ticker?.high ?? '0') || 0,
+              low24h: parseFloat(ticker?.low ?? '0') || 0,
+              volIdr24h: t.volIdr,
+              buyPrice: parseFloat(ticker?.buy ?? '0') || 0,
+              sellPrice: parseFloat(ticker?.sell ?? '0') || 0,
+              ts: Date.now(),
+            };
+
+            const features = extractFeatures(summaryItem, candles15m);
+            const momentumSentiment = coinSentiments[t.symbol.toUpperCase()] ?? 0.0;
+            const scoreRes = scoreOpportunity(features, momentumSentiment, false, btcRegimeVerdict.regime, 'momentum');
+
+            db.prepare(`
+              INSERT INTO opportunity_shortlist (id, ts, symbol, strategy, score, breakdown, consumed)
+              VALUES (?, ?, ?, ?, ?, ?, 0)
+            `).run(`opp_${Date.now()}_${t.symbol}`, Date.now(), t.symbol, 'momentum', scoreRes.score, JSON.stringify(scoreRes.breakdown));
+
+            agentBus.publish('opportunity.signal', 'scanner', { symbol: t.symbol, strategy: 'momentum', score: scoreRes.score, features });
+
+            // Konfirmasi multi-timeframe (1h) — hanya kandidat komposit top-8
+            // (bounded ≤ 8 fetch). Veto bila 1h downtrend; data kurang → warn.
+            const mtf = await this.checkMtfAlignment1h(t.symbol, true);
+            this.logMtfGate(t.symbol, mtf, { strategy: 'momentum' });
+
+            enriched.push({ ...t, features, score: scoreRes, mtfStatus: mtf.status });
           }
-          candidateSymbol = t.symbol;
-          candidateReason = `Top Momentum Gainer (+${t.gain24h.toFixed(1)}%, Volume: Rp ${(t.volIdr / 1e6).toFixed(0)} Jt)`;
-          logEntryGate(t.symbol, 'candidate_filter', true, { gain24h: t.gain24h, volIdr: t.volIdr });
-          break;
+          // Kandidat yang diveto MTF (1h downtrend) disingkirkan sebelum
+          // seleksi; 'warn' (data kurang) dan 'pass' tetap diikutkan.
+          momentumCandidates = enriched.filter((c) => c.mtfStatus !== 'veto');
+        }
+
+        const selection = selectMomentumCandidate({
+          mode: scoringMode,
+          profile: riskProfile,
+          candidates: momentumCandidates,
+          isAlreadyHoldingMeme,
+          // Tie-break rotasi: bila dua skor dalam jarak 2.0 poin, pilih yang
+          // TIDAK baru ditradingkan dalam 24 jam (nudge lembut, bukan veto).
+          recentlyTradedSymbols: this.getRecentlyTradedSymbols(),
+        });
+
+        if (selection) {
+          candidateSymbol = selection.symbol;
+          candidateReason = selection.reason;
+          candidateScore = selection.score;
+          candidateStrategy = 'momentum';
+          const picked = momentumCandidates.find((c) => c.symbol === selection.symbol);
+          logEntryGate(selection.symbol, 'candidate_filter', true, {
+            mode: scoringMode,
+            source: selection.source,
+            gain24h: picked?.gain24h,
+            volIdr: picked?.volIdr,
+            score: selection.score?.score,
+            threshold: scoringMode === 'composite_score' ? SCORE_THRESHOLDS[riskProfile] : undefined,
+          });
         }
       }
     }
@@ -1450,6 +2015,11 @@ export class TradingEngine {
         }
       }
     } catch {}
+
+    // Strategy-level Kelly governor (per entry_strategy, ditumpuk SETELAH
+    // faktor global; floor Rp 10.000 tetap dihormati, gerbang selanjutnya jalan).
+    const strategyKelly = this.applyStrategyKelly(maxAllocationIdr, candidateStrategy);
+    maxAllocationIdr = strategyKelly.allocationIdr;
 
     // Volatility Sizing
     const volatilitySizing = getSetting('volatility_sizing_enabled', '1') === '1';
@@ -1544,10 +2114,17 @@ export class TradingEngine {
       return;
     }
 
+    // True ATR sebagai % harga (dipakai volatility sizing SEKALIGUS rencana
+    // exit adaptif). Null saat candle belum cukup → faktor legacy 1.0.
+    const entryTrueAtr = calculateTrueATR(candles15m, 14);
+    const entryAtrPct: number | null =
+      entryTrueAtr !== null && entryTrueAtr > 0 && slippageCheck.averageFillPrice > 0
+        ? (entryTrueAtr / slippageCheck.averageFillPrice) * 100
+        : null;
+
     if (volatilitySizing) {
-      const trueAtr = calculateTrueATR(candles15m, 14);
-      if (trueAtr !== null && trueAtr > 0) {
-        const atrPct = (trueAtr / slippageCheck.averageFillPrice) * 100;
+      if (entryAtrPct !== null) {
+        const atrPct = entryAtrPct;
         if (atrPct > 4.0) {
           maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.6));
         } else if (atrPct > 2.5) {
@@ -1646,10 +2223,44 @@ export class TradingEngine {
       return;
     }
 
+    // --- Rencana Exit Adaptif (dihitung dari data kandidat yang SUDAH di-fetch
+    // di atas: ATR 15m, rezim BTC, lonjakan volume, depth imbalance). Preset
+    // optimizer profit-side dipakai di sini bila diaktifkan & masih segar;
+    // trailing tetap milik user. Detail di buildAdaptiveExitPlan().
+    let planVolumeSurgeRatio: number | null = null;
+    let planIsBluechip = false;
+    try {
+      const planTicker = summaries.tickers[`${candidateSymbol}_idr`];
+      const planSummary: MarketSummary = {
+        symbol: candidateSymbol,
+        pair: `${candidateSymbol}_idr`,
+        last: parseFloat(planTicker?.last ?? '0') || 0,
+        high24h: parseFloat(planTicker?.high ?? '0') || 0,
+        low24h: parseFloat(planTicker?.low ?? '0') || 0,
+        volIdr24h: parseFloat(planTicker?.vol_idr ?? '0') || 0,
+        buyPrice: parseFloat(planTicker?.buy ?? '0') || 0,
+        sellPrice: parseFloat(planTicker?.sell ?? '0') || 0,
+        ts: Date.now(),
+      };
+      const planFeatures = extractFeatures(planSummary, candles15m);
+      planVolumeSurgeRatio = planFeatures.volumeSurgeRatio;
+      planIsBluechip = planFeatures.isBluechip;
+    } catch {}
+    const exitPlan = this.buildAdaptiveExitPlan({
+      atrPct: entryAtrPct,
+      regime: btcRegimeVerdict.regime,
+      volumeSurgeRatio: planVolumeSurgeRatio,
+      depthImbalance,
+      isBluechip: planIsBluechip,
+    });
+    if (!exitPlan.legacy) {
+      console.log(`[Adaptive Exit] ${candidateSymbol.toUpperCase()}: TP1 ${exitPlan.tp1Pct}% · TP2 ${exitPlan.tp2Pct ?? 'off'} · Trail ${exitPlan.trailingPct}% — ${exitPlan.rationale.join('; ')}`);
+    }
+
     const buyPrice = slippageCheck.averageFillPrice;
     const amount = maxAllocationIdr / buyPrice;
 
-    const buySuccess = await this.executeBuy(candidateSymbol, buyPrice, amount, maxAllocationIdr, mode, candidateReason);
+    const buySuccess = await this.executeBuy(candidateSymbol, buyPrice, amount, maxAllocationIdr, mode, candidateReason, exitPlan, candidateStrategy);
 
     if (buySuccess) {
       logEntryGate(candidateSymbol, 'order_executed', true, { price: buyPrice, amount, totalIdr: maxAllocationIdr });
@@ -1851,12 +2462,14 @@ export class TradingEngine {
     amount: number,
     totalIdr: number,
     mode: 'paper' | 'live',
-    reason: string
+    reason: string,
+    exitPlan?: ExitPlan | null,
+    entryStrategy?: string | null
   ): Promise<boolean> {
     // Serialize entries so concurrent manual/AI buys cannot race the balance
     // read-modify-write or both pass the same exposure snapshot.
     return this.withPositionLock(ENTRY_LOCK_KEY, () =>
-      this.executeBuyUnlocked(symbol, price, amount, totalIdr, mode, reason)
+      this.executeBuyUnlocked(symbol, price, amount, totalIdr, mode, reason, exitPlan, entryStrategy)
     );
   }
 
@@ -1866,7 +2479,9 @@ export class TradingEngine {
     amount: number,
     totalIdr: number,
     mode: 'paper' | 'live',
-    reason: string
+    reason: string,
+    exitPlan?: ExitPlan | null,
+    entryStrategy?: string | null
   ): Promise<boolean> {
     // Validate minimum trade amount per pair rules (e.g. min Rp 10.000)
     const minTradeIdr = indodax.getMinTradeIdr(symbol);
@@ -2000,8 +2615,18 @@ export class TradingEngine {
     // Fee is computed on the actual spend (live fills may differ from the request).
     const feeIdr = totalIdr * feeRate;
 
-    const trailingStopPercent = parseFloat(getSetting('trailing_stop_percent', '2.5'));
-    const initialTrailingStop = effectivePrice * (1 - trailingStopPercent / 100);
+    // Rencana exit: pakai plan adaptif dari scanner bila ada; beli manual/AI
+    // tanpa plan → fallback legacy persis nilai setting (tetap disimpan untuk
+    // observability). Trailing awal & target TP posisi datang dari plan ini.
+    const legacyBaseTp2 = parseFloat(getSetting('take_profit_target_2_percent', '10.0'));
+    const plan = exitPlan ?? buildLegacyPlan({
+      baseTp1Pct: parseFloat(getSetting('take_profit_target_1_percent', '5.0')),
+      baseTp2Pct: Number.isFinite(legacyBaseTp2) && legacyBaseTp2 > 0 ? legacyBaseTp2 : null,
+      baseTrailingPct: parseFloat(getSetting('trailing_stop_percent', '2.5')),
+      tp1SellFractionPct: parseFloat(getSetting('tp1_sell_fraction_percent', '50')),
+      tp2SellFractionPct: parseFloat(getSetting('tp2_sell_fraction_percent', '50')),
+    });
+    const initialTrailingStop = effectivePrice * (1 - plan.trailingPct / 100);
 
     const positionId = `pos_${symbol}_${Date.now()}`;
     const txBuy = db.transaction(() => {
@@ -2009,8 +2634,8 @@ export class TradingEngine {
         INSERT INTO positions (
           id, symbol, base_currency, traded_currency, side, entry_price, current_price,
           amount, initial_cost_idr, highest_price, trailing_stop_price, take_profit_step,
-          status, opened_at, mode
-        ) VALUES (?, ?, 'idr', ?, 'buy', ?, ?, ?, ?, ?, ?, 0, 'open', ?, ?)
+          status, opened_at, mode, exit_plan_json, entry_strategy
+        ) VALUES (?, ?, 'idr', ?, 'buy', ?, ?, ?, ?, ?, ?, 0, 'open', ?, ?, ?, ?)
       `).run(
         positionId,
         symbol,
@@ -2022,15 +2647,18 @@ export class TradingEngine {
         effectivePrice,
         initialTrailingStop,
         Date.now(),
-        mode
+        mode,
+        JSON.stringify(plan),
+        entryStrategy || null
       );
 
-      // Record trade history
+      // Record trade history (random suffix: dua beli di milidetik yang sama
+      // tidak boleh saling menabrak PRIMARY KEY dan menggagalkan transaksi)
       db.prepare(`
         INSERT INTO trades_history (id, position_id, symbol, type, price, amount, total_idr, fee_idr, mode, order_id, reason, timestamp)
         VALUES (?, ?, ?, 'BUY', ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        `trade_${Date.now()}`,
+        `trade_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         positionId,
         symbol,
         effectivePrice,
@@ -2052,7 +2680,15 @@ export class TradingEngine {
     if (this.onTradeEventCallback) {
       this.onTradeEventCallback({
         type: 'BUY',
-        data: { symbol, price: effectivePrice, amount: effectiveAmount, totalIdr, mode, reason },
+        data: {
+          symbol,
+          price: effectivePrice,
+          amount: effectiveAmount,
+          totalIdr,
+          mode,
+          reason,
+          exitPlanLine: formatExitPlanLine(plan),
+        },
       });
     }
 
@@ -2293,7 +2929,11 @@ export class TradingEngine {
         INSERT INTO trades_history (id, position_id, symbol, type, price, amount, total_idr, fee_idr, mode, order_id, reason, timestamp)
         VALUES (?, ?, ?, 'SELL', ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        `trade_${Date.now()}`,
+        // Suffix acak seperti sisi BUY: dua exit (mis. dua trailing stop
+        // posisi berbeda, atau close vs panic sell) bisa mendarat di milidetik
+        // yang sama — tanpa suffix, PK collision membuat histori SELL yang
+        // SUDAH tereksekusi di bursa hilang permanen dari jurnal.
+        `trade_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         pos.id,
         pos.symbol,
         averagePrice,
@@ -2332,15 +2972,18 @@ export class TradingEngine {
 
   /**
    * Sells `fraction` of an ALREADY EXIT-CLAIMED position and updates the
-   * remainder in place. Shared by the TP1 scale-out and the drawdown de-risk
-   * path. Returns true when the sell executed (fully or partially).
+   * remainder in place. Shared by the TP1/TP2 scale-outs and the drawdown
+   * de-risk path. `takeProfitStep` (1 or 2) selects which rung of the partial
+   * take-profit ladder the position lands on after a successful scale-out.
+   * Returns true when the sell executed (fully or partially).
    */
   private async sellPositionFraction(
     claimed: PositionRecord,
     fraction: number,
     currentPrice: number,
     reason: string,
-    intentKind: 'partial_tp' | 'derisk' = 'partial_tp'
+    intentKind: 'partial_tp' | 'derisk' = 'partial_tp',
+    takeProfitStep: 1 | 2 = 1
   ): Promise<boolean> {
     const sellAmount = claimed.amount * fraction;
 
@@ -2411,17 +3054,33 @@ export class TradingEngine {
         markPrice,
         feeRate
       );
-      this.stmtUpdatePosTp1.run(
+      // TP1 deliberately re-bases the stop to the entry price (breakeven
+      // floor). TP2 must NOT discard the ratchet banked between TP1 and TP2:
+      // keep the higher of the existing ratcheted stop and the breakeven
+      // floor, and never let the tracked highest price fall backwards.
+      const [nextHighest, nextTrailingStop] =
+        takeProfitStep === 2
+          ? [
+              Math.max(claimed.highest_price, currentPrice, markPrice),
+              Math.max(claimed.trailing_stop_price, claimed.entry_price),
+            ]
+          : [Math.max(currentPrice, markPrice), claimed.entry_price];
+      const stepUpdateParams = [
         remainingAmount,
         remainingCost,
         markPrice,
-        Math.max(currentPrice, markPrice),
-        claimed.entry_price,
+        nextHighest,
+        nextTrailingStop,
         pnlIdr,
         pnlPercent,
         realizedDelta,
-        claimed.id
-      );
+        claimed.id,
+      ];
+      if (takeProfitStep === 2) {
+        this.stmtUpdatePosTp2.run(...stepUpdateParams);
+      } else {
+        this.stmtUpdatePosTp1.run(...stepUpdateParams);
+      }
       return true;
     } finally {
       if (!sold && !keepClaim) this.releasePositionClaim(claimed.id);
@@ -2455,6 +3114,37 @@ export class TradingEngine {
       currentPrice,
       `Partial Take-Profit (+${targetTp1}% Target 1, jual ${(fraction * 100).toFixed(0)}%)`,
       'partial_tp'
+    );
+  }
+
+  /**
+   * Partial take-profit tahap kedua (TP2). Hanya berlaku setelah TP1
+   * (take_profit_step === 1); menjual fraksi dari SISA posisi dan menandai
+   * take_profit_step = 2. Claim/lock discipline identik dengan TP1.
+   */
+  private async executePartialTakeProfit2(
+    pos: PositionRecord,
+    currentPrice: number,
+    targetTp2: number
+  ): Promise<boolean> {
+    const claimed = this.claimPositionForExit(pos.id);
+    if (!claimed) return false;
+
+    // TP2 scale-out fraction of the REMAINING position: 50 (default) banks
+    // half of what is left and lets the rest ride the post-TP1 floor.
+    // Values outside 1..100 fall back to 50 (same discipline as TP1).
+    const fractionPct = parseFloat(getSetting('tp2_sell_fraction_percent', '50'));
+    const fraction = Number.isFinite(fractionPct) && fractionPct >= 1 && fractionPct <= 100
+      ? fractionPct / 100
+      : 0.5;
+
+    return this.sellPositionFraction(
+      claimed,
+      fraction,
+      currentPrice,
+      `Take Profit 2 (+${targetTp2}%) — scale-out bertahap (jual ${(fraction * 100).toFixed(0)}% sisa)`,
+      'partial_tp',
+      2
     );
   }
 

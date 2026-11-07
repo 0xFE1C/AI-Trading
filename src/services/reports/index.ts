@@ -40,6 +40,15 @@ export interface PerformanceSummary {
     totalPnlIdr: number;
     avgPnlPercent: number;
   }>;
+  strategyBreakdown: Array<{
+    strategy: string; // 'bluechip_pullback' | 'momentum' | 'new_listing' | 'manual' | 'unknown' (NULL entry_strategy)
+    closedTrades: number;
+    wins: number;
+    losses: number;
+    winRatePercent: number;
+    netPnlIdr: number;
+    avgHoldMinutes: number | null;
+  }>;
   aiEfficacy: {
     evaluationsCount: number;
     approvedCount: number;
@@ -219,6 +228,45 @@ export class ReportingService {
       }))
       .sort((a, b) => b.totalPnlIdr - a.totalPnlIdr);
 
+    // Atribusi strategi: agregat per entry_strategy (NULL/kosong → 'unknown'
+    // untuk baris legacy). Diurutkan netPnlIdr desc dengan tie-break nama
+    // strategi asc agar urutan selalu deterministik.
+    const strategyMap = new Map<string, {
+      closedTrades: number;
+      wins: number;
+      losses: number;
+      netPnlIdr: number;
+      totalHoldMinutes: number;
+    }>();
+    for (const pos of positions) {
+      const key = (pos.entry_strategy && String(pos.entry_strategy).trim()) || 'unknown';
+      const pnlIdr = pos.pnl_idr || 0;
+      // Floor 1 menit per trade (sub-menit dihitung 1) — konvensi yang sama
+      // dengan tampilan WhatsApp; sedikit menggelembungkan rata-rata hold
+      // untuk trade kilat, demi konsistensi antar-permukaan.
+      const holdMin = pos.closed_at ? Math.max(1, Math.round((pos.closed_at - pos.opened_at) / 60000)) : 0;
+      const agg = strategyMap.get(key) || { closedTrades: 0, wins: 0, losses: 0, netPnlIdr: 0, totalHoldMinutes: 0 };
+      agg.closedTrades++;
+      if (pnlIdr > 0) agg.wins++;
+      else if (pnlIdr < 0) agg.losses++;
+      agg.netPnlIdr += pnlIdr;
+      agg.totalHoldMinutes += holdMin;
+      strategyMap.set(key, agg);
+    }
+    const strategyBreakdown = Array.from(strategyMap.entries())
+      .map(([strategy, s]) => ({
+        strategy,
+        closedTrades: s.closedTrades,
+        wins: s.wins,
+        losses: s.losses,
+        // Penyebut = closedTrades: trade breakeven (pnl === 0) tidak masuk
+        // wins/losses tetapi MENGENCERKAN win rate — semantik konservatif.
+        winRatePercent: s.closedTrades > 0 ? parseFloat(((s.wins / s.closedTrades) * 100).toFixed(1)) : 0,
+        netPnlIdr: Math.round(s.netPnlIdr),
+        avgHoldMinutes: s.closedTrades > 0 ? Math.round(s.totalHoldMinutes / s.closedTrades) : null,
+      }))
+      .sort((a, b) => (b.netPnlIdr - a.netPnlIdr) || (a.strategy < b.strategy ? -1 : a.strategy > b.strategy ? 1 : 0));
+
     // AI Swarm Efficacy Metrics
     const evalQuery = startTime > 0
       ? db.prepare("SELECT ai_verdict FROM ai_ab_evaluations WHERE timestamp >= ?").all(startTime) as any[]
@@ -285,6 +333,7 @@ export class ReportingService {
       bestTrade,
       worstTrade,
       coinBreakdown,
+      strategyBreakdown,
       aiEfficacy: {
         evaluationsCount,
         approvedCount,

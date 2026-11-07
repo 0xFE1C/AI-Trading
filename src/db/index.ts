@@ -84,6 +84,8 @@ export function initDatabase() {
       pnl_idr REAL DEFAULT 0,
       pnl_percent REAL DEFAULT 0,
       realized_pnl_idr REAL NOT NULL DEFAULT 0, -- net PnL already banked from partial exits
+      exit_plan_json TEXT, -- rencana exit adaptif (JSON) dibuat saat entry; NULL/korup = fallback setting global
+      entry_strategy TEXT, -- sinyal asal entry: 'bluechip_pullback' | 'momentum' | 'new_listing' | 'manual'; NULL = baris legacy
       exit_reason TEXT,
       mode TEXT NOT NULL DEFAULT 'paper' -- 'paper' | 'live'
     );
@@ -273,6 +275,7 @@ export function initDatabase() {
 
     -- Research candle cache (90-day ring buffer, written through whenever the
     -- engine observes candles). Backtests and walk-forward runs read from here.
+    -- volume = notional IDR (rawVolume * close), raw_volume = volume koin asli.
     CREATE TABLE IF NOT EXISTS candles (
       pair TEXT NOT NULL,
       timeframe TEXT NOT NULL,
@@ -282,7 +285,40 @@ export function initDatabase() {
       low REAL NOT NULL,
       close REAL NOT NULL,
       volume REAL NOT NULL DEFAULT 0,
+      raw_volume REAL,
       PRIMARY KEY (pair, timeframe, ts)
+    );
+
+    -- Market Radar Persistence (screener deterministik, 0 token LLM).
+    -- Satu snapshot per siklus runLoop: baris kandidat tahap-1 + breadth.
+    -- Ditulis SEBELUM gerbang auto-trading agar radar tetap hidup saat pause.
+    CREATE TABLE IF NOT EXISTS market_screener (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      symbol TEXT NOT NULL,
+      rank INTEGER NOT NULL,
+      cheap_score REAL NOT NULL,
+      gain24h REAL NOT NULL,
+      vol_idr REAL NOT NULL,
+      breadth_percent REAL NOT NULL,
+      breadth_sample INTEGER NOT NULL,
+      reasons_json TEXT
+    );
+
+    -- Optimizer walk-forward audit trail: satu baris per simbol per run
+    -- (services/optimizer). Prune > 90 hari di TradingEngine.pruneOldData.
+    CREATE TABLE IF NOT EXISTS optimizer_runs (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      symbol TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      verdict TEXT NOT NULL, -- 'ROBUST_PROFITABLE' | 'MODERATE' | 'OVERFITTED' | 'UNPROFITABLE'
+      in_sample_pf REAL,
+      out_sample_pf REAL,
+      oos_pnl_idr INTEGER,
+      wf_verdict TEXT, -- 'WALK_FORWARD_ROBUST' | 'WALK_FORWARD_WEAK' | 'OVERFIT'
+      wf_oos_pnl_idr INTEGER,
+      chosen_config_json TEXT
     );
 
     -- High-Performance Secondary Indexes
@@ -304,6 +340,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_shortlist ON opportunity_shortlist(ts DESC, consumed);
     CREATE INDEX IF NOT EXISTS idx_agent_messages_topic ON agent_messages(topic, ts DESC);
     CREATE INDEX IF NOT EXISTS idx_order_intents_state ON order_intents(state, ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_market_screener_ts ON market_screener(ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_optimizer_runs_ts ON optimizer_runs(ts DESC);
   `);
 
   // Safe migration for existing sqlite database: add oauth_data column if missing
@@ -342,6 +380,41 @@ export function initDatabase() {
     // Column already exists
   }
 
+  // Candle store: keep the raw coin volume alongside the IDR-notional volume
+  // so backtests can replay either semantic without losing information.
+  try {
+    db.exec('ALTER TABLE candles ADD COLUMN raw_volume REAL;');
+  } catch {
+    // Column already exists
+  }
+
+  // Adaptive Exit Engine: rencana exit per posisi (JSON dari
+  // services/trading/adaptiveExit.ts) dibekukan saat entry. NULL/korup →
+  // engine memakai setting global persis seperti perilaku lama.
+  try {
+    db.exec('ALTER TABLE positions ADD COLUMN exit_plan_json TEXT;');
+  } catch {
+    // Column already exists
+  }
+
+  // Strategy attribution: jalur entry yang membuka posisi (identik dengan
+  // kolom strategy di opportunity_shortlist). NULL = baris sebelum fitur ada.
+  try {
+    db.exec('ALTER TABLE positions ADD COLUMN entry_strategy TEXT;');
+  } catch {
+    // Column already exists
+  }
+
+  // One-time semantic migration: rows written before the raw_volume column
+  // hold coin-unit volume in `volume`. Convert them to the IDR-notional
+  // semantic the in-memory candles (and every new write) use. Idempotent:
+  // migrated rows always have raw_volume set, so the WHERE clause empties.
+  try {
+    db.exec('UPDATE candles SET raw_volume = volume, volume = volume * close WHERE raw_volume IS NULL;');
+  } catch {
+    // Migration not needed / table not present yet
+  }
+
   // Default configuration settings
   const defaultSettings: Record<string, string> = {
     trading_mode: 'paper', // default safe paper trading mode
@@ -351,6 +424,15 @@ export function initDatabase() {
     swarm_event_driven: '1', // '1' (adaptive cadence & context dedup) | '0' (fixed 60s)
     indodax_api_key: '',
     indodax_secret_key: '',
+    // --- Konfigurasi web-first (tanpa .env): dikelola dari tab Pengaturan. ---
+    // Port TIDAK bisa diubah dari web (dikunci 3001) — env PORT hanya untuk
+    // kebutuhan deployment (Docker/VPS) sebelum aplikasi berjalan.
+    watchdog_url: '', // ping uptime eksternal; env WATCHDOG_URL jadi fallback
+    extra_rss_feeds: '', // hingga 5 URL RSS tambahan, dipisah koma; env fallback
+    log_level: '', // '' = default (info); error|warn|info|debug (butuh restart)
+    allow_local_fetch: '0', // '1' = izinkan hostname lokal/private utk provider & watchdog
+    antigravity_client_id: '', // override klien OAuth Google Cloud Code (opsional)
+    antigravity_client_secret: '', // terenkripsi at-rest via pola /secret/
     max_allocation_per_trade_idr: '100000', // Rp 100.000 per trade default
     max_active_trades: '3',
     daily_loss_limit_percent: '5', // 5% daily circuit breaker
@@ -361,6 +443,13 @@ export function initDatabase() {
     slippage_tolerance_percent: '0.8',
     trailing_stop_percent: '2.5',
     take_profit_target_1_percent: '5.0',
+    take_profit_target_2_percent: '10.0', // target scale-out kedua setelah TP1 (% gross dari entry); '0' atau <=0 menonaktifkan TP2
+    tp2_sell_fraction_percent: '50', // fraksi dari SISA posisi yang dijual saat TP2
+    adaptive_exit_enabled: '1', // '1' = rencana exit adaptif per posisi (ATR/rezim/volume); '0' = perilaku legacy persis
+    max_hold_hours: '48', // rotasi modal: exit penuh posisi stagnan >X jam dengan PnL netral (-1%..+1.5%); '0' = nonaktif
+    entry_scoring_mode: 'composite_score', // 'composite_score' (skor fitur 15m) | 'gain_rank' (legacy: ranking gain24h mentah)
+    market_breadth_min_percent: '30', // gerbang breadth: tahan entry altcoin saat <X% koin likuid naik; '0' = nonaktif
+    reentry_cooldown_hours: '4', // anti-fixasi: jeda entry ulang simbol yang baru ditutup; rugi = jeda x2; '0' = nonaktif
     allow_new_listings: '1',
     allowed_coins_only: '',
     min_24h_volume_idr: '200000000',
@@ -393,6 +482,15 @@ export function initDatabase() {
     admin_token_rotation_interval_value: '1',
     admin_token_rotation_interval_unit: 'days', // 'minutes' | 'hours' | 'days'
     admin_token_last_rotated_at: String(Date.now()),
+    // --- Optimizer walk-forward (profit-side preset, deterministik 0 token) ---
+    optimizer_preset_enabled: '0', // '1' = target profit mengikuti preset hasil walk-forward
+    optimizer_auto_run: '0', // '1' = optimasi otomatis tiap 7 hari (self-throttle)
+    optimizer_last_run_at: '0', // timestamp run optimasi terakhir (throttle 7 hari)
+    optimizer_preset_tp1: '', // diisi service optimizer; '' = belum ada preset
+    optimizer_preset_tp2: '', // diisi service optimizer; '' = belum ada preset
+    optimizer_preset_meta: '', // JSON meta {testedAt, symbols, verdict, oosPfMedian, oosPnlIdrTotal, tp1, tp2}
+    // --- Strategy-level Kelly governor (saudara faktor Kelly global) ---
+    strategy_kelly_enabled: '1', // '1' = faktor Kelly per entry_strategy aktif
   };
 
   const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
@@ -437,6 +535,7 @@ export interface RiskProfileConfig {
   allowed_coins_only: string;
   min_24h_volume_idr: string;
   take_profit_target_1_percent: string;
+  take_profit_target_2_percent: string;
 }
 
 export const RISK_PROFILES: Record<string, RiskProfileConfig> = {
@@ -452,6 +551,7 @@ export const RISK_PROFILES: Record<string, RiskProfileConfig> = {
     allowed_coins_only: 'btc,eth,sol,bnb,xrp',
     min_24h_volume_idr: '1000000000',
     take_profit_target_1_percent: '3.0',
+    take_profit_target_2_percent: '7.0',
   },
   balanced: {
     name: 'Seimbang',
@@ -465,6 +565,7 @@ export const RISK_PROFILES: Record<string, RiskProfileConfig> = {
     allowed_coins_only: '',
     min_24h_volume_idr: '200000000',
     take_profit_target_1_percent: '5.0',
+    take_profit_target_2_percent: '10.0',
   },
   aggressive: {
     name: 'Agresif',
@@ -478,6 +579,7 @@ export const RISK_PROFILES: Record<string, RiskProfileConfig> = {
     allowed_coins_only: '',
     min_24h_volume_idr: '50000000',
     take_profit_target_1_percent: '8.0',
+    take_profit_target_2_percent: '15.0',
   },
 };
 
@@ -495,6 +597,7 @@ export function applyRiskProfile(profileKey: 'conservative' | 'balanced' | 'aggr
   setSetting('allowed_coins_only', config.allowed_coins_only);
   setSetting('min_24h_volume_idr', config.min_24h_volume_idr);
   setSetting('take_profit_target_1_percent', config.take_profit_target_1_percent);
+  setSetting('take_profit_target_2_percent', config.take_profit_target_2_percent);
 
   return true;
 }

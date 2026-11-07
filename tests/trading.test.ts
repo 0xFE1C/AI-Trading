@@ -65,7 +65,9 @@ describe('Slippage & Orderbook Depth Calculations', () => {
 
 describe('Crypto & Signature Calculations (HMAC-SHA256 & HMAC-SHA512)', () => {
   test('generates valid HMAC-SHA512 signature for Deadman Switch', () => {
-    const secretKey = 'da78a39e9dda31c399bcc293d997a347dc7fd0408cb5151931243a302b273ec3238510ea61e11f7c';
+    // Fixture sintetis dibuat saat runtime — menjamin tidak ada literal yang
+    // menyerupai kredensial nyata pernah tersimpan di source control.
+    const secretKey = crypto.randomBytes(48).toString('hex');
     const payload = 'pair=btc_idr&countdownTime=10000&timestamp=1578304294001&recvWindow=5000';
 
     const expectedSign = crypto.createHmac('sha512', secretKey).update(payload).digest('hex');
@@ -73,7 +75,7 @@ describe('Crypto & Signature Calculations (HMAC-SHA256 & HMAC-SHA512)', () => {
   });
 
   test('generates valid HMAC-SHA256 signature for Trade API v2.0', () => {
-    const secretKey = 'f60617a68fcce028f0a90bc9eb765d17379eb548cc935c01a7ee3186eecf870e9b68f27a31bcfe8d';
+    const secretKey = crypto.randomBytes(48).toString('hex');
     const queryString = 'limit=100&recvWindow=5000&symbol=btcidr&timestamp=1578304294000';
 
     const sign = crypto.createHmac('sha256', secretKey).update(queryString).digest('hex');
@@ -403,6 +405,7 @@ describe('Risk Profile Presets (Beginner to Aggressive)', () => {
     assert.strictEqual(getSetting('trailing_stop_percent'), '1.5');
     assert.strictEqual(getSetting('allow_new_listings'), '0');
     assert.strictEqual(getSetting('allowed_coins_only'), 'btc,eth,sol,bnb,xrp');
+    assert.strictEqual(getSetting('take_profit_target_2_percent'), '7.0');
   });
 
   test('applies aggressive risk profile correctly', () => {
@@ -412,6 +415,7 @@ describe('Risk Profile Presets (Beginner to Aggressive)', () => {
     assert.strictEqual(getSetting('max_active_trades'), '5');
     assert.strictEqual(getSetting('trailing_stop_percent'), '3.5');
     assert.strictEqual(getSetting('allow_new_listings'), '1');
+    assert.strictEqual(getSetting('take_profit_target_2_percent'), '15.0');
   });
 
   test('applies balanced risk profile as default', () => {
@@ -421,6 +425,138 @@ describe('Risk Profile Presets (Beginner to Aggressive)', () => {
     assert.strictEqual(getSetting('max_active_trades'), '3');
     assert.strictEqual(getSetting('trailing_stop_percent'), '2.5');
     assert.strictEqual(getSetting('allow_new_listings'), '1');
+    assert.strictEqual(getSetting('take_profit_target_2_percent'), '10.0');
+  });
+});
+
+describe('TP2 Second Scale-Out (partial take-profit ladder)', () => {
+  function insertTp2Position(overrides: Partial<PositionRecord> = {}): PositionRecord {
+    const pos: PositionRecord = {
+      id: `pos_tp2_${Math.random().toString(36).slice(2, 8)}`,
+      symbol: 'tp2testidr',
+      base_currency: 'idr',
+      traded_currency: 'tp2test',
+      side: 'buy',
+      entry_price: 100,
+      current_price: 100,
+      amount: 1000,
+      initial_cost_idr: 100000,
+      highest_price: 100,
+      trailing_stop_price: 80,
+      take_profit_step: 0,
+      status: 'open',
+      opened_at: Date.now() - 3600000,
+      closed_at: null,
+      pnl_idr: 0,
+      pnl_percent: 0,
+      realized_pnl_idr: 0,
+      exit_reason: null,
+      mode: 'paper',
+      ...overrides,
+    };
+
+    db.prepare(`
+      INSERT INTO positions (
+        id, symbol, base_currency, traded_currency, side, entry_price, current_price,
+        amount, initial_cost_idr, highest_price, trailing_stop_price, take_profit_step,
+        status, opened_at, realized_pnl_idr, mode
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      pos.id, pos.symbol, pos.base_currency, pos.traded_currency, pos.side,
+      pos.entry_price, pos.current_price, pos.amount, pos.initial_cost_idr,
+      pos.highest_price, pos.trailing_stop_price, pos.take_profit_step,
+      pos.status, pos.opened_at, pos.realized_pnl_idr ?? 0, pos.mode
+    );
+
+    return pos;
+  }
+
+  function cleanupTp2(id: string) {
+    db.prepare('DELETE FROM trades_history WHERE position_id = ?').run(id);
+    db.prepare('DELETE FROM positions WHERE id = ?').run(id);
+  }
+
+  test('paper position reaching TP2 fires the second scale-out, marks step 2, and banks realized PnL', async (t) => {
+    const originalBalance = getSetting('paper_idr_balance', '10000000');
+    const originalFee = getSetting('trading_fee_percent', '0.3322');
+    const originalTp1 = getSetting('take_profit_target_1_percent', '5.0');
+    const originalTp2 = getSetting('take_profit_target_2_percent', '10.0');
+    const originalTp2Frac = getSetting('tp2_sell_fraction_percent', '50');
+    setSetting('trading_fee_percent', '1'); // round fee rate for readable math
+    setSetting('take_profit_target_1_percent', '5.0');
+    setSetting('take_profit_target_2_percent', '10.0');
+    setSetting('tp2_sell_fraction_percent', '50');
+
+    const pos = insertTp2Position();
+    const engine = new TradingEngine();
+
+    t.after(() => {
+      cleanupTp2(pos.id);
+      setSetting('paper_idr_balance', originalBalance);
+      setSetting('trading_fee_percent', originalFee);
+      setSetting('take_profit_target_1_percent', originalTp1);
+      setSetting('take_profit_target_2_percent', originalTp2);
+      setSetting('tp2_sell_fraction_percent', originalTp2Frac);
+    });
+
+    // Tick 1: +6% gross -> TP1 sells 50% of the full position
+    await engine.handleRealtimeTick({ pair: 'tp2testidr', price: 106, volume: 1, timestamp: Date.now() });
+    let row = db.prepare('SELECT amount, take_profit_step, realized_pnl_idr, status FROM positions WHERE id = ?').get(pos.id) as any;
+    assert.equal(row.take_profit_step, 1, 'TP1 must advance the ladder to step 1');
+    assert.equal(row.amount, 500);
+
+    // Tick 2: +15% gross -> TP2 sells 50% of the REMAINING amount
+    await engine.handleRealtimeTick({ pair: 'tp2testidr', price: 115, volume: 1, timestamp: Date.now() });
+    row = db.prepare('SELECT amount, take_profit_step, realized_pnl_idr, status, exit_claimed_at FROM positions WHERE id = ?').get(pos.id) as any;
+    assert.equal(row.take_profit_step, 2, 'TP2 must advance the ladder to step 2');
+    assert.equal(row.amount, 250, 'TP2 must sell half of the REMAINING amount, leaving 25% of the original');
+    assert.equal(row.status, 'open', 'position must remain open after the TP2 scale-out');
+    assert.equal(row.exit_claimed_at, null, 'the exit claim must be released after a clean scale-out');
+    assert.ok(row.realized_pnl_idr > 0, 'realized PnL must accumulate across both scale-outs');
+
+    const sells = db.prepare("SELECT COUNT(*) AS c FROM trades_history WHERE position_id = ? AND type = 'SELL'").get(pos.id) as any;
+    assert.equal(sells.c, 2, 'exactly two partial sells (TP1 + TP2) must be recorded');
+
+    // Exact realized accounting at a 1% taker fee:
+    const tp1Delta = Math.round(500 * 106 * 0.99 - 50000 * 1.01);
+    const tp2Delta = Math.round(250 * 115 * 0.99 - 25000 * 1.01);
+    assert.ok(Math.abs(row.realized_pnl_idr - (tp1Delta + tp2Delta)) <= 1,
+      `realized PnL ${row.realized_pnl_idr} must equal TP1+TP2 deltas ${tp1Delta + tp2Delta}`);
+  });
+
+  test("setting take_profit_target_2_percent='0' disables TP2 entirely", async (t) => {
+    const originalBalance = getSetting('paper_idr_balance', '10000000');
+    const originalFee = getSetting('trading_fee_percent', '0.3322');
+    const originalTp1 = getSetting('take_profit_target_1_percent', '5.0');
+    const originalTp2 = getSetting('take_profit_target_2_percent', '10.0');
+    setSetting('trading_fee_percent', '1');
+    setSetting('take_profit_target_1_percent', '5.0');
+    setSetting('take_profit_target_2_percent', '0');
+
+    const pos = insertTp2Position();
+    const engine = new TradingEngine();
+
+    t.after(() => {
+      cleanupTp2(pos.id);
+      setSetting('paper_idr_balance', originalBalance);
+      setSetting('trading_fee_percent', originalFee);
+      setSetting('take_profit_target_1_percent', originalTp1);
+      setSetting('take_profit_target_2_percent', originalTp2);
+    });
+
+    await engine.handleRealtimeTick({ pair: 'tp2testidr', price: 106, volume: 1, timestamp: Date.now() });
+    let row = db.prepare('SELECT amount, take_profit_step FROM positions WHERE id = ?').get(pos.id) as any;
+    assert.equal(row.take_profit_step, 1);
+
+    // +15% would trigger TP2 if enabled; with '0' only the TP1 scale-out exists
+    await engine.handleRealtimeTick({ pair: 'tp2testidr', price: 115, volume: 1, timestamp: Date.now() });
+    row = db.prepare('SELECT amount, take_profit_step, status FROM positions WHERE id = ?').get(pos.id) as any;
+    assert.equal(row.take_profit_step, 1, 'TP2 must never fire when the target is 0');
+    assert.equal(row.amount, 500, 'no second sell may happen');
+    assert.equal(row.status, 'open');
+
+    const sells = db.prepare("SELECT COUNT(*) AS c FROM trades_history WHERE position_id = ? AND type = 'SELL'").get(pos.id) as any;
+    assert.equal(sells.c, 1);
   });
 });
 
@@ -566,6 +702,65 @@ describe('Quantitative Backtest Engine (Simulation & Metrics)', () => {
     assert.strictEqual(result.totalTrades, 1);
     assert.ok(result.trades[0].pnlIdr > 0);
     assert.ok(result.trades[0].exitReason.includes('Partial TP'));
+  });
+
+  test('backtest price run past TP2 produces the second partial exit with correct fees and pnl', () => {
+    // Entry @ bar2 close 102; bar3 high 120 (+17.6% over entry) trips TP1 AND TP2;
+    // bar4 crashes into the ratcheted trailing stop.
+    const bars: BacktestBar[] = [
+      { timestamp: 1000, open: 100, high: 101, low: 99, close: 100, volume: 1000 },
+      { timestamp: 2000, open: 100, high: 103, low: 99.5, close: 102, volume: 2000 },
+      { timestamp: 3000, open: 102, high: 120, low: 101, close: 118, volume: 2000 },
+      { timestamp: 4000, open: 117, high: 117.5, low: 108, close: 109, volume: 1200 },
+    ];
+
+    const feePercent = 0.4;
+    const feeRate = feePercent / 100;
+    const slippageRate = 0.002;
+    const result = backtestEngine.simulate(bars, {
+      symbol: 'TP2IDR',
+      timeframe: '1h',
+      allocationPerTradeIdr: 100000,
+      trailingStopPercent: 2.5,
+      takeProfitStep1Percent: 5.0,
+      takeProfitTarget2Percent: 10.0,
+      minGainThresholdPercent: 1.0,
+      strategyType: 'candle_breakout',
+      feePercent,
+    });
+
+    assert.strictEqual(result.totalTrades, 1);
+    assert.ok(result.trades[0].exitReason.includes('Partial TP2 (+10%)'), `post-TP2 label expected, got: ${result.trades[0].exitReason}`);
+    assert.ok(result.trades[0].exitReason.includes('Trailing Stop'));
+
+    // Exact pnl: TP1 half at +5% target, TP2 half-of-remainder at +10% target,
+    // final quarter at the ratcheted stop (120*0.975 = 117), all fee+slippage adjusted.
+    const entry = 102 * (1 + slippageRate);
+    const amount = (100000 * (1 - feeRate)) / entry;
+    const tp1 = (amount / 2) * entry * 1.05 * (1 - slippageRate) * (1 - feeRate);
+    const tp2 = (amount / 4) * entry * 1.10 * (1 - slippageRate) * (1 - feeRate);
+    const stopExit = (amount / 4) * 117 * (1 - slippageRate) * (1 - feeRate);
+    const expectedPnl = tp1 + tp2 + stopExit - 100000;
+    assert.ok(Math.abs(result.trades[0].pnlIdr - expectedPnl) <= 1,
+      `pnl ${result.trades[0].pnlIdr} must match the TP1+TP2+stop ladder ${Math.round(expectedPnl)}`);
+
+    // Contrast: with TP2 off, the same bars must NOT produce a TP2 label and
+    // the remaining half rides the whole way to the stop.
+    const resultNoTp2 = backtestEngine.simulate(bars, {
+      symbol: 'TP2IDR',
+      timeframe: '1h',
+      allocationPerTradeIdr: 100000,
+      trailingStopPercent: 2.5,
+      takeProfitStep1Percent: 5.0,
+      takeProfitTarget2Percent: 0,
+      minGainThresholdPercent: 1.0,
+      strategyType: 'candle_breakout',
+      feePercent,
+    });
+    assert.ok(!resultNoTp2.trades[0].exitReason.includes('TP2'));
+    assert.ok(resultNoTp2.trades[0].exitReason.includes('Partial TP'));
+    assert.ok(Math.abs(resultNoTp2.trades[0].pnlIdr - result.trades[0].pnlIdr) > 1,
+      'TP2 scale-out must change the realized pnl');
   });
 
   test('honest profit factor: returns null instead of 99.99 when 0 losing trades', () => {

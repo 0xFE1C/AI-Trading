@@ -54,6 +54,9 @@ export const BacktestView: React.FC = () => {
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Exit Adaptif: replay rencana exit per posisi (ATR/rezim/volume) di kedua mode.
+  const [adaptiveExit, setAdaptiveExit] = useState(false);
+
   const toggleSymbol = (pair: string) => {
     setSelectedSymbols((prev) =>
       prev.includes(pair) ? prev.filter((s) => s !== pair) : [...prev, pair].slice(0, 10)
@@ -90,11 +93,12 @@ export const BacktestView: React.FC = () => {
           takeProfitStep1Percent: params.takeProfitStep1Percent,
           minGainThresholdPercent: params.minGainThresholdPercent,
           slippagePercent: params.slippagePercent,
+          adaptiveExit,
         });
         setResult(null);
         setPortfolioResult(data);
       } else {
-        const data = await api.runBacktest(params);
+        const data = await api.runBacktest({ ...params, adaptiveExit });
         setPortfolioResult(null);
         setResult(data);
       }
@@ -265,6 +269,27 @@ export const BacktestView: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Exit Adaptif (both single & portfolio modes) */}
+        <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-colors">
+          <input
+            type="checkbox"
+            checked={adaptiveExit}
+            onChange={(e) => setAdaptiveExit(e.target.checked)}
+            className="mt-0.5 rounded border-slate-700 text-indigo-600 focus:ring-0"
+          />
+          <span className="min-w-0">
+            <span className="block text-xs font-bold text-slate-200">
+              {l('Adaptive Exit', 'Exit Adaptif')}
+            </span>
+            <span className="block text-[11px] text-slate-400 leading-snug">
+              {l(
+                'Replay the per-position exit plan (ATR volatility, BTC regime, volume momentum) instead of flat fixed percentages.',
+                'Replay rencana exit per posisi (volatilitas ATR, rezim BTC, momentum volume), bukan persentase tetap flat.'
+              )}
+            </span>
+          </span>
+        </label>
 
         <form onSubmit={handleRunBacktest} className="space-y-4">
           {/* Strategy Mode Selector (single-pair mode only) */}
@@ -660,6 +685,14 @@ export const BacktestView: React.FC = () => {
               <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                 Data: {result.totalCandles} {l('candles', 'candle')} (~{result.effectiveDays} {l('days', 'hari')})
               </span>
+              {result.dataSource && (
+                <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                  {l('Source: ', 'Sumber: ')}
+                  {result.dataSource === 'cache'
+                    ? l('local candle cache', 'cache candle lokal')
+                    : l('exchange fetch', 'fetch bursa')}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
@@ -951,6 +984,14 @@ export const BacktestView: React.FC = () => {
               <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                 {portfolioResult.totalCandles} {l('candles', 'candle')}
               </span>
+              {portfolioResult.dataSource && (
+                <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                  {l('Source: ', 'Sumber: ')}
+                  {portfolioResult.dataSource === 'cache'
+                    ? l('local candle cache', 'cache candle lokal')
+                    : l('exchange fetch', 'fetch bursa')}
+                </span>
+              )}
               {portfolioResult.symbolsRequested.length !== portfolioResult.symbolsWithData.length && (
                 <span className="px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-500/30">
                   {l('No data: ', 'Tanpa data: ')}
@@ -1140,7 +1181,7 @@ export const BacktestView: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
                 <Clock className="w-4 h-4 text-indigo-400" />
-                <span>{l('Portfolio Trade Log', 'Catatan Trade Portofolio')} ({portfolioResult.trades.length} {l('Trades', 'Trade')})</span>
+                <span>{l('Portfolio Trade Log', 'Catatan Trade Portofolio')} ({portfolioResult.totalTrades ?? portfolioResult.trades.length} {l('Trades', 'Trade')})</span>
               </div>
             </div>
 

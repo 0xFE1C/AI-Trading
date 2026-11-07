@@ -250,7 +250,9 @@ export class MultiAgentSwarm {
         rssNewsService.getFeed('https://blog.indodax.com/feed/', 5),
       ]);
       const extraFeeds: NewsFeedContext[] = await Promise.all(
-        getExtraFeedUrls().map(async (url) => ({
+        // Web-first: setting `extra_rss_feeds` (tab Pengaturan) lebih diutamakan;
+        // env AI_TRADING_EXTRA_RSS_FEEDS tetap jadi fallback.
+        getExtraFeedUrls(getSetting('extra_rss_feeds', '') || process.env.AI_TRADING_EXTRA_RSS_FEEDS || '').map(async (url) => ({
           source: feedSourceName(url),
           items: await rssNewsService.getFeed(url, 5),
         }))
@@ -273,7 +275,9 @@ export class MultiAgentSwarm {
 
       for (const item of allNews) {
         try {
-          const id = crypto.createHash('md5').update(`${item.source}:${item.title}`).digest('hex');
+          // sha256 (bukan md5): id dedup konten berita — meski non-kripto,
+          // hash kuat mencegah kolisi dan menyatukan standar hash codebase.
+          const id = crypto.createHash('sha256').update(`${item.source}:${item.title}`).digest('hex');
           const sentiment = scoreHeadline(item.title, item.description);
           const threats = detectThreats({
             id,

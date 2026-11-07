@@ -13,6 +13,7 @@ import {
   getAiCallStats24h,
 } from '../db/index.js';
 import { agentBus } from '../services/agents/bus.js';
+import { validateOutboundUrl, setAllowLocalFetchAllowed } from '../services/security/urlGuard.js';
 import { aiClient } from '../services/ai/index.js';
 import { indodax } from '../services/indodax/index.js';
 import { agentSwarm, SUBAGENT_DEFINITIONS } from '../services/agents/index.js';
@@ -27,6 +28,12 @@ import { reportingService } from '../services/reports/index.js';
 import { backupService } from '../services/backup/index.js';
 import { telegramService } from '../services/telegram/index.js';
 import { adminTokenService, isAuthenticatedAdminToken } from '../services/auth/tokenRotation.js';
+import {
+  getFreshOptimizerPreset,
+  getRecentOptimizerRuns,
+  isOptimizing,
+  runWalkForwardOptimization,
+} from '../services/optimizer/index.js';
 import { calculateCapitalAllocation } from '../services/trading/riskGuard.js';
 import {
   decryptProviderApiKeys,
@@ -88,6 +95,14 @@ export const tradingToggleLimiter = createRateLimiter({
   max: 5,
   windowMs: 10 * 1000,
   message: 'Terlalu sering mengubah status trading.',
+});
+
+// Optimizer walk-forward adalah CPU-bound (meski terbatas): maks 1 run per
+// 10 menit per IP + guard konkurensi isOptimizing di dalam service.
+export const optimizerRunLimiter = createRateLimiter({
+  max: 1,
+  windowMs: 10 * 60 * 1000,
+  message: 'Optimasi baru saja dijalankan.',
 });
 
 export function checkIsAdmin(req: Request): boolean {
@@ -313,6 +328,11 @@ apiRouter.post('/settings', authMiddleware, (req, res) => {
       }
       setSetting(key, String(value));
     }
+    // Web-first: izin fetch lokal (anti-SSRF) berlaku seketika saat setting
+    // diubah dari web — tanpa perlu restart.
+    if ('allow_local_fetch' in body) {
+      setAllowLocalFetchAllowed(String(body.allow_local_fetch) === '1');
+    }
     res.json({ success: true, message: 'Settings berhasil diperbarui.' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -359,6 +379,14 @@ apiRouter.post('/providers', authMiddleware, (req, res) => {
     const { id, name, base_url, api_keys, alias, protocol, oauth_data } = req.body;
     if (!name || !base_url || !alias) {
       return res.status(400).json({ success: false, error: 'Nama, Base URL, dan Alias wajib diisi.' });
+    }
+
+    // Guard SSRF: base_url tersimpan di DB dan akan di-fetch engine saat
+    // import model — validasi di titik masuk (skema http/https, tanpa
+    // userinfo, hostname lokal/private hanya via env opt-in eksplisit).
+    const baseUrlCheck = validateOutboundUrl(String(base_url));
+    if (!baseUrlCheck.ok) {
+      return res.status(400).json({ success: false, error: `Base URL ditolak: ${baseUrlCheck.error}` });
     }
 
     const providerId = id || `prov_${Date.now()}`;
@@ -618,6 +646,66 @@ apiRouter.get('/scanner', async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- 4.5 Market Radar (Screener deterministik, 0 token LLM, Public View-Only) ---
+// Snapshot terakhir yang dipersistensi runLoop dari tabel market_screener.
+apiRouter.get('/market/radar', (req, res) => {
+  try {
+    const latest = db.prepare('SELECT MAX(ts) AS ts FROM market_screener').get() as { ts: number | null };
+    if (!latest || !latest.ts) {
+      return res.json({
+        success: true,
+        data: { ts: 0, breadth: { percent: 0, sampleSize: 0 }, candidates: [] },
+      });
+    }
+
+    const rows = db.prepare(`
+      SELECT symbol, rank, cheap_score, gain24h, vol_idr, breadth_percent, breadth_sample, reasons_json
+      FROM market_screener
+      WHERE ts = ?
+      ORDER BY rank ASC
+    `).all(latest.ts) as Array<{
+      symbol: string;
+      rank: number;
+      cheap_score: number;
+      gain24h: number;
+      vol_idr: number;
+      breadth_percent: number;
+      breadth_sample: number;
+      reasons_json: string | null;
+    }>;
+
+    const first = rows[0] || null;
+    const candidates = rows.map((r) => {
+      let reasons: string[] = [];
+      try {
+        reasons = JSON.parse(r.reasons_json || '[]');
+      } catch {}
+      return {
+        rank: r.rank,
+        symbol: r.symbol,
+        cheapScore: r.cheap_score,
+        gain24h: r.gain24h,
+        volIdr: r.vol_idr,
+        reasons,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ts: latest.ts,
+        breadth: {
+          percent: first ? first.breadth_percent : 0,
+          sampleSize: first ? first.breadth_sample : 0,
+        },
+        candidates,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal memuat radar pasar' });
   }
 });
 
@@ -941,6 +1029,7 @@ apiRouter.post('/settings/auto-set-capital', authMiddleware, (req, res) => {
     setSetting('daily_loss_limit_percent', String(plan.dailyLossLimitPercent));
     setSetting('slippage_tolerance_percent', String(plan.slippageTolerancePercent));
     setSetting('take_profit_target_1_percent', String(plan.takeProfitStep1Percent));
+    setSetting('take_profit_target_2_percent', String(plan.takeProfitTarget2Percent));
     setSetting('allow_new_listings', plan.allowNewListings ? '1' : '0');
     setSetting('allowed_coins_only', plan.allowedCoinsOnly);
     setSetting('min_24h_volume_idr', String(plan.minVolumeIdr));
@@ -979,7 +1068,9 @@ apiRouter.post('/backtest/run', authMiddleware, async (req, res) => {
       allocationPerTradeIdr,
       trailingStopPercent,
       takeProfitStep1Percent,
+      takeProfitTarget2Percent,
       minGainThresholdPercent,
+      adaptiveExit,
     } = req.body;
 
     if (!symbol) {
@@ -994,7 +1085,9 @@ apiRouter.post('/backtest/run', authMiddleware, async (req, res) => {
       allocationPerTradeIdr: allocationPerTradeIdr ? Number(allocationPerTradeIdr) : undefined,
       trailingStopPercent: trailingStopPercent ? Number(trailingStopPercent) : undefined,
       takeProfitStep1Percent: takeProfitStep1Percent ? Number(takeProfitStep1Percent) : undefined,
+      takeProfitTarget2Percent: takeProfitTarget2Percent !== undefined ? Number(takeProfitTarget2Percent) : undefined,
       minGainThresholdPercent: minGainThresholdPercent ? Number(minGainThresholdPercent) : undefined,
+      adaptiveExit: Boolean(adaptiveExit),
     });
 
     res.json({ success: true, data: result });
@@ -1006,7 +1099,7 @@ apiRouter.post('/backtest/run', authMiddleware, async (req, res) => {
 // Portfolio backtest: multi-symbol, concurrent position slots, shared cash.
 apiRouter.post('/backtest/portfolio', authMiddleware, async (req, res) => {
   try {
-    const { symbols, timeframe, days, initialBalanceIdr, allocationPerTradeIdr, maxActiveTrades, trailingStopPercent, takeProfitStep1Percent, minGainThresholdPercent } = req.body;
+    const { symbols, timeframe, days, initialBalanceIdr, allocationPerTradeIdr, maxActiveTrades, trailingStopPercent, takeProfitStep1Percent, takeProfitTarget2Percent, minGainThresholdPercent, adaptiveExit } = req.body;
 
     const result = await portfolioBacktestEngine.run({
       symbols: Array.isArray(symbols) ? symbols.map(String) : String(symbols || '').split(',').map((s: string) => s.trim()).filter(Boolean),
@@ -1017,12 +1110,80 @@ apiRouter.post('/backtest/portfolio', authMiddleware, async (req, res) => {
       maxActiveTrades: maxActiveTrades ? Number(maxActiveTrades) : undefined,
       trailingStopPercent: trailingStopPercent ? Number(trailingStopPercent) : undefined,
       takeProfitStep1Percent: takeProfitStep1Percent ? Number(takeProfitStep1Percent) : undefined,
+      takeProfitTarget2Percent: takeProfitTarget2Percent !== undefined ? Number(takeProfitTarget2Percent) : undefined,
       minGainThresholdPercent: minGainThresholdPercent ? Number(minGainThresholdPercent) : undefined,
+      adaptiveExit: Boolean(adaptiveExit),
     });
 
     res.json({ success: true, data: result });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- 12.5 Optimizer Walk-Forward (deterministik, 0 token LLM, Admin Only) ---
+
+const OPTIMIZER_TIMEFRAMES = new Set(['15m', '1h', '4h', '1d']);
+
+// Jalankan optimasi sinkron (bounded: <= 6 simbol x 6 konfigurasi). Body
+// divalidasi dan di-clamp; service menolak re-entry (satu run pada satu waktu).
+apiRouter.post('/optimizer/run', authMiddleware, optimizerRunLimiter, async (req, res) => {
+  try {
+    if (isOptimizing()) {
+      return res.status(409).json({
+        success: false,
+        error: 'Optimasi sedang berjalan. Tunggu run saat ini selesai.',
+      });
+    }
+
+    const body = req.body || {};
+    const rawSymbols = Array.isArray(body.symbols) ? body.symbols.map((s: any) => String(s || '').trim().toUpperCase()).filter(Boolean) : undefined;
+    const timeframe = typeof body.timeframe === 'string' && OPTIMIZER_TIMEFRAMES.has(body.timeframe) ? body.timeframe : '1h';
+    const daysRaw = Number(body.days);
+    const days = Number.isFinite(daysRaw) && daysRaw > 0 ? Math.min(Math.round(daysRaw), 120) : 90;
+
+    const summary = await runWalkForwardOptimization({ symbols: rawSymbols, timeframe, days });
+    if (!summary.ok) {
+      const status = summary.reason === 'already_running' ? 409 : 500;
+      return res.status(status).json({ success: false, error: summary.error || 'Optimasi gagal.' });
+    }
+
+    res.json({
+      success: true,
+      message: summary.presetWritten
+        ? `Optimasi selesai (${summary.symbols.length} simbol). Preset profit-side ditulis (TP1 ${summary.preset?.tp1}% / TP2 ${summary.preset?.tp2}%).`
+        : `Optimasi selesai (${summary.symbols.length} simbol). Tidak ada simbol robust — preset tidak ditulis.`,
+      data: summary,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Optimasi gagal.' });
+  }
+});
+
+// Status optimizer: 10 run terakhir + preset saat ini + flag settings.
+apiRouter.get('/optimizer/status', authMiddleware, (req, res) => {
+  try {
+    const presetRaw = getFreshOptimizerPreset();
+    res.json({
+      success: true,
+      data: {
+        isOptimizing: isOptimizing(),
+        runs: getRecentOptimizerRuns(10),
+        preset: presetRaw
+          ? {
+              tp1: presetRaw.tp1,
+              tp2: presetRaw.tp2,
+              meta: presetRaw.meta,
+              fresh: true,
+            }
+          : null,
+        autoRun: getSetting('optimizer_auto_run', '0') === '1',
+        presetEnabled: getSetting('optimizer_preset_enabled', '0') === '1',
+        lastRunAt: parseInt(getSetting('optimizer_last_run_at', '0'), 10) || 0,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal memuat status optimizer.' });
   }
 });
 

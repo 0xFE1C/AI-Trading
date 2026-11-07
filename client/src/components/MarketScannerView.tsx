@@ -7,16 +7,18 @@ import {
   RefreshCw,
   ExternalLink,
   ShieldAlert,
-  ArrowUpRight
+  ArrowUpRight,
+  Gauge
 } from 'lucide-react';
 import { api } from '../services/api';
-import { MarketTicker, NewCoinAlert } from '../types';
+import { MarketTicker, NewCoinAlert, MarketRadarResponse } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export const MarketScannerView: React.FC = () => {
   const { l, formatCurrency, formatNumber } = useLanguage();
   const [gainers, setGainers] = useState<MarketTicker[]>([]);
   const [newCoins, setNewCoins] = useState<NewCoinAlert[]>([]);
+  const [radar, setRadar] = useState<MarketRadarResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -33,9 +35,21 @@ export const MarketScannerView: React.FC = () => {
     }
   };
 
+  const loadRadarData = async () => {
+    try {
+      setRadar(await api.getMarketRadar());
+    } catch (e) {
+      console.error('Error loading market radar', e);
+    }
+  };
+
   useEffect(() => {
     loadScannerData();
-    const interval = setInterval(loadScannerData, 20000);
+    loadRadarData();
+    const interval = setInterval(() => {
+      loadScannerData();
+      loadRadarData();
+    }, 20000);
     return () => clearInterval(interval);
   }, []);
 
@@ -137,6 +151,96 @@ export const MarketScannerView: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* RADAR PASAR (Deterministik — screener tahap-1, 0 token LLM) */}
+      <div className="rounded-xl border border-emerald-500/20 bg-gradient-to-b from-emerald-950/10 to-slate-900/40 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-emerald-500/20">
+          <div className="flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">
+              {l('Radar Pasar (Deterministik)', 'Radar Pasar (Deterministik)')}
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-900/40 border border-emerald-500/30 text-emerald-300">
+            {l('0 tokens — pure price math', '0 token — murni matematika harga')}
+          </span>
+        </div>
+
+        {/* Breadth gauge */}
+        {radar && radar.ts > 0 && radar.breadth.sampleSize > 0 ? (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`text-3xl font-bold font-mono ${
+                  radar.breadth.percent >= 55
+                    ? 'text-emerald-400'
+                    : radar.breadth.percent >= 35
+                    ? 'text-amber-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {radar.breadth.percent.toFixed(1)}%
+              </span>
+              <span className="text-xs text-slate-400">{l('of top', 'dari top')} {radar.breadth.sampleSize} {l('most liquid pairs advancing', 'pair terlikuid ikut naik')}</span>
+            </div>
+            <div className="flex-1">
+              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    radar.breadth.percent >= 55
+                      ? 'bg-emerald-500'
+                      : radar.breadth.percent >= 35
+                      ? 'bg-amber-500'
+                      : 'bg-rose-500'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, radar.breadth.percent))}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-1 text-[11px] font-mono text-slate-500">
+                <span className="text-emerald-400">▲ {radar.candidates.length > 0 || radar.breadth.percent > 0 ? Math.round((radar.breadth.percent / 100) * radar.breadth.sampleSize) : 0} {l('up', 'naik')}</span>
+                <span className="text-rose-400">▼ {Math.max(0, radar.breadth.sampleSize - Math.round((radar.breadth.percent / 100) * radar.breadth.sampleSize))} {l('down', 'turun')}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-3 mb-2 text-center text-slate-400 text-xs">
+            {l(
+              'No market radar snapshot yet — the engine persists one every cycle (even while paused).',
+              'Belum ada snapshot radar — engine menyimpannya setiap siklus (bahkan saat bot pause).'
+            )}
+          </div>
+        )}
+
+        {/* Top-10 candidate table */}
+        {radar && radar.candidates.length > 0 && (
+          <div className="overflow-x-auto rounded-lg border border-slate-800/60">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800/60 bg-slate-900/60 text-slate-400 font-mono text-[11px] uppercase">
+                  <th className="py-2 px-3">#</th>
+                  <th className="py-2 px-3">{l('Symbol', 'Simbol')}</th>
+                  <th className="py-2 px-3">{l('Cheap Score', 'Skor Murah')}</th>
+                  <th className="py-2 px-3">{l('Gain 24h', 'Gain 24j')}</th>
+                  <th className="py-2 px-3">{l('Volume 24h (IDR)', 'Volume 24j (IDR)')}</th>
+                  <th className="py-2 px-3">{l('First Reason', 'Alasan Utama')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/40 font-mono">
+                {radar.candidates.slice(0, 10).map((c) => (
+                  <tr key={`${c.rank}-${c.symbol}`} className="hover:bg-slate-800/20 transition-colors">
+                    <td className="py-2 px-3 text-slate-500">{c.rank}</td>
+                    <td className="py-2 px-3 font-bold text-slate-200 uppercase">{c.symbol}</td>
+                    <td className="py-2 px-3 text-slate-100 font-semibold">{c.cheapScore.toFixed(2)}</td>
+                    <td className="py-2 px-3 text-emerald-400 font-bold">+{c.gain24h.toFixed(2)}%</td>
+                    <td className="py-2 px-3 text-slate-300">{formatCurrency(c.volIdr)}</td>
+                    <td className="py-2 px-3 text-slate-400 font-sans">{c.reasons?.[0] || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

@@ -7,20 +7,23 @@
 1. [Pengenalan Singkat](#1-pengenalan-singkat)
 2. [Langkah 1: Menjalankan Program (1-Klik)](#2-langkah-1-menjalankan-program-1-klik)
 3. [Langkah 2: Token Akses & Keamanan Dashboard](#3-langkah-2-token-akses--keamanan-dashboard)
-4. [Langkah 3: Menghubungkan Akun Indodax](#4-langkah-3-menghubungkan-akun-indodax)
-5. [Langkah 4: Memilih Profil Risiko](#5-langkah-4-memilih-profil-risiko)
-6. [Langkah 5: Uji Coba di Mode Demo (Paper Trading)](#6-langkah-5-uji-coba-di-mode-demo-paper-trading)
-7. [Langkah 6: Beralih ke Mode Nyata (Live Trading)](#7-langkah-6-beralih-ke-mode-nyata-live-trading)
-8. [Fitur Unggulan: Tim Riset AI 24 Jam](#8-fitur-unggulan-tim-riset-ai-24-jam)
-9. [Notifikasi WhatsApp & Perintah Remote](#9-notifikasi-whatsapp--perintah-remote)
-10. [Prosedur Darurat: Tombol Panic Sell](#10-prosedur-darurat-tombol-panic-sell)
-11. [Backup & Pemeliharaan Data](#11-backup--pemeliharaan-data)
-12. [Tanya Jawab (FAQ) & Troubleshooting](#12-tanya-jawab-faq--troubleshooting)
+4. [Panduan Setup & Skor Kesiapan Live](#4-panduan-setup--skor-kesiapan-live)
+5. [Langkah 3: Menghubungkan Akun Indodax](#5-langkah-3-menghubungkan-akun-indodax)
+6. [Langkah 4: Memilih Profil Risiko](#6-langkah-4-memilih-profil-risiko)
+7. [Langkah 5: Uji Coba di Mode Demo (Paper Trading)](#7-langkah-5-uji-coba-di-mode-demo-paper-trading)
+8. [Langkah 6: Beralih ke Mode Nyata (Live Trading)](#8-langkah-6-beralih-ke-mode-nyata-live-trading)
+9. [Fitur Unggulan: Tim Riset AI 24 Jam](#9-fitur-unggulan-tim-riset-ai-24-jam)
+10. [Notifikasi WhatsApp & Perintah Remote](#10-notifikasi-whatsapp--perintah-remote)
+11. [Prosedur Darurat: Tombol Panic Sell](#11-prosedur-darurat-tombol-panic-sell)
+12. [Backup & Pemeliharaan Data](#12-backup--pemeliharaan-data)
+13. [Tanya Jawab (FAQ) & Troubleshooting](#13-tanya-jawab-faq--troubleshooting)
 
 ---
 
 ## 1. PENGENALAN SINGKAT
 
+
+> 📸 **Ingin melihat tampilan aplikasinya dulu?** Buka galeri screenshot di [README — App Screenshots](../README.md#-app-screenshots-tampilan-aplikasi) (dashboard, radar pasar, wizard, backtest, bots, laporan).
 AI Trading Terminal adalah sistem perdagangan kripto otonom untuk bursa **Indodax**. 
 
 Bot ini dirancang khusus untuk melindungi modal Anda terlebih dahulu (*capital preservation*) sebelum mengejar keuntungan. Menggunakan kombinasi **10 Analis Riset AI**, filter keselamatan **9 Gerbang Risiko**, dan eksekusi **Trailing Stop Ratchet** matematis, bot bekerja 24 jam sehari memantau pasar tanpa emosi manusia (bebas FOMO dan panic-selling yang keliru).
@@ -56,7 +59,70 @@ Saat server pertama kali menyala, sistem akan menghasilkan sebuah **Admin Access
 
 ---
 
-## 4. LANGKAH 3: MENGHUBUNGKAN AKUN INDODAX
+## 4. PANDUAN SETUP & SKOR KESIAPAN LIVE
+
+### 🚀 Panduan Setup (Setup Wizard)
+
+Setelah masuk sebagai admin pada pemakaian pertama, jendela **Panduan Setup** terbuka **otomatis satu kali** (setelah tutorial perdana ditutup) ketika bot masih belum dikonfigurasi. Anda juga bisa membukanya kapan saja lewat tombol **🚀 Panduan Setup** di bagian bawah Sidebar.
+
+Isinya 6 langkah singkat — semuanya opsional selain sambutan:
+
+1. **Selamat datang & pilih bahasa** (Inggris/Indonesia).
+2. **Hubungkan AI** (opsional — tanpa AI, bot berjalan 100% deterministik tanpa biaya token).
+3. **Pilih model AI** (opsional — model swarm riset dan model konfirmasi entry).
+4. **Modal & profil risiko** — masukkan modal, pilih gaya risiko, lihat pratinjau alokasi (jumlah per trade, maks posisi, trailing stop, batas rugi harian), lalu klik **Terapkan & Lanjut**.
+5. **Notifikasi WhatsApp/Telegram** (opsional — dibuka dari tab Bots).
+6. **Selesai** — tombol **Mulai Paper Trading** yang selalu memulai dalam mode PAPER yang aman.
+
+Setiap cara keluar dari wizard (tombol X, ESC, "Nanti", maupun selesai) menandai setup selesai, sehingga wizard tidak terbuka otomatis untuk kedua kalinya. Buka ulang kapan saja dari Sidebar.
+
+### 🎯 Skor Kesiapan Live
+
+Kartu **"Skor Kesiapan Live"** di Dashboard mengukur apakah rekam jejak paper trading Anda sudah layak dipertimbangkan untuk mode live. Skor berkisar **0–100**, dihitung dari 5 kriteria setara (masing-masing 20 poin):
+
+| Kriteria | Syarat |
+|---|---|
+| Jumlah trade selesai | Minimal 20 trade tertutup |
+| Win rate | Minimal 45% |
+| Profit bersih | Lebih dari 0 (positif) |
+| Drawdown maksimum | Tidak lebih dari 15% |
+| Profit factor | Minimal 1.2 |
+
+Skor **70 ke atas** berarti siap dipertimbangkan, **40–69** hampir siap, dan **di bawah 40** belum siap — teruskan dulu latihan di mode paper. Saat bot sudah berada di mode live, kartu ini tampil sebagai info netral (skornya memang untuk persiapan sebelum live).
+
+### 💡 Penjelasan Sederhana & Pengaturan Lanjutan
+
+- Di panel **Log Penolakan Entry** (Dashboard), sakelar **"Penjelasan sederhana"** menampilkan alasan penolakan dalam bahasa awam untuk setiap gerbang (misalnya "Aset sedang overbought", "BTC sedang turun tajam"). Pilihan ini tersimpan di browser Anda.
+- Pada mode tampilan **Sederhana**, tab **Pengaturan** menyembunyikan kartu teknis (rotasi token, tunnel publik, ekspor/impor konfigurasi) di balik sakelar **"Tampilkan pengaturan lanjutan"** — aktifkan bila Anda membutuhkannya.
+
+### 🧠 Exit Adaptif (Cara Berpikir Trader Profesional)
+
+Bot tidak lagi terikat target untung persentase tetap. Setiap posisi mendapat **Exit Plan** sendiri yang dihitung saat entry dari tiga konteks:
+
+1. **Volatilitas (ATR)** — aset yang bergerak lebar mendapat target & trailing lebih lebar; aset yang tenang lebih ketat. Gerak 3% di BTC dan 3% di PEPE tidak diperlakukan sama.
+2. **Regime BTC** — saat pasar RISK_ON, target dilonggarkan agar profit berlari; saat RISK_OFF/CRASH, profit dipercepat diambil.
+3. **Kekuatan momentum** — lonjakan volume + bid wall kuat memperbesar target (+20%).
+
+Batas aman tetap berlaku: trailing (sisi rugi) tidak pernah melebihi 2× nilai setting Anda, dan **tidak pernah lebih longgar dari jangkar risiko Anda sendiri**. Nonaktifkan lewat Pengaturan → Risiko → **Exit adaptif**. Posisi yang stagnan (di antara −1% s.d. +1,5% setelah X jam, default 48) otomatis dieksit untuk **rotasi modal** — bisa diatur dengan `max_hold_hours` (0 = mati).
+
+Rencana exit terlihat di tabel posisi Dashboard (baris kecil "TP1 … · TP2 … · Trail … · adaptif"), di notifikasi pembelian WhatsApp, dan lewat perintah `/kenapa`.
+
+### 📊 Atribusi Strategi
+
+Tab **Laporan** kini memiliki tabel **"Atribusi Strategi"**: performa riil per jalur entry — *Blue-Chip Pullback*, *Momentum*, *Listing Baru*, dan *Manual* — berisi jumlah trade, win rate, net PnL, dan rata-rata durasi hold. Gunakan ini untuk melihat jalur mana yang benar-benar menghasilkan di akun Anda, bukan sekadar teori. Di Backtest, centang **"Exit Adaptif"** untuk mensimulasikan perilaku exit yang sama, dan badge **"Sumber: cache candle lokal / fetch bursa"** menunjukkan asal data backtest.
+
+### 🌐 Radar Pasar (Pemindaian Seluruh Market — 0 Token)
+
+Tab **Scanner** kini menampilkan kartu **"Radar Pasar (Deterministik)"**: bot memeringkat SELURUH pair Indodax yang likuid setiap siklus — murni matematika harga, **tanpa biaya token AI**. Dua hal yang ditampilkan:
+
+- **Gauge Market Breadth** — persentase dari 20 pair paling likuid yang harga terakhirnya di atas harga 24 jam lalu. Tape lemah (< 30%, bisa diatur di Pengaturan → Risiko) membuat bot menahan entry altcoin sambil tetap mengizinkan pullback blue-chip — perilaku trader profesional saat pasar sedang tidak sehat.
+- **Daftar kandidat teratas** — peringkat seluruh market berdasarkan kombinasi likuiditas + momentum sehat, sehingga bot selalu punya pilihan terbaik dari *semua* koin, bukan dari daftar pendek tetap.
+
+Bot juga kini **berotasi, bukan menempel**: koin yang baru ditutup diblokir masuk kembali selama beberapa jam (berlipat setelah rugi — anti mengejar harga), dan saat dua kandidat sama kuat, koin yang belum lama diperdagangkan diberi prioritas. Serta **konfirmasi dua timeframe**: setup 15 menit hanya dieksekusi bila tren 1 jam searah. Ketiga aturan baru ini tampil di panel diagnostik entry dengan penjelasan bahasa awam.
+
+---
+
+## 5. LANGKAH 3: MENGHUBUNGKAN AKUN INDODAX
 
 Untuk menghubungkan bot dengan saldo Indodax Anda:
 
@@ -80,7 +146,7 @@ Untuk menghubungkan bot dengan saldo Indodax Anda:
 
 ---
 
-## 5. LANGKAH 4: MEMILIH PROFIL RISIKO
+## 6. LANGKAH 4: MEMILIH PROFIL RISIKO
 
 Anda dapat menyesuaikan gaya trading bot dengan modal dan toleransi risiko Anda melalui 1-klik di tab **Pengaturan &rarr; Profil Risiko**:
 
@@ -92,7 +158,7 @@ Anda dapat menyesuaikan gaya trading bot dengan modal dan toleransi risiko Anda 
 
 ---
 
-## 6. LANGKAH 5: UJI COBA DI MODE DEMO (PAPER TRADING)
+## 7. LANGKAH 5: UJI COBA DI MODE DEMO (PAPER TRADING)
 
 > ⚠️ **Saran Profesional:** Jangan langsung menggunakan uang nyata! Jalankan bot di **Mode Demo** terlebih dahulu selama 3 sampai 7 hari.
 
@@ -105,7 +171,7 @@ Anda dapat menyesuaikan gaya trading bot dengan modal dan toleransi risiko Anda 
 
 ---
 
-## 7. LANGKAH 6: BERALIH KE MODE NYATA (LIVE TRADING)
+## 8. LANGKAH 6: BERALIH KE MODE NYATA (LIVE TRADING)
 
 Setelah Anda merasa puas dengan performa bot di Mode Demo dan memahami karakternya:
 
@@ -122,7 +188,7 @@ Setelah Anda merasa puas dengan performa bot di Mode Demo dan memahami karaktern
 
 ---
 
-## 8. FITUR UNGGULAN: TIM RISET AI 24 JAM
+## 9. FITUR UNGGULAN: TIM RISET AI 24 JAM
 
 Di tab **Riset AI**, Anda memiliki tim yang terdiri dari **10 Analis Khusus** yang bekerja secara otomatis di atas sumber data yang sama:
 
@@ -143,7 +209,7 @@ Jika ada ancaman serius terdeteksi oleh salah satu analis (misalnya indikasi koi
 
 ---
 
-## 9. NOTIFIKASI BOTS (WHATSAPP & TELEGRAM) & PERINTAH REMOTE
+## 10. NOTIFIKASI BOTS (WHATSAPP & TELEGRAM) & PERINTAH REMOTE
 
 Anda tidak perlu menatap layar komputer seharian. Buka tab **Bots** di dashboard untuk mengatur kanal notifikasi sesuai preferensi Anda:
 - **Keduanya Sekaligus:** Mengirim sinyal dan order ke WhatsApp dan Telegram bersamaan.
@@ -171,7 +237,7 @@ Anda tidak perlu menatap layar komputer seharian. Buka tab **Bots** di dashboard
 
 ---
 
-## 10. PROSEDUR DARURAT: TOMBOL PANIC SELL
+## 11. PROSEDUR DARURAT: TOMBOL PANIC SELL
 
 Jika terjadi peristiwa luar biasa di pasar dunia dan Anda ingin mengamankan seluruh aset seketika:
 
@@ -184,7 +250,7 @@ Jika terjadi peristiwa luar biasa di pasar dunia dan Anda ingin mengamankan selu
 
 ---
 
-## 11. BACKUP & PEMELIHARAAN DATA
+## 12. BACKUP & PEMELIHARAAN DATA
 
 Seluruh riwayat trading, pengaturan, dan log analisa tersimpan di database lokal SQLite komputer Anda:
 
@@ -194,7 +260,7 @@ Seluruh riwayat trading, pengaturan, dan log analisa tersimpan di database lokal
 
 ---
 
-## 12. TANYA JAWAB (FAQ) & TROUBLESHOOTING
+## 13. TANYA JAWAB (FAQ) & TROUBLESHOOTING
 
 #### Q: Mengapa bot belum melakukan pembelian koin sama sekali hari ini?
 > **A:** Ini adalah perilaku normal dan tanda bahwa filter risiko bekerja dengan baik! Bot memiliki 9 gerbang keselamatan ketat (menganalisa spread bid-ask, tren harga Bitcoin, indikator RSI jenuh beli, dan analisa sentimen berita). Bot hanya akan membeli jika seluruh gerbang keselamatan terpenuhi demi meminimalkan risiko kerugian.

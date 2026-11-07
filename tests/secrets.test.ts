@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -66,21 +67,27 @@ test('startup migration encrypts legacy plaintext settings and provider credenti
   const settingKey = 'test_legacy_api_key';
   const providerId = `prov_secret_test_${Date.now()}`;
   const alias = `secret_test_${Date.now()}`;
+  // Fixture sintetis dibuat saat runtime — fixture test tidak boleh berisi
+  // literal yang menyerupai kredensial nyata di source control.
+  const legacyPlainSecret = crypto.randomBytes(12).toString('hex');
+  const providerKeyPlain = crypto.randomBytes(12).toString('hex');
+  const refreshPlain = crypto.randomBytes(12).toString('hex');
+  const fixtureEmail = `user-${crypto.randomBytes(4).toString('hex')}@example.test`;
 
   try {
     db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').run(
       settingKey,
-      'legacy-plain-secret',
-      'legacy-plain-secret'
+      legacyPlainSecret,
+      legacyPlainSecret
     );
     db.prepare(`
       INSERT INTO providers (id, name, base_url, api_keys, alias, protocol, oauth_data, is_active, created_at)
       VALUES (?, 'Secret Test', 'https://example.com/v1', ?, ?, 'chat_completions', ?, 1, ?)
     `).run(
       providerId,
-      JSON.stringify(['provider-key-plain']),
+      JSON.stringify([providerKeyPlain]),
       alias,
-      JSON.stringify({ refreshToken: 'refresh-plain', email: 'secret@example.com' }),
+      JSON.stringify({ refreshToken: refreshPlain, email: fixtureEmail }),
       Date.now()
     );
 
@@ -88,7 +95,7 @@ test('startup migration encrypts legacy plaintext settings and provider credenti
 
     const settingRaw = db.prepare('SELECT value FROM settings WHERE key = ?').get(settingKey) as { value: string };
     assert.ok(isEncrypted(settingRaw.value));
-    assert.equal(getSetting(settingKey), 'legacy-plain-secret');
+    assert.equal(getSetting(settingKey), legacyPlainSecret);
 
     const providerRaw = db.prepare('SELECT api_keys, oauth_data FROM providers WHERE id = ?').get(providerId) as {
       api_keys: string;
@@ -96,10 +103,10 @@ test('startup migration encrypts legacy plaintext settings and provider credenti
     };
     assert.ok(isEncrypted(providerRaw.api_keys));
     assert.ok(isEncrypted(providerRaw.oauth_data));
-    assert.deepEqual(decryptProviderApiKeys(providerRaw.api_keys), ['provider-key-plain']);
+    assert.deepEqual(decryptProviderApiKeys(providerRaw.api_keys), [providerKeyPlain]);
     assert.deepEqual(decryptProviderOAuth(providerRaw.oauth_data), {
-      refreshToken: 'refresh-plain',
-      email: 'secret@example.com',
+      refreshToken: refreshPlain,
+      email: fixtureEmail,
     });
   } finally {
     db.prepare('DELETE FROM settings WHERE key = ?').run(settingKey);

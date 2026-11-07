@@ -17,7 +17,13 @@ import { backupService } from './services/backup/index.js';
 import { tunnelService } from './services/tunnel/index.js';
 import { indodaxMarketStream } from './services/indodax/marketStream.js';
 import { adminTokenService, isAuthenticatedAdminToken } from './services/auth/tokenRotation.js';
-import { installConsoleBridge } from './utils/logger.js';
+import {
+  runWalkForwardOptimization,
+  setOptimizerAlertCallback,
+  isOptimizing,
+} from './services/optimizer/index.js';
+import { logger, installConsoleBridge } from './utils/logger.js';
+import { setAllowLocalFetchAllowed } from './services/security/urlGuard.js';
 
 import dns from 'dns';
 try {
@@ -144,7 +150,9 @@ indodax.setNewCoinCallback(async (coin) => {
 tradingEngine.setTradeCallback(async (event) => {
   broadcastAdmin('TRADE_EVENT', event);
   if (event.type === 'BUY') {
-    const msg = `🟢 *[BUY ORDER EXECUTED]*\nPair: *${event.data.symbol.toUpperCase()}*\nHarga: Rp ${event.data.price.toLocaleString('id-ID')}\nTotal: Rp ${event.data.totalIdr.toLocaleString('id-ID')} (${event.data.mode.toUpperCase()})\nAlasan: ${event.data.reason}`;
+    // Rencana exit adaptif turut dilaporkan: 'Exit Plan: TP1 X% · TP2 Y% · Trail Z% (adaptif|standar)'
+    const exitPlanLine = event.data?.exitPlanLine ? `\n${event.data.exitPlanLine}` : '';
+    const msg = `🟢 *[BUY ORDER EXECUTED]*\nPair: *${event.data.symbol.toUpperCase()}*\nHarga: Rp ${event.data.price.toLocaleString('id-ID')}\nTotal: Rp ${event.data.totalIdr.toLocaleString('id-ID')} (${event.data.mode.toUpperCase()})\nAlasan: ${event.data.reason}${exitPlanLine}`;
     await whatsappService.sendAlert(msg);
     await telegramService.sendAlert(msg);
   } else if (event.type === 'SELL') {
@@ -156,6 +164,13 @@ tradingEngine.setTradeCallback(async (event) => {
     await whatsappService.sendAlert(msg);
     await telegramService.sendAlert(msg);
   }
+});
+
+// Optimizer walk-forward: preset profit-side baru tersimpan → notify WhatsApp,
+// Telegram & broadcast ke admin (angka saja, tanpa secret).
+setOptimizerAlertCallback(async (message) => {
+  broadcastAdmin('OPTIMIZER_PRESET', { message });
+  await Promise.allSettled([whatsappService.sendAlert(message), telegramService.sendAlert(message)]);
 });
 
 // Wire Telegram 2-Way Remote Bot panic action and start polling
@@ -407,13 +422,27 @@ wss.on('connection', (ws: WebSocket, req) => {
 });
 
 // 5. Start Background Engines & Graceful Shutdown
-const PORT = process.env.PORT || 3001;
+// Port dikunci: tidak bisa diubah dari web UI (stabil untuk tunnel, PWA, dan
+// remote bot). env PORT tetap tersedia HANYA untuk kebutuhan deployment
+// (Docker/VPS) sebelum aplikasi berjalan; default permanen 3001.
+const PORT = parseInt(process.env.PORT || '', 10) || 3001;
+
+// Log level dari setting (kosong = default info), diterapkan saat boot.
+const configuredLogLevel = getSetting('log_level', '').trim();
+if (['error', 'warn', 'info', 'debug'].includes(configuredLogLevel)) {
+  logger.level = configuredLogLevel;
+}
+
+// Guard SSRF: izin hostname lokal kini setting web (`allow_local_fetch`),
+// diterapkan setelah DB siap; perubahan lewat API juga menyegarkan ini.
+setAllowLocalFetchAllowed(getSetting('allow_local_fetch', '0') === '1');
 
 // Pairs cache refresh interval (seeds pair rules + new-listing radar detection)
 let pairsRefreshInterval: NodeJS.Timeout | null = null;
 let walCheckpointInterval: NodeJS.Timeout | null = null;
 let advisoryInterval: NodeJS.Timeout | null = null;
 let weeklyReportInterval: NodeJS.Timeout | null = null;
+let optimizerInterval: NodeJS.Timeout | null = null;
 
 if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes('test'))) {
   server.listen(PORT, async () => {
@@ -493,6 +522,39 @@ if (process.env.NODE_ENV !== 'test' && !process.argv.some((arg) => arg.includes(
       await agentSwarm.sendWeeklyLearningReport(sendToAdminBots);
     }, 24 * 3600 * 1000);
     if (weeklyReportInterval.unref) weeklyReportInterval.unref();
+
+    // Optimizer walk-forward otomatis (deterministik, 0 token LLM). Timer 1 jam
+    // yang self-throttle ke SEKALI per 7 hari via setting optimizer_last_run_at
+    // (pola sama dengan weekly report). Skip bila optimizer_auto_run mati atau
+    // ada run yang sedang berjalan. Preset profit-side ditulis oleh service
+    // bila ada simbol yang lolos gerbang ROBUST.
+    optimizerInterval = setInterval(() => {
+      try {
+        if (getSetting('optimizer_auto_run', '0') !== '1') return;
+        if (isOptimizing()) {
+          console.log('[Optimizer] Auto-run dilewati: optimasi sedang berjalan.');
+          return;
+        }
+        const lastRunAt = parseInt(getSetting('optimizer_last_run_at', '0'), 10) || 0;
+        if (Date.now() - lastRunAt < 7 * 24 * 3600 * 1000) return;
+        setSetting('optimizer_last_run_at', String(Date.now()));
+        console.log('[Optimizer] Auto-run mingguan dimulai (optimizer_auto_run=1, interval 7 hari).');
+        runWalkForwardOptimization()
+          .then((summary) => {
+            if (summary.ok) {
+              console.log(
+                `[Optimizer] Auto-run selesai dalam ${summary.durationMs}ms — preset ditulis: ${summary.presetWritten ? 'YA' : 'tidak (tidak ada simbol robust)'}`
+              );
+            } else {
+              console.warn(`[Optimizer] Auto-run gagal: ${summary.error}`);
+            }
+          })
+          .catch((err: any) => console.warn('[Optimizer] Auto-run error:', err?.message || err));
+      } catch (err: any) {
+        console.warn('[Optimizer] Auto-run scheduler error:', err?.message || err);
+      }
+    }, 3600 * 1000);
+    if (optimizerInterval.unref) optimizerInterval.unref();
     // Kick the advisor once shortly after boot (models/settings are ready then)
     setTimeout(() => {
       agentSwarm.runPortfolioAdvisory().catch(() => {});
@@ -542,6 +604,10 @@ async function gracefulShutdown(signal: string) {
     if (weeklyReportInterval) {
       clearInterval(weeklyReportInterval);
       weeklyReportInterval = null;
+    }
+    if (optimizerInterval) {
+      clearInterval(optimizerInterval);
+      optimizerInterval = null;
     }
     if (wsHeartbeatInterval) {
       clearInterval(wsHeartbeatInterval);

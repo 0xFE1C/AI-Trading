@@ -39,10 +39,12 @@ import { SystemStatus, RiskProfileKey, SafetyStatus } from '../types';
 import { CryptoChart } from './CryptoChart';
 import { AbValidationSection } from './AbValidationSection';
 import { EntryDiagnosticsSection } from './EntryDiagnosticsSection';
+import { LiveReadinessCard } from './LiveReadinessCard';
 import { HelpTooltip } from './HelpTooltip';
 import { Toast } from './Toast';
 import { api } from '../services/api';
 import { useLanguage } from '../i18n/LanguageContext';
+import { strategyLabel, strategyBadgeClass, formatClientExitPlanLine } from '../utils/strategy';
 
 interface DashboardViewProps {
   status: SystemStatus | null;
@@ -239,10 +241,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center">
                 {status?.mode === 'paper'
                   ? l('Virtual Balance (Paper)', 'Saldo Virtual (Paper)')
                   : l('Real Indodax Balance', 'Saldo Riil Indodax')}
+                <HelpTooltip
+                  title={l('IDR Balance', 'Saldo IDR')}
+                  content={l(
+                    'Total Rupiah the bot can trade with. In paper mode this is virtual money that behaves exactly like the real thing.',
+                    'Total Rupiah yang bisa dipakai bot untuk trading. Di mode paper, ini uang virtual yang perilakunya sama seperti uang asli.'
+                  )}
+                />
               </span>
               <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
                 <DollarSign className="h-4 w-4" />
@@ -275,8 +284,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center">
                 {l('Floating Profit / Loss', 'Keuntungan / Rugi Berjalan')}
+                <HelpTooltip
+                  title={l('Floating PnL', 'PnL Berjalan')}
+                  content={l(
+                    'Unrealized profit or loss of the coins currently held. It only becomes real once the bot sells.',
+                    'Profit atau rugi koin yang sedang dipegang. Baru menjadi nyata setelah bot menjualnya.'
+                  )}
+                />
               </span>
               <div className={`p-1.5 rounded-lg border ${
                 totalFloatingPnl >= 0
@@ -311,8 +327,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center">
                 {l('AI Market Condition Index', 'Kondisi Pasar Menurut AI')}
+                <HelpTooltip
+                  title={l('AI Sentiment Index', 'Indeks Sentimen AI')}
+                  content={l(
+                    'Average market mood measured by the AI research agents: positive means bullish, negative means bearish.',
+                    'Suasana pasar rata-rata menurut agen riset AI: positif berarti bullish (naik), negatif berarti bearish (turun).'
+                  )}
+                />
               </span>
               <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                 <Layers className="h-4 w-4" />
@@ -351,8 +374,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0e1629] via-[#0b1120] to-[#080d19] p-4 sm:p-5 shadow-lg flex flex-col justify-between hover:border-slate-700/80 transition-all">
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center">
                 {l('Trading Engine & Alerts', 'Status Mesin & Notifikasi')}
+                <HelpTooltip
+                  title={l('Engine Status', 'Status Mesin')}
+                  content={l(
+                    'Whether the auto-trading engine is running. PAUSED means it only watches the market and places no orders.',
+                    'Menunjukkan apakah mesin trading otomatis sedang berjalan. DIJEDA berarti hanya memantau pasar tanpa memasang order.'
+                  )}
+                />
               </span>
               <div className={`p-1.5 rounded-lg border ${
                 isAuto
@@ -477,6 +507,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* 1.6 Live Readiness Score (both display modes; fetched once, manual refresh) */}
+      <LiveReadinessCard mode={status?.mode || 'paper'} />
 
       {/* 2. Unified, Collapsible Quick Start Guide & Checklist */}
       <div className="rounded-2xl border border-slate-800/90 bg-gradient-to-b from-[#0c1426] via-[#090f1d] to-[#070b14] shadow-md overflow-hidden transition-all">
@@ -921,11 +954,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {openPositions.map((pos) => {
                     const isProfit = (pos.pnl_percent || 0) >= 0;
                     const holdMin = Math.round((Date.now() - pos.opened_at) / 60000);
+                    const exitPlanLine = formatClientExitPlanLine(pos.exit_plan_json);
 
                     return (
                       <tr key={pos.id} className="hover:bg-slate-800/20 transition-colors">
                         <td className="py-3.5 px-4 font-bold text-slate-200 text-sm">
-                          {pos.symbol.toUpperCase()}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{pos.symbol.toUpperCase()}</span>
+                            {pos.entry_strategy && (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold border ${strategyBadgeClass(pos.entry_strategy)}`}>
+                                {strategyLabel(pos.entry_strategy, l)}
+                              </span>
+                            )}
+                          </div>
+                          {exitPlanLine && (
+                            <span className="block text-[10px] text-slate-500 font-sans font-normal mt-0.5">
+                              {exitPlanLine}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-slate-300">
                           {formatCurrency(pos.entry_price)}
@@ -950,12 +996,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans border ${
-                            pos.take_profit_step === 1
+                            (pos.take_profit_step || 0) >= 2
+                              ? 'bg-emerald-950/60 text-emerald-200 border-emerald-400/40 font-semibold'
+                              : pos.take_profit_step === 1
                               ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30 font-semibold'
                               : 'bg-blue-950/40 text-blue-300 border-blue-500/30'
                           }`}>
                             <Shield className="h-3 w-3" />
-                            {pos.take_profit_step === 1
+                            {(pos.take_profit_step || 0) >= 2
+                              ? l('75% Profit Locked (TP2)', '75% Profit Aman (TP2)')
+                              : pos.take_profit_step === 1
                               ? l('50% Profit Locked (Breakeven)', '50% Profit Aman (Breakeven Locked)')
                               : l('Tracking Momentum', 'Tracking Momentum')}
                           </span>
@@ -976,21 +1026,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {openPositions.map((pos) => {
                 const isProfit = (pos.pnl_percent || 0) >= 0;
                 const holdMin = Math.round((Date.now() - pos.opened_at) / 60000);
+                const exitPlanLine = formatClientExitPlanLine(pos.exit_plan_json);
 
                 return (
                   <div key={pos.id} className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/50 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-base font-bold text-slate-100 font-mono">
                           {pos.symbol.toUpperCase()}
                         </span>
+                        {pos.entry_strategy && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold border ${strategyBadgeClass(pos.entry_strategy)}`}>
+                            {strategyLabel(pos.entry_strategy, l)}
+                          </span>
+                        )}
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${
-                          pos.take_profit_step === 1
+                          (pos.take_profit_step || 0) >= 2
+                            ? 'bg-emerald-950/60 text-emerald-200 border-emerald-400/40'
+                            : pos.take_profit_step === 1
                             ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
                             : 'bg-blue-950/60 text-blue-300 border-blue-500/30'
                         }`}>
                           <Shield className="w-2.5 h-2.5" />
-                          {pos.take_profit_step === 1 ? l('Profit Locked', 'Profit Aman') : l('Tracking', 'Tracking')}
+                          {(pos.take_profit_step || 0) >= 2
+                            ? l('TP2 Locked', 'TP2 Aman')
+                            : pos.take_profit_step === 1
+                            ? l('Profit Locked', 'Profit Aman')
+                            : l('Tracking', 'Tracking')}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -998,6 +1060,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span>{holdMin}m</span>
                       </div>
                     </div>
+
+                    {exitPlanLine && (
+                      <div className="text-[10px] text-slate-500 font-mono bg-slate-950/40 px-2 py-1 rounded border border-slate-800/50">
+                        {exitPlanLine}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                       <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/60">

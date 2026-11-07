@@ -576,7 +576,7 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
           </div>
         </div>
 
-        {/* Bottom Actions: ONLY Prev & Next / Finish Button */}
+        {/* Bottom Actions: Prev / Skip + Next / Finish Button */}
         <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
           {currentStepIndex > 0 ? (
             <button
@@ -592,6 +592,18 @@ export const GameTutorialModal: React.FC<GameTutorialModalProps> = ({
               <HelpCircle className="w-3.5 h-3.5" />
               <span>{l('Follow step-by-step briefing', 'Ikuti panduan tahap demi tahap')}</span>
             </div>
+          )}
+
+          {/* Skip: pengguna baru tidak boleh terjebak 8 layar paksa —
+              keluar kapan saja dan tandai tur selesai. */}
+          {!isFinalStep && (
+            <button
+              type="button"
+              onClick={onComplete}
+              className="text-[11px] font-semibold text-slate-500 hover:text-slate-300 underline underline-offset-2 transition-colors px-2 py-2"
+            >
+              {l('Skip tour', 'Lewati tur')}
+            </button>
           )}
 
           <button
