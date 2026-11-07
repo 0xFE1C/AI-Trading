@@ -208,7 +208,7 @@ flowchart TD
         SQLiteDB[(SQLite Database WAL Mode)]
         UnifiedBots[Unified Bots: WhatsApp Baileys + Telegram Bot API]
         ReactUI[React 19 Dashboard + Tailwind CSS + PWA]
-        PDFReport[Executive PDF Report (client-side jsPDF) & Tax CSV Export]
+        PDFReport["Executive PDF Report (client-side jsPDF) & Tax CSV Export"]
         MetricsEndpoint[Prometheus /api/metrics + External Watchdog Ping]
     end
 
