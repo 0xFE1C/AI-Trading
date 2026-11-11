@@ -42,3 +42,7 @@ Thumbs.db
 # ZCode tooling (lokal)
 .mimosa/
 .zcode/
+
+# Test Coverage Reports (generated)
+coverage/
+client/coverage/
