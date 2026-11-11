@@ -25,6 +25,7 @@ import {
 import { api } from '../services/api';
 import { BacktestParams, BacktestResult, BacktestTrade, PortfolioBacktestResult } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { QuantMonteCarloPanel } from './QuantMonteCarloPanel';
 
 const POPULAR_PAIRS = ['BTCIDR', 'ETHIDR', 'SOLIDR', 'PEPEIDR', 'DOGEIDR', 'XRPIDR', 'BNBIDR'];
 
@@ -789,6 +790,9 @@ export const BacktestView: React.FC = () => {
             </div>
           </div>
 
+          {/* Institutional Quant Ratios & 1,000-Path Monte Carlo Stress Test */}
+          <QuantMonteCarloPanel quantMetrics={result.quantMetrics} monteCarlo={result.monteCarlo} />
+
           {/* Equity Curve SVG Chart */}
           {result.equityCurve.length > 1 && (
             <div className="rounded-2xl border border-slate-800 bg-[#0b101b] p-6 space-y-4">
@@ -1068,6 +1072,9 @@ export const BacktestView: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Portfolio Institutional Quant Ratios & Monte Carlo Stress Test */}
+          <QuantMonteCarloPanel quantMetrics={portfolioResult.quantMetrics} monteCarlo={portfolioResult.monteCarlo} />
 
           {/* Equity Curve */}
           {portfolioResult.equityCurve.length > 1 && (

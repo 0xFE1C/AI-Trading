@@ -35,7 +35,7 @@ import {
   ShieldAlert,
   RefreshCw,
 } from 'lucide-react';
-import { SystemStatus, RiskProfileKey, SafetyStatus } from '../types';
+import { SystemStatus, RiskProfileKey, SafetyStatus, PortfolioRiskIntelligence } from '../types';
 import { CryptoChart } from './CryptoChart';
 import { AbValidationSection } from './AbValidationSection';
 import { EntryDiagnosticsSection } from './EntryDiagnosticsSection';
@@ -83,6 +83,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [safetyStatus, setSafetyStatus] = useState<SafetyStatus | null>(null);
   const [safetyLoading, setSafetyLoading] = useState<boolean>(false);
+  const [portfolioRisk, setPortfolioRisk] = useState<PortfolioRiskIntelligence | null>(null);
+  const [positionActionId, setPositionActionId] = useState<string | null>(null);
 
   // Persistent Onboarding Checklist
   const [checklist, setChecklist] = useState<Record<string, boolean>>(() => {
@@ -145,8 +147,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     let cancelled = false;
     const loadSafety = async () => {
       try {
-        const safety = await api.getSafetyStatus();
-        if (!cancelled) setSafetyStatus(safety);
+        const [safety, riskIntel] = await Promise.all([
+          api.getSafetyStatus(),
+          api.getPortfolioRiskIntelligence().catch(() => null),
+        ]);
+        if (!cancelled) {
+          setSafetyStatus(safety);
+          if (riskIntel) setPortfolioRisk(riskIntel);
+        }
       } catch {
         // Silent: the card simply shows the last known state
       }
@@ -175,6 +183,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setToast({ message: `${l('Failed to reset drawdown kill switch: ', 'Gagal reset kill switch drawdown: ')}${err.message}`, type: 'error' });
     } finally {
       setSafetyLoading(false);
+    }
+  };
+
+  const handleClosePosition = async (positionId: string, symbol: string) => {
+    if (!isAdmin) {
+      if (onOpenAuthModal) onOpenAuthModal();
+      return;
+    }
+    setPositionActionId(positionId);
+    try {
+      const res = await api.closePositionById(positionId);
+      setToast({
+        message: res.message || l(`Closed ${symbol.toUpperCase()} position.`, `Posisi ${symbol.toUpperCase()} berhasil ditutup.`),
+        type: 'success',
+      });
+      const riskIntel = await api.getPortfolioRiskIntelligence().catch(() => null);
+      if (riskIntel) setPortfolioRisk(riskIntel);
+      onRefresh();
+    } catch (err: any) {
+      setToast({
+        message: `${l('Failed to close position: ', 'Gagal menutup posisi: ')}${err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setPositionActionId(null);
+    }
+  };
+
+  const handleLockBreakeven = async (positionId: string, symbol: string) => {
+    if (!isAdmin) {
+      if (onOpenAuthModal) onOpenAuthModal();
+      return;
+    }
+    setPositionActionId(positionId);
+    try {
+      const res = await api.lockPositionBreakeven(positionId);
+      setToast({
+        message: res.message || l(`Locked ${symbol.toUpperCase()} stop at breakeven.`, `Stop loss ${symbol.toUpperCase()} dikunci di titik impas.`),
+        type: 'success',
+      });
+      const riskIntel = await api.getPortfolioRiskIntelligence().catch(() => null);
+      if (riskIntel) setPortfolioRisk(riskIntel);
+      onRefresh();
+    } catch (err: any) {
+      setToast({
+        message: `${l('Failed to lock breakeven: ', 'Gagal mengunci breakeven: ')}${err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setPositionActionId(null);
     }
   };
 
@@ -882,6 +940,94 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
+      {/* Portfolio Heat, Sector Concentration & Kelly Edge Bar */}
+      {isAdmin && portfolioRisk && (
+        <div className="rounded-xl border border-indigo-500/25 bg-gradient-to-r from-[#0b101b] via-[#0f172a] to-[#0b101b] p-4 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-bold text-slate-100 uppercase tracking-wide">
+                {l('Institutional Portfolio Heat & Correlation Matrix', 'Portfolio Heat & Matriks Korelasi Institusional')}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-mono">
+              <span className={`px-2 py-0.5 rounded border ${
+                portfolioRisk.diversificationScore >= 80
+                  ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30'
+                  : portfolioRisk.diversificationScore >= 55
+                  ? 'bg-amber-950/50 text-amber-300 border-amber-500/30'
+                  : 'bg-rose-950/50 text-rose-300 border-rose-500/30'
+              }`}>
+                {l('Health Score', 'Skor Diversifikasi')}: {portfolioRisk.diversificationScore}/100
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+            <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-950/50">
+              <span className="text-[10px] text-slate-400 block uppercase font-sans">
+                {l('Portfolio Heat (Downside Risk)', 'Portfolio Heat (Risiko ke Stop)')}
+              </span>
+              <span className={`text-sm font-bold ${
+                portfolioRisk.portfolioHeatPercent <= 2.5
+                  ? 'text-emerald-400'
+                  : portfolioRisk.portfolioHeatPercent <= 6.0
+                  ? 'text-amber-400'
+                  : 'text-rose-400'
+              }`}>
+                {portfolioRisk.portfolioHeatPercent}% ({formatCurrency(portfolioRisk.totalAtRiskIdr)})
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-950/50">
+              <span className="text-[10px] text-slate-400 block uppercase font-sans">
+                {l('Ratchet Locked Profit', 'Profit Terkunci Ratchet')}
+              </span>
+              <span className="text-sm font-bold text-emerald-400">
+                +{formatCurrency(portfolioRisk.lockedProfitIdr)} ({portfolioRisk.freeRollPositions}/{portfolioRisk.totalPositions} Free-Roll)
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-950/50">
+              <span className="text-[10px] text-slate-400 block uppercase font-sans">
+                {l('Max Pair Correlation (15m)', 'Korelasi Maks Antar Koin')}
+              </span>
+              <span className={`text-sm font-bold ${
+                portfolioRisk.maxPairwiseCorrelation === null || portfolioRisk.maxPairwiseCorrelation < 0.7
+                  ? 'text-slate-200'
+                  : 'text-amber-400'
+              }`}>
+                {portfolioRisk.maxPairwiseCorrelation !== null ? `r = ${portfolioRisk.maxPairwiseCorrelation.toFixed(2)}` : l('Uncorrelated / Single', 'Tunggal / Bebas')}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-950/50">
+              <span className="text-[10px] text-slate-400 block uppercase font-sans">
+                {l('Payoff-Aware Half-Kelly', 'Half-Kelly Edge (Payoff)')}
+              </span>
+              <span className={`text-sm font-bold ${
+                portfolioRisk.kellyEdge.expectancyPct >= 0 ? 'text-indigo-300' : 'text-amber-400'
+              }`}>
+                {portfolioRisk.kellyEdge.sampleSize >= 6
+                  ? `${portfolioRisk.kellyEdge.halfKellyMultiplier}x (${portfolioRisk.kellyEdge.expectancyPct >= 0 ? '+' : ''}${portfolioRisk.kellyEdge.expectancyPct}%/trade)`
+                  : l('Warming up (<6 trades)', 'Kalibrasi (<6 trade)')}
+              </span>
+            </div>
+          </div>
+
+          {portfolioRisk.sectorExposure.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] font-mono text-slate-400">
+              <span className="text-slate-500 font-sans font-semibold">{l('Sector Exposure:', 'Eksposur Sektor:')}</span>
+              {portfolioRisk.sectorExposure.map((sec) => (
+                <span key={sec.sector} className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                  {sec.sector.toUpperCase()} • {sec.count} ({sec.sharePercent}%)
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Section: Posisi Koin Aktif */}
       <div className="rounded-xl border border-slate-800 bg-[#0b101b] overflow-hidden shadow-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 bg-slate-900/30">
@@ -948,6 +1094,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </th>
                     <th className="py-3 px-4">{l('Hold Duration', 'Lama Hold')}</th>
+                    {isAdmin && <th className="py-3 px-4 text-right">{l('Tactical Actions', 'Kontrol Taktis')}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40 font-mono">
@@ -1014,6 +1161,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <Clock className="h-3.5 w-3.5 text-slate-500" />
                           {holdMin} {l('min', 'menit')}
                         </td>
+                        {isAdmin && (
+                          <td className="py-3.5 px-4 text-right font-sans">
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              {isProfit && pos.trailing_stop_price < pos.entry_price && (
+                                <button
+                                  type="button"
+                                  disabled={positionActionId === pos.id}
+                                  onClick={() => handleLockBreakeven(pos.id, pos.symbol)}
+                                  className="px-2 py-1 rounded-lg border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 text-[10px] font-semibold transition-colors disabled:opacity-50"
+                                  title={l('Raise Stop Loss to fee-adjusted Breakeven', 'Kunci Stop Loss di Titik Impas Bersih')}
+                                >
+                                  {l('Lock BE', 'Kunci BE')}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={positionActionId === pos.id}
+                                onClick={() => handleClosePosition(pos.id, pos.symbol)}
+                                className="px-2.5 py-1 rounded-lg border border-rose-500/40 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[10px] font-semibold transition-colors disabled:opacity-50"
+                                title={l('Close only this position now', 'Jual hanya posisi koin ini sekarang')}
+                              >
+                                {positionActionId === pos.id ? '...' : l('Close', 'Jual')}
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -1095,6 +1268,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    {isAdmin && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+                        {isProfit && pos.trailing_stop_price < pos.entry_price && (
+                          <button
+                            type="button"
+                            disabled={positionActionId === pos.id}
+                            onClick={() => handleLockBreakeven(pos.id, pos.symbol)}
+                            className="px-2.5 py-1 rounded-lg border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-[11px] font-semibold disabled:opacity-50"
+                          >
+                            {l('Lock Breakeven', 'Kunci Breakeven')}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={positionActionId === pos.id}
+                          onClick={() => handleClosePosition(pos.id, pos.symbol)}
+                          className="px-3 py-1 rounded-lg border border-rose-500/40 bg-rose-950/40 text-rose-300 text-[11px] font-semibold disabled:opacity-50"
+                        >
+                          {positionActionId === pos.id ? '...' : l('Close Position', 'Jual Posisi')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

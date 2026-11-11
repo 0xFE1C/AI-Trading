@@ -191,3 +191,208 @@ export function calculateVolumeZScore(volumes: number[], window = 20): number | 
   const latest = volumes[volumes.length - 1];
   return Number(((latest - mean) / stdDev).toFixed(2));
 }
+
+export interface BollingerBandsResult {
+  upper: number;
+  middle: number;
+  lower: number;
+  widthPct: number;
+  percentB: number; // 0 = lower band, 0.5 = SMA middle, 1 = upper band, >1 = breakout above upper
+}
+
+/**
+ * Full Bollinger Bands snapshot including %B position and width%.
+ */
+export function calculateBollingerBands(
+  closes: number[],
+  period = 20,
+  stdDevMultiplier = 2
+): BollingerBandsResult | null {
+  if (!closes || closes.length < period || period <= 0) return null;
+
+  const slice = closes.slice(-period);
+  const mean = slice.reduce((a, b) => a + b, 0) / period;
+  if (mean <= 0) return null;
+
+  const variance = slice.reduce((acc, c) => acc + Math.pow(c - mean, 2), 0) / period;
+  const stdDev = Math.sqrt(variance);
+  const bandHalf = stdDevMultiplier * stdDev;
+  const upper = mean + bandHalf;
+  const lower = mean - bandHalf;
+  const latest = closes[closes.length - 1];
+  const bandRange = upper - lower;
+  const percentB = bandRange > 0 ? (latest - lower) / bandRange : 0.5;
+  const widthPct = ((bandRange * 100) / mean);
+
+  return {
+    upper: Number(upper.toFixed(4)),
+    middle: Number(mean.toFixed(4)),
+    lower: Number(lower.toFixed(4)),
+    widthPct: Number(widthPct.toFixed(2)),
+    percentB: Number(percentB.toFixed(3)),
+  };
+}
+
+export interface AdxResult {
+  adx: number;     // 0..100 trend strength (>= 25 = trending, < 20 = ranging/chop)
+  plusDi: number;  // +DI directional bullish force
+  minusDi: number; // -DI directional bearish force
+}
+
+/**
+ * Calculates Wilder's Average Directional Index (ADX) + Directional Indicators (+DI / -DI).
+ * Requires at least (2 * period) candles so both Wilder's TR/DM smoothing and DX smoothing
+ * converge without lookahead or artificial seed values.
+ */
+export function calculateADX(candles: CandleData[], period = 14): AdxResult | null {
+  if (!candles || period <= 0 || candles.length < period * 2) return null;
+
+  const trList: number[] = [];
+  const plusDmList: number[] = [];
+  const minusDmList: number[] = [];
+
+  for (let i = 1; i < candles.length; i++) {
+    const cur = candles[i];
+    const prev = candles[i - 1];
+
+    const upMove = cur.high - prev.high;
+    const downMove = prev.low - cur.low;
+
+    const plusDm = upMove > downMove && upMove > 0 ? upMove : 0;
+    const minusDm = downMove > upMove && downMove > 0 ? downMove : 0;
+
+    const tr = Math.max(
+      cur.high - cur.low,
+      Math.abs(cur.high - prev.close),
+      Math.abs(cur.low - prev.close)
+    );
+
+    trList.push(tr);
+    plusDmList.push(plusDm);
+    minusDmList.push(minusDm);
+  }
+
+  if (trList.length < period * 2 - 1) return null;
+
+  let smoothTr = trList.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothPlusDm = plusDmList.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothMinusDm = minusDmList.slice(0, period).reduce((a, b) => a + b, 0);
+
+  const dxSeries: number[] = [];
+  let latestPlusDi = 0;
+  let latestMinusDi = 0;
+
+  const computeDxStep = () => {
+    latestPlusDi = smoothTr > 0 ? (smoothPlusDm / smoothTr) * 100 : 0;
+    latestMinusDi = smoothTr > 0 ? (smoothMinusDm / smoothTr) * 100 : 0;
+    const diSum = latestPlusDi + latestMinusDi;
+    const dx = diSum > 0 ? (Math.abs(latestPlusDi - latestMinusDi) / diSum) * 100 : 0;
+    dxSeries.push(dx);
+  };
+
+  computeDxStep();
+
+  for (let i = period; i < trList.length; i++) {
+    smoothTr = smoothTr - smoothTr / period + trList[i];
+    smoothPlusDm = smoothPlusDm - smoothPlusDm / period + plusDmList[i];
+    smoothMinusDm = smoothMinusDm - smoothMinusDm / period + minusDmList[i];
+    computeDxStep();
+  }
+
+  if (dxSeries.length < period) return null;
+
+  let adx = dxSeries.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < dxSeries.length; i++) {
+    adx = (adx * (period - 1) + dxSeries[i]) / period;
+  }
+
+  return {
+    adx: Number(adx.toFixed(2)),
+    plusDi: Number(latestPlusDi.toFixed(2)),
+    minusDi: Number(latestMinusDi.toFixed(2)),
+  };
+}
+
+/**
+ * Rolling Volume-Weighted Average Price (VWAP) over `window` candles.
+ * Uses Typical Price = (High + Low + Close) / 3 weighted by candle volume.
+ * Note: when candle `volume` is stored as IDR notional (rawVolume * close) and
+ * `rawVolume` is available, prefers `rawVolume` so price is not double-weighted.
+ */
+export function calculateVWAP(
+  candles: Array<{ high: number; low: number; close: number; volume: number; rawVolume?: number }>,
+  window = 24
+): number | null {
+  if (!candles || candles.length === 0 || window <= 0) return null;
+  const slice = candles.slice(-window);
+
+  let sumPv = 0;
+  let sumVol = 0;
+  for (const c of slice) {
+    const typical = (c.high + c.low + c.close) / 3;
+    const vol =
+      typeof c.rawVolume === 'number' && Number.isFinite(c.rawVolume) && c.rawVolume > 0
+        ? c.rawVolume
+        : c.close > 0 && c.volume > 0
+          ? c.volume
+          : 0;
+    if (typical > 0 && vol > 0) {
+      sumPv += typical * vol;
+      sumVol += vol;
+    }
+  }
+
+  if (sumVol <= 0) return null;
+  return Number((sumPv / sumVol).toFixed(4));
+}
+
+/**
+ * Computes Pearson return correlation (-1.0 .. +1.0) between two close-price series.
+ * Aligns from the newest bar backwards over `maxBars` overlapping returns.
+ * Returns null if fewer than `minReturns` valid overlapping return pairs exist
+ * or either series has zero variance.
+ */
+export function calculateReturnCorrelation(
+  closesA: number[],
+  closesB: number[],
+  maxBars = 32,
+  minReturns = 10
+): number | null {
+  if (!closesA || !closesB) return null;
+  const len = Math.min(closesA.length, closesB.length, maxBars + 1);
+  if (len < minReturns + 1) return null;
+
+  const sliceA = closesA.slice(-len);
+  const sliceB = closesB.slice(-len);
+
+  const retA: number[] = [];
+  const retB: number[] = [];
+  for (let i = 1; i < len; i++) {
+    if (sliceA[i - 1] > 0 && sliceB[i - 1] > 0) {
+      retA.push((sliceA[i] - sliceA[i - 1]) / sliceA[i - 1]);
+      retB.push((sliceB[i] - sliceB[i - 1]) / sliceB[i - 1]);
+    }
+  }
+
+  const n = retA.length;
+  if (n < minReturns) return null;
+
+  const meanA = retA.reduce((s, v) => s + v, 0) / n;
+  const meanB = retB.reduce((s, v) => s + v, 0) / n;
+
+  let cov = 0;
+  let varA = 0;
+  let varB = 0;
+  for (let i = 0; i < n; i++) {
+    const da = retA[i] - meanA;
+    const db = retB[i] - meanB;
+    cov += da * db;
+    varA += da * da;
+    varB += db * db;
+  }
+
+  const denom = Math.sqrt(varA * varB);
+  if (denom === 0) return null;
+  const corr = Math.max(-1, Math.min(1, cov / denom));
+  return Number(corr.toFixed(3));
+}

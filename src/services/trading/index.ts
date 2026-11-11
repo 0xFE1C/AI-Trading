@@ -50,7 +50,12 @@ import {
   resolveEntryExitPlan,
   ExitPlan,
 } from './adaptiveExit.js';
-import { strategyKellyFactor } from './strategyKelly.js';
+import { strategyKellyFactor, computeContinuousKelly } from './strategyKelly.js';
+import {
+  checkPortfolioCorrelation,
+  computePortfolioHeat,
+  PortfolioHeatSnapshot,
+} from './portfolioRisk.js';
 import {
   getFreshOptimizerPreset,
   OPTIMIZER_PRESET_RATIONALE,
@@ -1699,7 +1704,7 @@ export class TradingEngine {
     let candidateReason = '';
     let candidateScore: ScoreResult | null = null;
     // Atribusi strategi: identik dengan nilai `strategy` di opportunity_shortlist
-    let candidateStrategy: 'bluechip_pullback' | 'momentum' | 'new_listing' | null = null;
+    let candidateStrategy: 'bluechip_pullback' | 'momentum' | 'volatility_squeeze' | 'new_listing' | null = null;
 
     // Candidate 1: NEW COIN ALERTS (Pump hunter - disabled for Conservative profile)
     // Breadth lemah memveto koin baru juga (tape turun = pump koin baru rapuh).
@@ -1995,6 +2000,88 @@ export class TradingEngine {
             score: selection.score?.score,
             threshold: scoringMode === 'composite_score' ? SCORE_THRESHOLDS[riskProfile] : undefined,
           });
+        } else if (!breadthBlocked && getSetting('squeeze_breakout_enabled', '1') === '1') {
+          // --- VOLATILITY SQUEEZE BREAKOUT RADAR (Early Coiled Expansion: 0.3% .. 2.0% gain24h) ---
+          // Catches liquid coins coiled inside tight Bollinger Bands breaking upward with volume
+          // BEFORE 24h gain crosses +2% (where standard momentum scanners finally wake up).
+          const squeezePool: Array<{ symbol: string; gain24h: number; volIdr: number; last: number; ticker: IndodaxSummaryTicker }> = [];
+          for (const [key, ticker] of Object.entries(summaries.tickers)) {
+            if (!key.endsWith('_idr')) continue;
+            const symbol = key.replace('_idr', '');
+            const last = parseFloat(ticker.last);
+            const low = parseFloat(ticker.low);
+            const high = parseFloat(ticker.high);
+            const volIdr = parseFloat(ticker.vol_idr);
+            if (!(last > 0) || volIdr < minVolumeIdr) continue;
+            if (allowedCoins.length > 0 && !allowedCoins.includes(symbol)) continue;
+            if (isAlreadyHoldingMeme && MEME_TOKENS.has(symbol.toLowerCase())) continue;
+
+            const gain24h = low > 0 ? ((last - low) / low) * 100 : 0;
+            const dropFromHigh = high > 0 ? ((high - last) / high) * 100 : 0;
+            if (gain24h < 0.3 || gain24h >= 2.0 || dropFromHigh > 3.5) continue;
+
+            if (!checkThreatScope(symbol, activeThreats).passed) continue;
+            if (cooldownBlocked.has(TradingEngine.normalizeSymbol(symbol))) continue;
+            if (db.prepare("SELECT id FROM positions WHERE symbol = ? AND status = 'open'").get(symbol)) continue;
+            if (db.prepare("SELECT id FROM ghost_positions WHERE symbol = ? AND status = 'open'").get(symbol)) continue;
+
+            squeezePool.push({ symbol, gain24h, volIdr, last, ticker });
+          }
+
+          const topSqueeze = squeezePool.sort((a, b) => b.volIdr - a.volIdr).slice(0, 5);
+          let bestSqueeze: { symbol: string; scoreRes: ScoreResult; features: CoinFeatures } | null = null;
+
+          for (const item of topSqueeze) {
+            let candles15m: any[] = [];
+            try {
+              candles15m = (await indodaxMarketStream.getRealCandles(item.symbol, '15m')) || [];
+            } catch {}
+            if (candles15m.length < 24) continue;
+
+            const summaryItem: MarketSummary = {
+              symbol: item.symbol,
+              pair: `${item.symbol}_idr`,
+              last: item.last,
+              high24h: parseFloat(item.ticker.high || '0') || 0,
+              low24h: parseFloat(item.ticker.low || '0') || 0,
+              volIdr24h: item.volIdr,
+              buyPrice: parseFloat(item.ticker.buy || '0') || 0,
+              sellPrice: parseFloat(item.ticker.sell || '0') || 0,
+              ts: Date.now(),
+            };
+            const features = extractFeatures(summaryItem, candles15m);
+            if (!features.isSqueezeBreakout) continue;
+
+            const coinSent = coinSentiments[item.symbol.toUpperCase()] ?? 0.0;
+            const scoreRes = scoreOpportunity(features, coinSent, false, btcRegimeVerdict.regime, 'volatility_squeeze');
+            const threshold = SCORE_THRESHOLDS[riskProfile];
+            if (scoreRes.score < threshold) continue;
+
+            const mtf = await this.checkMtfAlignment1h(item.symbol, true);
+            this.logMtfGate(item.symbol, mtf, { strategy: 'volatility_squeeze' });
+            if (mtf.status === 'veto') continue;
+
+            if (!bestSqueeze || scoreRes.score > bestSqueeze.scoreRes.score) {
+              bestSqueeze = { symbol: item.symbol, scoreRes, features };
+            }
+          }
+
+          if (bestSqueeze) {
+            candidateSymbol = bestSqueeze.symbol;
+            candidateScore = bestSqueeze.scoreRes;
+            candidateStrategy = 'volatility_squeeze';
+            candidateReason = `Volatility Squeeze Breakout (Skor: ${bestSqueeze.scoreRes.score}/100, BB Width: ${bestSqueeze.features.bbWidthPct}%, %B: ${bestSqueeze.features.bbPercentB})`;
+            db.prepare(`
+              INSERT INTO opportunity_shortlist (id, ts, symbol, strategy, score, breakdown, consumed)
+              VALUES (?, ?, ?, ?, ?, ?, 0)
+            `).run(`opp_${Date.now()}_${bestSqueeze.symbol}`, Date.now(), bestSqueeze.symbol, 'volatility_squeeze', bestSqueeze.scoreRes.score, JSON.stringify(bestSqueeze.scoreRes.breakdown));
+            logEntryGate(bestSqueeze.symbol, 'candidate_filter', true, {
+              strategy: 'volatility_squeeze',
+              score: bestSqueeze.scoreRes.score,
+              bbWidthPct: bestSqueeze.features.bbWidthPct,
+              bbPercentB: bestSqueeze.features.bbPercentB,
+            });
+          }
         }
       }
     }
@@ -2114,6 +2201,37 @@ export class TradingEngine {
       return;
     }
 
+    // Gate 10: Portfolio Sector & Return Correlation Guard (prevents correlated cluster stacking)
+    if (getSetting('correlation_guard_enabled', '1') === '1') {
+      const openModeRows = db.prepare(
+        "SELECT symbol FROM positions WHERE status = 'open' AND mode = ?"
+      ).all(mode) as Array<{ symbol: string }>;
+
+      if (openModeRows.length > 0) {
+        const peerPositions = openModeRows.map((row) => {
+          const peerBars = loadCandles(row.symbol, '15m', 40);
+          return {
+            symbol: row.symbol,
+            closes: peerBars.length >= 12 ? peerBars.map((b) => b.close) : undefined,
+          };
+        });
+        const maxReturnCorr = parseFloat(getSetting('max_return_correlation', '0.85')) || 0.85;
+        const maxSectorSlots = parseInt(getSetting('max_same_sector_positions', '2'), 10) || 2;
+        const corrGate = checkPortfolioCorrelation({
+          candidateSymbol,
+          candidateCloses: candles15m.map((c) => c.close),
+          openPositions: peerPositions,
+          maxSameSector: maxSectorSlots,
+          maxReturnCorrelation: maxReturnCorr,
+        });
+        logEntryGate(candidateSymbol, 'portfolio_correlation', corrGate.passed, corrGate.values);
+        if (!corrGate.passed) {
+          console.log(`[Correlation Guard] Entry ${candidateSymbol.toUpperCase()} ditolak: ${corrGate.reason}`);
+          return;
+        }
+      }
+    }
+
     // True ATR sebagai % harga (dipakai volatility sizing SEKALIGUS rencana
     // exit adaptif). Null saat candle belum cukup → faktor legacy 1.0.
     const entryTrueAtr = calculateTrueATR(candles15m, 14);
@@ -2125,10 +2243,12 @@ export class TradingEngine {
     if (volatilitySizing) {
       if (entryAtrPct !== null) {
         const atrPct = entryAtrPct;
+        // Scale from the ALREADY Kelly-governed & equity-capped maxAllocationIdr
+        // (never reset back to baseAllocationIdr, which would erase Kelly throttling!)
         if (atrPct > 4.0) {
-          maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.6));
+          maxAllocationIdr = Math.max(10000, Math.round(maxAllocationIdr * 0.6));
         } else if (atrPct > 2.5) {
-          maxAllocationIdr = Math.max(10000, Math.round(baseAllocationIdr * 0.8));
+          maxAllocationIdr = Math.max(10000, Math.round(maxAllocationIdr * 0.8));
         }
       }
     }
@@ -3334,6 +3454,147 @@ export class TradingEngine {
     }
 
     return closedCount;
+  }
+
+  /**
+   * Tactical Manual Position Exit: closes a SINGLE open position cleanly through
+   * the same lock, floored-limit collar, and trade-history reconciliation pipeline
+   * without triggering a portfolio-wide Panic Sell or halting auto-trading.
+   */
+  public async closeSinglePositionById(
+    positionId: string,
+    customReason = 'Manual Tactical Close via Dashboard'
+  ): Promise<{ ok: boolean; error?: string; symbol?: string; exitPrice?: number }> {
+    const snapshot = this.getOpenPosition(positionId);
+    if (!snapshot) {
+      return { ok: false, error: 'Posisi tidak ditemukan atau sudah ditutup.' };
+    }
+
+    let currentPrice = snapshot.current_price || snapshot.entry_price;
+    try {
+      const ticker = await indodax.getTicker(snapshot.symbol);
+      const fetched = parseFloat(ticker?.ticker?.last || '0');
+      if (fetched > 0) currentPrice = fetched;
+    } catch {
+      // Fall back to latest tracked mark price
+    }
+
+    const closed = await this.closePosition(snapshot, currentPrice, customReason, { intentKind: 'exit' });
+    if (!closed) {
+      return { ok: false, error: `Gagal mengeksekusi penutupan posisi ${snapshot.symbol.toUpperCase()}.` };
+    }
+    return { ok: true, symbol: snapshot.symbol.toUpperCase(), exitPrice: currentPrice };
+  }
+
+  /**
+   * Tactical Breakeven Ratchet Lock: immediately raises an in-profit open position's
+   * trailing stop floor to its fee-adjusted breakeven (or entry price) one-way so
+   * the trade becomes a zero-downside "free-roll".
+   */
+  public async lockPositionBreakeven(
+    positionId: string
+  ): Promise<{ ok: boolean; error?: string; newStopPrice?: number; symbol?: string }> {
+    let outcome: { ok: boolean; error?: string; newStopPrice?: number; symbol?: string } = {
+      ok: false,
+      error: 'Posisi sedang dikunci proses lain.',
+    };
+
+    await this.withPositionLock(positionId, async () => {
+      const pos = this.getOpenPosition(positionId);
+      if (!pos || pos.exit_claimed_at) {
+        outcome = { ok: false, error: 'Posisi tidak ditemukan atau sedang dalam proses exit.' };
+        return;
+      }
+
+      const feeRate = getTakerFeeRate();
+      // Fee-adjusted breakeven price: entry_price * (1 + feeRate) / (1 - feeRate)
+      const feeAdjustedBreakeven = pos.entry_price * ((1 + feeRate) / Math.max(0.01, 1 - feeRate));
+      const markPrice = pos.current_price > 0 ? pos.current_price : pos.entry_price;
+
+      if (markPrice <= feeAdjustedBreakeven) {
+        outcome = {
+          ok: false,
+          error: `Harga saat ini (Rp ${Math.round(markPrice).toLocaleString('id-ID')}) belum melampaui titik impas bersih termasuk fee (Rp ${Math.round(feeAdjustedBreakeven).toLocaleString('id-ID')}).`,
+        };
+        return;
+      }
+
+      const newStop = Math.max(pos.trailing_stop_price, feeAdjustedBreakeven);
+      db.prepare(`
+        UPDATE positions SET trailing_stop_price = ? WHERE id = ? AND status = 'open'
+      `).run(newStop, pos.id);
+
+      outcome = {
+        ok: true,
+        symbol: pos.symbol.toUpperCase(),
+        newStopPrice: newStop,
+      };
+    });
+
+    return outcome;
+  }
+
+  /**
+   * Real-time Portfolio Risk Intelligence: computes Portfolio Heat (% of equity at risk
+   * to active trailing stops), locked free-roll profits, sector concentration, pairwise
+   * 15m return correlations, and strategy-level continuous Half-Kelly edge.
+   */
+  public async getPortfolioRiskIntelligence(mode?: 'paper' | 'live'): Promise<
+    PortfolioHeatSnapshot & {
+      mode: 'paper' | 'live';
+      kellyEdge: ReturnType<typeof computeContinuousKelly>;
+    }
+  > {
+    const activeMode: 'paper' | 'live' =
+      mode ?? (getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper');
+    const feeRate = getTakerFeeRate();
+
+    let equityIdr = parseFloat(getSetting('paper_idr_balance', '10000000')) || 10_000_000;
+    try {
+      const snap = await this.getEquitySnapshot(activeMode);
+      equityIdr = snap.equityIdr;
+    } catch {
+      // If live balance check temporarily fails, fall back to position cost sum + paper baseline
+    }
+
+    const openRows = db.prepare(
+      "SELECT symbol, entry_price, current_price, amount, initial_cost_idr, trailing_stop_price FROM positions WHERE status = 'open' AND mode = ?"
+    ).all(activeMode) as Array<{
+      symbol: string;
+      entry_price: number;
+      current_price: number;
+      amount: number;
+      initial_cost_idr: number;
+      trailing_stop_price: number;
+    }>;
+
+    const enriched = openRows.map((r) => {
+      const bars = loadCandles(r.symbol, '15m', 40);
+      return {
+        ...r,
+        closes: bars.length >= 12 ? bars.map((b) => b.close) : undefined,
+      };
+    });
+
+    const heat = computePortfolioHeat({
+      equityIdr,
+      feeRate,
+      openPositions: enriched,
+    });
+
+    const recentClosed = db.prepare(
+      "SELECT pnl_percent FROM positions WHERE status = 'closed' AND mode = ? ORDER BY closed_at DESC LIMIT 40"
+    ).all(activeMode) as Array<{ pnl_percent: number }>;
+
+    const kellyEdge = computeContinuousKelly(
+      recentClosed.map((r) => ({ pnlPercent: Number(r.pnl_percent) || 0 }))
+    );
+
+    return {
+      ...heat,
+      mode: activeMode,
+      kellyEdge,
+    };
   }
 
   /**

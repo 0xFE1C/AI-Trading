@@ -491,6 +491,11 @@ export function initDatabase() {
     optimizer_preset_meta: '', // JSON meta {testedAt, symbols, verdict, oosPfMedian, oosPnlIdrTotal, tp1, tp2}
     // --- Strategy-level Kelly governor (saudara faktor Kelly global) ---
     strategy_kelly_enabled: '1', // '1' = faktor Kelly per entry_strategy aktif
+    // --- Portfolio Correlation & Volatility Squeeze Intelligence ---
+    correlation_guard_enabled: '1', // '1' = cegah konsentrasi sektor & korelasi return ekstrem (>0.85)
+    max_return_correlation: '0.85', // batas korelasi Pearson return 15m antar posisi terbuka
+    max_same_sector_positions: '2', // maks posisi terbuka di sektor yang sama (meme dikunci 1)
+    squeeze_breakout_enabled: '1', // '1' = aktifkan radar Volatility Squeeze Breakout saat momentum tenang
   };
 
   const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');

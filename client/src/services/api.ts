@@ -28,6 +28,8 @@ import {
   OptimizerStatus,
   OptimizerRunParams,
   OptimizerRunSummary,
+  PortfolioRiskIntelligence,
+  MonteCarloResult,
 } from '../types';
 import {
   mockSystemStatus,
@@ -877,5 +879,80 @@ export const api = {
         })),
       };
     }
+  },
+
+  async getPortfolioRiskIntelligence(): Promise<PortfolioRiskIntelligence> {
+    try {
+      const json: any = await request('/trading/portfolio-risk');
+      return json.data;
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      return {
+        mode: 'paper',
+        equityIdr: 10350000,
+        totalExposureIdr: 1850000,
+        exposurePercent: 17.87,
+        totalAtRiskIdr: 42000,
+        portfolioHeatPercent: 0.41,
+        lockedProfitIdr: 68000,
+        freeRollPositions: 1,
+        totalPositions: 2,
+        sectorExposure: [
+          { sector: 'btc_macro', count: 1, valueIdr: 1050000, sharePercent: 56.8 },
+          { sector: 'smart_contract_l1', count: 1, valueIdr: 800000, sharePercent: 43.2 },
+        ],
+        correlationMatrix: [{ pairA: 'BTC', pairB: 'SOL', correlation: 0.54 }],
+        maxPairwiseCorrelation: 0.54,
+        diversificationScore: 94,
+        positions: [],
+        kellyEdge: {
+          sampleSize: 18,
+          winRate: 0.611,
+          avgWinPct: 4.8,
+          avgLossPct: 2.1,
+          payoffRatio: 2.29,
+          fullKellyFraction: 0.441,
+          halfKellyMultiplier: 1.35,
+          expectancyPct: 2.12,
+        },
+      };
+    }
+  },
+
+  async closePositionById(positionId: string): Promise<{ message: string }> {
+    try {
+      return await request(`/positions/${encodeURIComponent(positionId)}/close`, {
+        method: 'POST',
+      });
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      mockSystemStatus.openPositions = mockSystemStatus.openPositions.filter((p) => p.id !== positionId);
+      return { message: 'Posisi berhasil ditutup (Demo Mode).' };
+    }
+  },
+
+  async lockPositionBreakeven(positionId: string): Promise<{ message: string }> {
+    try {
+      return await request(`/positions/${encodeURIComponent(positionId)}/lock-breakeven`, {
+        method: 'POST',
+      });
+    } catch (err) {
+      throwUnlessStaticHost(err);
+      return { message: 'Stop loss berhasil dikunci di titik impas (Demo Mode).' };
+    }
+  },
+
+  async runMonteCarlo(params: {
+    trades?: Array<{ pnlIdr: number; pnlPercent: number }>;
+    initialCapitalIdr?: number;
+    iterations?: number;
+    horizonTrades?: number;
+    ruinDrawdownPercent?: number;
+  }): Promise<MonteCarloResult> {
+    const json: any = await request('/backtest/monte-carlo', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+    return json.data;
   },
 };

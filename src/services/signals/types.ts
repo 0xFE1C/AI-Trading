@@ -22,12 +22,26 @@ export interface NewsItem {
 
 export interface CoinFeatures {
   symbol: string;
-  ts: number;
+  ts?: number;
   close: number;
+  high24h?: number;
+  low24h?: number;
+  volume24hIdr?: number;
   rsi14: number | null;
-  ema9: number | null;
+  ema9?: number | null;
   ema21: number | null;
+  ema50?: number | null;
   atr14: number | null;
+  macdHistogram?: number | null;
+  adx14?: number | null;
+  plusDi14?: number | null;
+  minusDi14?: number | null;
+  bbWidthPct?: number | null;
+  bbPercentB?: number | null;
+  vwap?: number | null;
+  vwapDistancePct?: number | null;
+  volumeZScore?: number | null;
+  isSqueezeBreakout?: boolean;
   gain24hPct: number;
   dropFromHighPct: number;
   volumeSurgeRatio: number;
@@ -69,7 +83,7 @@ export interface RegimeVerdict {
   reasons: string[];
 }
 
-export type Strategy = 'bluechip_pullback' | 'momentum' | 'new_listing';
+export type Strategy = 'bluechip_pullback' | 'momentum' | 'volatility_squeeze' | 'new_listing';
 
 export interface ScoreResult {
   symbol: string;

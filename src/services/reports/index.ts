@@ -1,4 +1,10 @@
 import { db, getSetting } from '../../db/index.js';
+import {
+  computeInstitutionalMetrics,
+  runMonteCarloSimulation,
+  InstitutionalQuantMetrics,
+  MonteCarloResult,
+} from '../backtest/quantMetrics.js';
 
 export interface PerformanceSummary {
   periodLabel: string;
@@ -81,6 +87,8 @@ export interface PerformanceSummary {
     hold_minutes: number;
     mode: string;
   }>;
+  quantMetrics?: InstitutionalQuantMetrics;
+  monteCarlo?: MonteCarloResult;
 }
 
 export class ReportingService {
@@ -311,6 +319,29 @@ export class ReportingService {
       date: new Date(l.timestamp).toLocaleDateString('id-ID'),
     }));
 
+    const chronologicalSamples = formattedTrades.map((t) => ({
+      pnlIdr: t.pnl_idr,
+      pnlPercent: t.pnl_percent,
+    }));
+    const effectiveReportDays =
+      daysFilter !== 'all' && typeof daysFilter === 'number'
+        ? daysFilter
+        : positions.length >= 2 && positions[0].closed_at && positions[positions.length - 1].closed_at
+          ? Math.max(1, Math.round((positions[positions.length - 1].closed_at - positions[0].opened_at) / 86400000))
+          : 30;
+    const roundedReportDd = parseFloat(maxDrawdownPercent.toFixed(2));
+    const quantMetrics = computeInstitutionalMetrics({
+      trades: chronologicalSamples,
+      initialCapitalIdr: baseBalance,
+      effectiveDays: effectiveReportDays,
+      maxDrawdownPercent: roundedReportDd,
+    });
+    const monteCarlo = runMonteCarloSimulation({
+      trades: chronologicalSamples,
+      initialCapitalIdr: baseBalance,
+      iterations: 1000,
+    });
+
     return {
       periodLabel,
       startDate: startTime > 0 ? new Date(startTime).toLocaleDateString('id-ID') : 'Awal',
@@ -327,7 +358,7 @@ export class ReportingService {
       netPnlIdr: Math.round(netPnlIdr),
       netPnlPercent: parseFloat(netPnlPercent.toFixed(2)),
       profitFactor,
-      maxDrawdownPercent: parseFloat(maxDrawdownPercent.toFixed(2)),
+      maxDrawdownPercent: roundedReportDd,
       maxDrawdownIdr: Math.round(maxDrawdownIdr),
       avgHoldDurationMinutes,
       bestTrade,
@@ -344,7 +375,9 @@ export class ReportingService {
         missedProfitIdr: Math.round(missedProfitIdr),
       },
       lessonsLearned,
-      tradesList: formattedTrades.reverse(), // Urutkan yang terbaru di atas
+      quantMetrics,
+      monteCarlo,
+      tradesList: [...formattedTrades].reverse(), // Urutkan yang terbaru di atas
     };
   }
 

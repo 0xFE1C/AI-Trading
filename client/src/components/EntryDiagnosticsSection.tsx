@@ -83,6 +83,10 @@ const GATE_PLAIN_LANGUAGE: Record<string, { en: string; id: string }> = {
     en: 'No setup strong enough yet — the bot stays patient.',
     id: 'Belum ada setup yang cukup kuat — bot bersabar menunggu.',
   },
+  portfolio_correlation: {
+    en: 'Sector concentration or return correlation with an open position is too high — avoiding correlated stacking.',
+    id: 'Konsentrasi sektor atau korelasi return dengan posisi aktif terlalu tinggi — mencegah penumpukan risiko searah.',
+  },
   indicators: {
     en: 'Not enough candle data yet for a reliable analysis.',
     id: 'Data candle belum cukup untuk analisis.',

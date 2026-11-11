@@ -7,12 +7,13 @@ import type { LanguageContextType } from '../i18n/LanguageContext';
  * ('bluechip_pullback' | 'momentum' | 'new_listing' | 'manual'; NULL/unknown
  * untuk baris legacy).
  */
-export type EntryStrategyKey = 'bluechip_pullback' | 'momentum' | 'new_listing' | 'manual' | 'unknown';
+export type EntryStrategyKey = 'bluechip_pullback' | 'momentum' | 'volatility_squeeze' | 'new_listing' | 'manual' | 'unknown';
 
 export function strategyKey(strategy: string | null | undefined): EntryStrategyKey {
   switch (strategy) {
     case 'bluechip_pullback':
     case 'momentum':
+    case 'volatility_squeeze':
     case 'new_listing':
     case 'manual':
       return strategy;
@@ -30,6 +31,8 @@ export function strategyLabel(
       return l('Blue-Chip Pullback', 'Blue-Chip Pullback');
     case 'momentum':
       return l('Momentum', 'Momentum');
+    case 'volatility_squeeze':
+      return l('Volatility Squeeze', 'Squeeze Breakout');
     case 'new_listing':
       return l('New Listing', 'Listing Baru');
     case 'manual':
@@ -39,13 +42,15 @@ export function strategyLabel(
   }
 }
 
-/** Kelas badge kecil bertema gelap: blue-chip=sky, momentum=amber, new_listing=fuchsia, manual=slate. */
+/** Kelas badge kecil bertema gelap: blue-chip=sky, momentum=amber, squeeze=emerald, new_listing=fuchsia, manual=slate. */
 export function strategyBadgeClass(strategy: string | null | undefined): string {
   switch (strategyKey(strategy)) {
     case 'bluechip_pullback':
       return 'bg-sky-950/60 text-sky-300 border-sky-500/30';
     case 'momentum':
       return 'bg-amber-950/50 text-amber-300 border-amber-500/30';
+    case 'volatility_squeeze':
+      return 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30';
     case 'new_listing':
       return 'bg-fuchsia-950/50 text-fuchsia-300 border-fuchsia-500/30';
     case 'manual':

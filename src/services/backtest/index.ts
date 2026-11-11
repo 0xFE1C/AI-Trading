@@ -4,6 +4,12 @@ import { loadCandles } from '../candles/store.js';
 import { calculateTrueATR } from '../../utils/indicators.js';
 import { isBluechipSymbol } from '../signals/features.js';
 import { computeExitPlan, ExitPlan } from '../trading/adaptiveExit.js';
+import {
+  computeInstitutionalMetrics,
+  runMonteCarloSimulation,
+  InstitutionalQuantMetrics,
+  MonteCarloResult,
+} from './quantMetrics.js';
 
 export interface BacktestParams {
   symbol: string; // e.g. 'btcidr', 'ethidr', 'solidr', 'pepeidr'
@@ -61,6 +67,8 @@ export interface BacktestResult {
   feePercent: number;
   strategyUsed: string;
   dataSource?: 'cache' | 'exchange'; // 'cache' = candle store covered the range, 'exchange' = history_v2 fetch
+  quantMetrics?: InstitutionalQuantMetrics;
+  monteCarlo?: MonteCarloResult;
   trades: BacktestTrade[];
   equityCurve: Array<{ time: string; timestamp: number; equity: number }>;
 }
@@ -553,6 +561,21 @@ export class BacktestEngine {
     // Honest profit factor: return null if totalLossIdr is 0 (rendered as ∞ without fake 99.99)
     const profitFactor = totalLossIdr === 0 ? (totalGainIdr > 0 ? null : 0) : parseFloat((totalGainIdr / totalLossIdr).toFixed(2));
     const avgPnlPercent = trades.length > 0 ? parseFloat((trades.reduce((sum, t) => sum + t.pnlPercent, 0) / trades.length).toFixed(2)) : 0;
+    const roundedMaxDd = parseFloat(maxDrawdownPercent.toFixed(2));
+
+    const chronologicalSamples = trades.map((t) => ({ pnlIdr: t.pnlIdr, pnlPercent: t.pnlPercent }));
+    const quantMetrics = computeInstitutionalMetrics({
+      trades: chronologicalSamples,
+      initialCapitalIdr: initialBalance,
+      effectiveDays,
+      maxDrawdownPercent: roundedMaxDd,
+      equityCurve,
+    });
+    const monteCarlo = runMonteCarloSimulation({
+      trades: chronologicalSamples,
+      initialCapitalIdr: initialBalance,
+      iterations: 1000,
+    });
 
     return {
       symbol: cleanSymbol,
@@ -570,12 +593,14 @@ export class BacktestEngine {
       losingTrades,
       winRatePercent,
       profitFactor,
-      maxDrawdownPercent: parseFloat(maxDrawdownPercent.toFixed(2)),
+      maxDrawdownPercent: roundedMaxDd,
       averageTradePnlPercent: avgPnlPercent,
       slippagePercent,
       feePercent,
       strategyUsed: (strategyType === 'live_momentum' ? '24h Rolling Momentum (Live Engine Replay)' : 'Single Candlestick Momentum Breakout') + (adaptiveExit ? ' + Adaptive Exit' : ''),
       dataSource,
+      quantMetrics,
+      monteCarlo,
       trades: trades.reverse(), // most recent first
       equityCurve,
     };

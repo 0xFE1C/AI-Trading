@@ -24,6 +24,7 @@ import { buildAntigravityAuthUrl, exchangeCodeForTokens } from '../services/anti
 import { indodaxMarketStream } from '../services/indodax/marketStream.js';
 import { backtestEngine } from '../services/backtest/index.js';
 import { portfolioBacktestEngine } from '../services/backtest/portfolio.js';
+import { runMonteCarloSimulation } from '../services/backtest/quantMetrics.js';
 import { reportingService } from '../services/reports/index.js';
 import { backupService } from '../services/backup/index.js';
 import { telegramService } from '../services/telegram/index.js';
@@ -768,7 +769,7 @@ apiRouter.post('/subagents/run', authMiddleware, async (req, res) => {
   }
 });
 
-// --- 7. Positions & Trade History (Public View-Only) ---
+// --- 7. Positions & Trade History + Tactical Single-Position Controls (Admin Only) ---
 apiRouter.get('/positions', authMiddleware, (req, res) => {
   try {
     const mode = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
@@ -777,6 +778,58 @@ apiRouter.get('/positions', authMiddleware, (req, res) => {
     res.json({ success: true, data: { open, history } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Close a SINGLE open position cleanly without triggering portfolio-wide Panic Sell
+apiRouter.post('/positions/:id/close', authMiddleware, tradingToggleLimiter, async (req, res) => {
+  try {
+    const positionId = String(req.params.id || '').trim();
+    if (!positionId) {
+      return res.status(400).json({ success: false, error: 'ID posisi wajib diisi.' });
+    }
+    const result = await tradingEngine.closeSinglePositionById(positionId, 'Manual Tactical Close via Dashboard');
+    if (!result.ok) {
+      return res.status(400).json({ success: false, error: result.error || 'Gagal menutup posisi.' });
+    }
+    res.json({
+      success: true,
+      message: `Posisi ${result.symbol} berhasil ditutup di Rp ${Math.round(result.exitPrice || 0).toLocaleString('id-ID')}.`,
+      data: result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal menutup posisi.' });
+  }
+});
+
+// Ratchet an in-profit position's stop floor immediately to fee-adjusted breakeven ("Free-Roll Lock")
+apiRouter.post('/positions/:id/lock-breakeven', authMiddleware, tradingToggleLimiter, async (req, res) => {
+  try {
+    const positionId = String(req.params.id || '').trim();
+    if (!positionId) {
+      return res.status(400).json({ success: false, error: 'ID posisi wajib diisi.' });
+    }
+    const result = await tradingEngine.lockPositionBreakeven(positionId);
+    if (!result.ok) {
+      return res.status(400).json({ success: false, error: result.error || 'Gagal mengunci breakeven.' });
+    }
+    res.json({
+      success: true,
+      message: `Stop loss ${result.symbol} berhasil dikunci di titik impas bersih (Rp ${Math.round(result.newStopPrice || 0).toLocaleString('id-ID')}).`,
+      data: result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal mengunci breakeven.' });
+  }
+});
+
+// Portfolio Heat, Sector Concentration, Pairwise Return Correlation & Continuous Half-Kelly Telemetry
+apiRouter.get('/trading/portfolio-risk', authMiddleware, async (req, res) => {
+  try {
+    const data = await tradingEngine.getPortfolioRiskIntelligence();
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal memuat analitik risiko portofolio.' });
   }
 });
 
@@ -1118,6 +1171,44 @@ apiRouter.post('/backtest/portfolio', authMiddleware, async (req, res) => {
     res.json({ success: true, data: result });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Standalone Monte Carlo Stress-Test endpoint: re-runs bootstrap paths with custom
+// iterations / horizon / ruin drawdown threshold on either supplied trades or DB history.
+apiRouter.post('/backtest/monte-carlo', authMiddleware, (req, res) => {
+  try {
+    const body = req.body || {};
+    let sampleTrades: Array<{ pnlIdr: number; pnlPercent: number }> = [];
+
+    if (Array.isArray(body.trades) && body.trades.length > 0) {
+      sampleTrades = body.trades
+        .map((t: any) => ({
+          pnlIdr: Number(t.pnlIdr ?? t.pnl_idr ?? 0),
+          pnlPercent: Number(t.pnlPercent ?? t.pnl_percent ?? 0),
+        }))
+        .filter((t: any) => Number.isFinite(t.pnlIdr) && Number.isFinite(t.pnlPercent));
+    } else {
+      const mode = getSetting('trading_mode', 'paper') === 'live' ? 'live' : 'paper';
+      const closed = db.prepare(
+        "SELECT pnl_idr, pnl_percent FROM positions WHERE status = 'closed' AND mode = ? ORDER BY closed_at ASC LIMIT 300"
+      ).all(mode) as Array<{ pnl_idr: number; pnl_percent: number }>;
+      sampleTrades = closed.map((r) => ({ pnlIdr: Number(r.pnl_idr) || 0, pnlPercent: Number(r.pnl_percent) || 0 }));
+    }
+
+    const initialCapitalIdr = Number(body.initialCapitalIdr) || parseFloat(getSetting('paper_idr_balance', '10000000')) || 10_000_000;
+    const mc = runMonteCarloSimulation({
+      trades: sampleTrades,
+      initialCapitalIdr,
+      iterations: Number(body.iterations) || 1000,
+      horizonTrades: body.horizonTrades ? Number(body.horizonTrades) : undefined,
+      ruinDrawdownPercent: body.ruinDrawdownPercent ? Number(body.ruinDrawdownPercent) : 20,
+      seed: body.seed !== undefined ? Number(body.seed) : 42,
+    });
+
+    res.json({ success: true, data: mc });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Simulasi Monte Carlo gagal.' });
   }
 });
 

@@ -45,6 +45,18 @@ export function scoreOpportunity(
     breakdown.trend = Math.round(trendScore * 0.25);
     breakdown.sentiment = Math.round(sentimentScore * 0.10);
     breakdown.quality = Math.round(qualityScore * 0.10);
+
+    // Optional multi-factor confluence bonus when richer indicators are present:
+    // VWAP support alignment + positive MACD inflection (capped +8 pts, never penalizes missing fields)
+    let confluence = 0;
+    if (typeof f.vwapDistancePct === 'number' && f.vwapDistancePct >= -2.5 && f.vwapDistancePct <= 1.5) {
+      confluence += 4;
+    }
+    if (typeof f.macdHistogram === 'number' && f.macdHistogram >= 0) {
+      confluence += 4;
+    }
+    if (confluence > 0) breakdown.confluence = confluence;
+
     score = Object.values(breakdown).reduce((a, b) => a + b, 0);
   } else if (strategy === 'momentum') {
     if (f.rsi14 === null) {
@@ -62,6 +74,72 @@ export function scoreOpportunity(
     breakdown.depth = Math.round(depthScore * 0.20);
     breakdown.rsi = Math.round(rsiScore * 0.15);
     breakdown.sentiment = Math.round(sentimentScore * 0.10);
+
+    // Multi-factor trend & institutional flow confluence (ADX +DI>-DI, VWAP, MACD, Vol Z-Score)
+    let confluence = 0;
+    if (
+      typeof f.adx14 === 'number' &&
+      f.adx14 >= 22 &&
+      typeof f.plusDi14 === 'number' &&
+      typeof f.minusDi14 === 'number' &&
+      f.plusDi14 > f.minusDi14
+    ) {
+      confluence += 5;
+    } else if (
+      typeof f.adx14 === 'number' &&
+      f.adx14 >= 25 &&
+      typeof f.plusDi14 === 'number' &&
+      typeof f.minusDi14 === 'number' &&
+      f.minusDi14 > f.plusDi14
+    ) {
+      // Strong bearish directional dominance despite 24h gain -> distribution warning
+      confluence -= 8;
+    }
+    if (typeof f.vwapDistancePct === 'number') {
+      if (f.vwapDistancePct >= 0 && f.vwapDistancePct <= 4.0) confluence += 4;
+      else if (f.vwapDistancePct > 8.0) confluence -= 5; // Overextended far above intraday VWAP
+    }
+    if (typeof f.macdHistogram === 'number' && f.macdHistogram > 0) {
+      confluence += 3;
+    }
+    if (typeof f.volumeZScore === 'number' && f.volumeZScore >= 1.5) {
+      confluence += 3;
+    }
+    if (confluence !== 0) breakdown.confluence = confluence;
+
+    score = Object.values(breakdown).reduce((a, b) => a + b, 0);
+  } else if (strategy === 'volatility_squeeze') {
+    // Volatility Squeeze Breakout: catches tight Bollinger coils expanding upward
+    // BEFORE 24h gain becomes overextended. Requires RSI14 + Bollinger Bands.
+    if (f.rsi14 === null || f.bbWidthPct === null || f.bbWidthPct === undefined || f.bbPercentB === null || f.bbPercentB === undefined) {
+      return { symbol: f.symbol, strategy, score: 0, breakdown: { missing_indicators: 0 } };
+    }
+    if (f.rsi14 > 70 || f.rsi14 < 45) {
+      return { symbol: f.symbol, strategy, score: 0, breakdown: { rsi_out_of_band: 0 } };
+    }
+
+    // Tighter coil = higher compression potential (ideal width 1.0%..6.5%, hard cap 12%)
+    const compressionScore = bandScore(f.bbWidthPct, 1.0, 6.5, 0.2, 12.0);
+    // Breakout position in upper Bollinger zone (%B ideal 0.80..1.50, hard cap 2.10)
+    const breakoutPosScore = bandScore(f.bbPercentB, 0.80, 1.50, 0.55, 2.10);
+    // Volume ignition: Z-score or surge ratio
+    const zPart = typeof f.volumeZScore === 'number' ? clamp(f.volumeZScore * 40, 0, 100) : 0;
+    const surgePart = clamp((f.volumeSurgeRatio - 1.0) * 80, 0, 100);
+    const volumeIgnitionScore = Math.max(zPart, surgePart);
+    // Trend & VWAP alignment
+    const aboveVwap = typeof f.vwap === 'number' && f.vwap > 0 ? f.close >= f.vwap : true;
+    const aboveEma = f.ema21 !== null ? f.close >= f.ema21 : true;
+    const structureScore = aboveVwap && aboveEma ? 100 : aboveVwap || aboveEma ? 60 : 0;
+    const sentimentScore = clamp((coinSentiment + 1) * 50, 0, 100);
+
+    breakdown.compression = Math.round(compressionScore * 0.30);
+    breakdown.breakout = Math.round(breakoutPosScore * 0.25);
+    breakdown.volume = Math.round(volumeIgnitionScore * 0.25);
+    breakdown.structure = Math.round(structureScore * 0.12);
+    breakdown.sentiment = Math.round(sentimentScore * 0.08);
+    if (f.isSqueezeBreakout) {
+      breakdown.squeeze_confirmed = 8;
+    }
     score = Object.values(breakdown).reduce((a, b) => a + b, 0);
   } else {
     // new_listing: butuh volume & momentum awal

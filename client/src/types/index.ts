@@ -199,6 +199,112 @@ export interface BacktestTrade {
   holdDurationHours: number;
 }
 
+export interface InstitutionalQuantMetrics {
+  sharpeRatio: number | null;
+  sortinoRatio: number | null;
+  calmarRatio: number | null;
+  sqn: number | null;
+  sqnRating: 'INSUFFICIENT_DATA' | 'POOR' | 'AVERAGE' | 'GOOD' | 'EXCELLENT' | 'HOLY_GRAIL';
+  expectancyIdr: number;
+  expectancyPercent: number;
+  payoffRatio: number | null;
+  avgWinIdr: number;
+  avgLossIdr: number;
+  avgWinPercent: number;
+  avgLossPercent: number;
+  kellyPercent: number;
+  ulcerIndex: number;
+  recoveryFactor: number | null;
+  maxConsecutiveWins: number;
+  maxConsecutiveLosses: number;
+}
+
+export interface MonteCarloResult {
+  iterations: number;
+  horizonTrades: number;
+  sampleTradesCount: number;
+  initialCapitalIdr: number;
+  ruinThresholdPercent: number;
+  terminalEquity: {
+    p5: number;
+    p25: number;
+    median: number;
+    p75: number;
+    p95: number;
+    mean: number;
+  };
+  netReturnPercent: {
+    p5: number;
+    median: number;
+    p95: number;
+  };
+  maxDrawdownPercent: {
+    median: number;
+    p90: number;
+    p95: number;
+    p99: number;
+  };
+  var95Percent: number;
+  cvar95Percent: number;
+  probabilityOfProfitPercent: number;
+  probabilityOfRuinPercent: number;
+  fanChart: Array<{
+    step: number;
+    p5: number;
+    p25: number;
+    median: number;
+    p75: number;
+    p95: number;
+  }>;
+  verdict: 'INSTITUTIONAL_GRADE' | 'ROBUST' | 'FRAGILE' | 'HIGH_RUIN_RISK' | 'INSUFFICIENT_TRADES';
+}
+
+export interface PortfolioRiskIntelligence {
+  mode: 'paper' | 'live';
+  equityIdr: number;
+  totalExposureIdr: number;
+  exposurePercent: number;
+  totalAtRiskIdr: number;
+  portfolioHeatPercent: number;
+  lockedProfitIdr: number;
+  freeRollPositions: number;
+  totalPositions: number;
+  sectorExposure: Array<{
+    sector: string;
+    count: number;
+    valueIdr: number;
+    sharePercent: number;
+  }>;
+  correlationMatrix: Array<{
+    pairA: string;
+    pairB: string;
+    correlation: number;
+  }>;
+  maxPairwiseCorrelation: number | null;
+  diversificationScore: number;
+  positions: Array<{
+    symbol: string;
+    sector: string;
+    marketValueIdr: number;
+    costBasisIdr: number;
+    stopLiquidationIdr: number;
+    atRiskIdr: number;
+    lockedProfitIdr: number;
+    isFreeRoll: boolean;
+    distanceToStopPct: number;
+  }>;
+  kellyEdge: {
+    sampleSize: number;
+    winRate: number;
+    avgWinPct: number;
+    avgLossPct: number;
+    payoffRatio: number | null;
+    fullKellyFraction: number;
+    halfKellyMultiplier: number;
+    expectancyPct: number;
+  };
+}
+
 export interface BacktestResult {
   symbol: string;
   timeframe: string;
@@ -221,6 +327,8 @@ export interface BacktestResult {
   feePercent: number;
   strategyUsed: string;
   dataSource?: 'cache' | 'exchange';
+  quantMetrics?: InstitutionalQuantMetrics;
+  monteCarlo?: MonteCarloResult;
   trades: BacktestTrade[];
   equityCurve: Array<{ time: string; timestamp: number; equity: number }>;
 }
@@ -271,6 +379,8 @@ export interface PortfolioBacktestResult {
   slippagePercent: number;
   feePercent: number;
   dataSource?: 'cache' | 'exchange';
+  quantMetrics?: InstitutionalQuantMetrics;
+  monteCarlo?: MonteCarloResult;
   perSymbol: Array<{ symbol: string; candles: number; trades: number; netPnlIdr: number }>;
   equityCurve: Array<{ timestamp: number; equity: number }>;
   trades: PortfolioBacktestTrade[];
@@ -484,6 +594,8 @@ export interface PerformanceReport {
     hold_minutes: number;
     mode: string;
   }>;
+  quantMetrics?: InstitutionalQuantMetrics;
+  monteCarlo?: MonteCarloResult;
 }
 
 export interface BackupItem {

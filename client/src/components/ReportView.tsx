@@ -28,6 +28,7 @@ import { generatePdfReport } from '../utils/pdfGenerator';
 import { strategyLabel } from '../utils/strategy';
 import { Toast } from './Toast';
 import { useLanguage } from '../i18n/LanguageContext';
+import { QuantMonteCarloPanel } from './QuantMonteCarloPanel';
 
 interface ReportViewProps {
   isAdmin?: boolean;
@@ -315,6 +316,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ isAdmin = false }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 3.5 Institutional Risk-Adjusted Quant Ratios & Monte Carlo Stress-Test */}
+      {report && (report.quantMetrics || report.monteCarlo) && (
+        <QuantMonteCarloPanel quantMetrics={report.quantMetrics} monteCarlo={report.monteCarlo} />
       )}
 
       {/* 4. AI Swarm & Server Health Grid */}

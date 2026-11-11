@@ -4,6 +4,12 @@ import { getTakerFeePercent } from '../trading/fees.js';
 import { calculateTrueATR } from '../../utils/indicators.js';
 import { isBluechipSymbol } from '../signals/features.js';
 import { computeExitPlan, ExitPlan } from '../trading/adaptiveExit.js';
+import {
+  computeInstitutionalMetrics,
+  runMonteCarloSimulation,
+  InstitutionalQuantMetrics,
+  MonteCarloResult,
+} from './quantMetrics.js';
 
 /**
  * Portfolio-level backtest: multiple symbols, concurrent position slots and a
@@ -70,6 +76,8 @@ export interface PortfolioBacktestResult {
   slippagePercent: number;
   feePercent: number;
   dataSource?: PortfolioDataSource; // 'cache' only when EVERY symbol resolved from the candle store
+  quantMetrics?: InstitutionalQuantMetrics;
+  monteCarlo?: MonteCarloResult;
   perSymbol: PortfolioSymbolStat[];
   equityCurve: Array<{ timestamp: number; equity: number }>;
   trades: PortfolioTrade[];
@@ -466,6 +474,21 @@ export class PortfolioBacktestEngine {
       };
     });
 
+    const roundedMaxDd = parseFloat(maxDrawdownPercent.toFixed(2));
+    const chronologicalSamples = trades.map((t) => ({ pnlIdr: t.pnlIdr, pnlPercent: t.pnlPercent }));
+    const quantMetrics = computeInstitutionalMetrics({
+      trades: chronologicalSamples,
+      initialCapitalIdr: initialBalance,
+      effectiveDays: days,
+      maxDrawdownPercent: roundedMaxDd,
+      equityCurve,
+    });
+    const monteCarlo = runMonteCarloSimulation({
+      trades: chronologicalSamples,
+      initialCapitalIdr: initialBalance,
+      iterations: 1000,
+    });
+
     return {
       timeframe,
       days,
@@ -481,12 +504,14 @@ export class PortfolioBacktestEngine {
       losingTrades,
       winRatePercent: trades.length > 0 ? parseFloat(((winningTrades / trades.length) * 100).toFixed(1)) : 0,
       profitFactor: totalLoss === 0 ? (totalGain > 0 ? null : 0) : parseFloat((totalGain / totalLoss).toFixed(2)),
-      maxDrawdownPercent: parseFloat(maxDrawdownPercent.toFixed(2)),
+      maxDrawdownPercent: roundedMaxDd,
       maxConcurrentPositions: maxConcurrent,
       slotUtilizationPercent: slotSamples > 0 ? parseFloat(((concurrentSlotSum / slotSamples / maxActiveTrades) * 100).toFixed(1)) : 0,
       slippagePercent,
       feePercent,
       dataSource,
+      quantMetrics,
+      monteCarlo,
       perSymbol,
       equityCurve,
       trades: trades.reverse(),

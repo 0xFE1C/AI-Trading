@@ -6,7 +6,7 @@
 
 [![Language: English](https://img.shields.io/badge/Language-English-38bdf8?style=for-the-badge)](README.md)
 [![Dokumentasi: Bahasa Indonesia](https://img.shields.io/badge/Dokumentasi-Bahasa%20Indonesia-10b981?style=for-the-badge)](docs/PANDUAN_PENGGUNA.md)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-306%2F306%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-319%2F319%20PASS%20(100%25)-10b981?style=for-the-badge&logo=jest)](tests/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x%20Strict-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D%2022.12.0-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-19%20%2B%20Vite%20%2B%20Tailwind-61dafb?style=for-the-badge&logo=react)](client/)
@@ -18,7 +18,7 @@
 **Unified Autonomous Cryptocurrency Spot Trading Platform for Indodax Exchange**  
 *Unifying High-Speed Deterministic Section 9 Signals (0 Token Cost), 10 Specialized AI Research Sub-Agents, a 9-Gate Pure Risk Guard Pipeline wrapped in an Institutional Protection Layer (drawdown kill switch, exit guard, floored exits, order-intent crash recovery), and Unified Remote Bots via WhatsApp &amp; Telegram.*
 
-[Key Features](#-key-features--advantages) • [System Architecture](#-end-to-end-system-architecture) • [9 Risk Gates Pipeline](#-pure-risk-guard-9-sequential-defense-gates) • [AI Swarm Research](#-multi-agent-ai-research-swarm-10-analytical-lenses) • [Quickstart Guide](#-quickstart-guide-1-click-launchers) • [Remote Bots](#-unified-remote-bots-whatsapp--telegram) • [Capital Auto-Set](#-intelligent-capital-allocation-auto-set-engine)
+[Key Features](#-key-features--advantages) • [System Architecture](#-end-to-end-system-architecture) • [10 Risk Gates Pipeline](#-pure-risk-guard-10-sequential-defense-gates) • [AI Swarm Research](#-multi-agent-ai-research-swarm-10-analytical-lenses) • [Quickstart Guide](#-quickstart-guide-1-click-launchers) • [Remote Bots](#-unified-remote-bots-whatsapp--telegram) • [Capital Auto-Set](#-intelligent-capital-allocation-auto-set-engine)
 
 📄 **Dokumentasi:** [Panduan Pengguna (Bahasa Indonesia)](docs/PANDUAN_PENGGUNA.md) • [Laporan Implementasi](docs/LAPORAN-IMPLEMENTASI.md) • [Verifikasi](docs/VERIFIKASI.md) • [Galeri Screenshot](docs/assets/screenshots/README.md)
 
@@ -33,7 +33,7 @@
 - [📸 App Screenshots (Tampilan Aplikasi)](#-app-screenshots-tampilan-aplikasi)
 - [3. End-to-End System Architecture](#-end-to-end-system-architecture)
 - [4. Deterministic Section 9 Signal Engine](#-deterministic-section-9-signal-engine)
-- [5. Pure Risk Guard: 9 Sequential Defense Gates](#-pure-risk-guard-9-sequential-defense-gates)
+- [5. Pure Risk Guard: 10 Sequential Defense Gates](#-pure-risk-guard-10-sequential-defense-gates)
 - [6. Multi-Agent AI Research Swarm (10 Analytical Lenses)](#-multi-agent-ai-research-swarm-10-analytical-lenses)
 - [7. Counterfactual A/B Testing & Ghost Position Engine](#-counterfactual-ab-testing--ghost-position-engine)
 - [8. Intelligent Capital Allocation (Auto-Set Engine)](#-intelligent-capital-allocation-auto-set-engine)
@@ -44,7 +44,7 @@
 - [13. Quickstart Guide: 1-Click Launchers](#-quickstart-guide-1-click-launchers)
 - [14. Production Deployment via Docker](#-production-deployment-via-docker)
 - [15. Project Directory Architecture](#-project-directory-architecture)
-- [16. Quality Assurance & Test Suite (306/306 Passing)](#-quality-assurance--test-suite)
+- [16. Quality Assurance & Test Suite (319/319 Passing)](#-quality-assurance--test-suite)
 - [17. Frequently Asked Questions (FAQ) & Troubleshooting](#-frequently-asked-questions-faq--troubleshooting)
 - [18. Financial Risk Disclaimer](#-financial-risk-disclaimer)
 
@@ -62,7 +62,7 @@ Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psy
 1. **Decoupled Quantitative Architecture:** Large Language Models (LLMs) excel at processing global news and qualitative sentiment, but are far too slow, expensive, and unpredictable for high-frequency price analysis. We decouple these responsibilities:
    - **Deterministic Section 9:** Calculates pure mathematical technical indicators (Wilder's RSI, EMA, True ATR, Depth Imbalance) in **< 2 milliseconds** with **zero token cost** (`0 Token Cost`).
    - **AI Research Swarm:** Operates in the background analyzing macro narratives and exploit headlines from CoinDesk/CoinTelegraph/Indodax Blog RSS plus live Indodax tickers, using SHA-256 context deduplication to skip AI calls when the news and market fingerprint is unchanged.
-2. **9 Pure Risk Defense Gates + Institutional Protection Layer:** Every prospective buy signal **must pass 100% of all 9 sequential safety gates** before any order is submitted to Indodax — and every open position stays wrapped in a drawdown kill switch, an exit guard, and floored limit exits that can never fill below the stop level.
+2. **10 Pure Risk Defense Gates + Institutional Protection Layer:** Every prospective buy signal **must pass 100% of all 10 sequential safety gates** before any order is submitted to Indodax — and every open position stays wrapped in a drawdown kill switch, an exit guard, and floored limit exits that can never fill below the stop level.
 3. **Mathematical Trailing Stop Ratchet:** As an asset's market price increases, profit protection thresholds are monotonically ratcheted upward and **locked one-way**. If the trend abruptly reverses, the bot immediately locks in accumulated gains.
 4. **Zero-Configuration 1-Click Launchers:** Pre-packaged scripts for Windows (`start.bat`), PowerShell (`start.ps1`), and Linux/macOS (`start.sh`), accompanied by full bidirectional remote control via WhatsApp and Telegram.
 
@@ -74,7 +74,7 @@ Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psy
 | :--- | :--- | :--- |
 | **Speed & Efficiency** | **Section 9 Engine** | Pure mathematical signal pipeline, sub-millisecond execution, 0 token expenditure. |
 | **Market Intelligence** | **10 AI Sub-Agents** | Ten analytical lenses over verified inputs: CoinDesk/CoinTelegraph/Indodax Blog RSS, Indodax tickers, and a deterministic threat scanner. No Twitter/X, Reddit, or on-chain scraping is claimed. |
-| **Capital Defense** | **9 Risk Defense Gates + Institutional Protection Layer** | Daily circuit breaker, bid-ask spread trap filter, anti-FOMO RSI guard, and BTC flash crash veto — wrapped in a drawdown kill switch, exit guard, and floored exit execution. |
+| **Capital Defense** | **10 Risk Defense Gates + Institutional Protection Layer** | Daily circuit breaker, bid-ask spread trap filter, anti-FOMO RSI guard, BTC flash crash veto, and the sector/return-correlation concentration guard — wrapped in a drawdown kill switch, exit guard, and floored exit execution. |
 | **Financial Sizing** | **Capital Auto-Set** | Intelligent dynamic position sizing scaled to available balance (from micro IDR 10,000 up to tens of millions), with an optional max-allocation-per-trade cap as a percentage of current equity. |
 | **Profit Locking** | **Trailing Ratchet** | Dynamic monotonic stop-loss escalation prevents open profits from turning into catastrophic losses. Live exits use **floored limit orders** so they can never fill below the stop level. |
 | **Profit Locking** | **Second Scale-Out (TP2)** | After TP1 banks the first 50%, a second take-profit rung (default 10%, per profile 7/10/15%) sells a configurable fraction of the *remainder* while preserving the ratcheted breakeven-or-better stop (`take_profit_target_2_percent`, `tp2_sell_fraction_percent`). |
@@ -83,6 +83,12 @@ Manual cryptocurrency trading is frequently plagued by emotional exhaustion, psy
 | **UI Observability** | **Guided Setup Wizard & Live-Readiness Score** | A 6-step first-run onboarding wizard ("Panduan Setup") plus a dashboard readiness card (0–100) that scores paper-trading performance across 5 beginner-friendly criteria before considering live mode. |
 | **Market Intelligence** | **Whole-Market Radar (0 Token)** | Deterministic screener ranks every liquid Indodax pair each cycle (volume percentile + momentum band), a market-breadth gate reads the advancing share of the top-20 pairs to pause altcoin entries on weak tape, and re-entry cooldowns force rotation instead of chasing the same coin. |
 | **Exit Intelligence** | **Adaptive Exit Engine** | Per-position exit plans computed at entry from ATR volatility, BTC regime, and momentum strength — profit targets stretch in healthy trends while the trailing (loss side) stays anchored to the user's own setting (never more than 2×); stagnant positions are rotated out after a configurable hold window. |
+| **Strategy Research** | **Institutional Quant Ratios** | Every backtest and performance report carries **Sharpe, Sortino, Calmar, Van Tharp SQN (with rating tier), Payoff Ratio, Expectancy (± IDR/% per trade), Ulcer Index, Optimal Kelly %, and max consecutive win/loss streaks** — computed by a pure, dependency-free engine (`src/services/backtest/quantMetrics.ts`). |
+| **Stress Testing** | **Monte Carlo Bootstrap & Tail Risk** | A deterministic seeded (Mulberry32) **1,000-path trade-resampling simulator** reports P5/P25/P50/P75/P95 terminal equity, P95 worst-case drawdown, **VaR 95% / CVaR 95% (Expected Shortfall)**, probability of profit, and **probability of ruin**, rendered as a P5–P95 probability-cone fan chart in the Backtest Lab. |
+| **Capital Defense** | **Portfolio Heat & Sector Correlation Guard (Gate 10)** | Live telemetry measures the exact IDR/% of equity at risk to active trailing stops (Portfolio Heat), distinguishes zero-downside **"free-roll"** positions whose stops ratcheted above fee-adjusted breakeven, exposes a pairwise 15m return-correlation matrix and 9-narrative sector exposure, and **blocks correlated cluster stacking** before it turns a "3-slot portfolio" into one leveraged bet. |
+| **Entry Strategy** | **Volatility Squeeze Breakout** | A fourth deterministic strategy catches liquid coins coiled in tight Bollinger Bands breaking upward with volume-Z-score ignition (`volatility_squeeze`), targeting the 0.3%–2.0% 24h-gain window **before** late 24h momentum scanners chase them. |
+| **Entry Strategy** | **Multi-Factor Confluence Scoring** | ADX(14) with ±DI directional dominance, rolling intraday **VWAP** distance, MACD histogram, Bollinger %B, and volume Z-score now feed the composite scorer, which penalizes bearish distribution (strong −DI) and over-extension far above VWAP. |
+| **Position Control** | **Tactical Single-Position Exit & Breakeven Lock** | `POST /api/positions/:id/close` exits one position through the same floored-limit collar and trade-history pipeline **without** an all-or-nothing Panic Sell, and `POST /api/positions/:id/lock-breakeven` ratchets a winner's stop to its fee-adjusted breakeven (`entry × (1+fee)/(1−fee)`) for an instant zero-downside free-roll — both surfaced as per-row dashboard buttons. |
 | **Ops Observability** | **Prometheus Metrics & Watchdog** | `GET /api/metrics` exposition (positions, drawdown state, pending order intents, loop latency), structured pino logging, and an external uptime-watchdog ping (`WATCHDOG_URL`). |
 | **Remote Control** | **Unified Bots View** | Centralized bot management for WhatsApp & Telegram with 4 modes: *Both*, *WhatsApp Only*, *Telegram Only*, or *Disabled*. Conversational AI actions are guarded by a two-step confirmation code. |
 | **Zero-Trust Security** | **Admin Access Token** | Constant-time token verification (`crypto.timingSafeEqual`) with automated background rotation schedules. |
@@ -182,7 +188,7 @@ flowchart TD
     Sec9 --> RiskPipeline
     AIResearch -.->|Confirmation / Veto| RiskPipeline
 
-    subgraph RiskPipeline [4. Pure Risk Guard - 9 Defense Gates]
+    subgraph RiskPipeline [4. Pure Risk Guard - 10 Defense Gates]
         G1[G1: Daily Circuit Breaker] --> G2[G2: Portfolio Exposure Cap]
         G2 --> G3[G3: BTC Crash Veto]
         G3 --> G4[G4: Bid-Ask Spread Trap]
@@ -247,11 +253,11 @@ Unlike conventional cryptocurrency bots that exhaust costly LLM tokens on every 
 
 ---
 
-## 🛡️ Pure Risk Guard (9 Sequential Defense Gates)
+## 🛡️ Pure Risk Guard (10 Sequential Defense Gates)
 
-Every prospective trade signal must sequentially pass the rigorous **9 Defense Gates** in [`src/services/trading/riskGuard.ts`](src/services/trading/riskGuard.ts):
+Every prospective trade signal must sequentially pass the rigorous **10 Defense Gates** in [`src/services/trading/riskGuard.ts`](src/services/trading/riskGuard.ts) plus the deterministic rotation/portfolio-intelligence gates in [`src/services/trading/portfolioRisk.ts`](src/services/trading/portfolioRisk.ts):
 
-![9 Risk Gates Pipeline](docs/assets/risk-gates-pipeline.svg)
+![10 Risk Gates Pipeline](docs/assets/risk-gates-pipeline.svg)
 
 ```mermaid
 graph TD
@@ -273,7 +279,9 @@ graph TD
     G8 -- Score &lt; threshold --> V8[VETO: Setup Score Sub-Threshold]
     G8 -- Passed --> G9{Gate 9: Min IDR 10,000 Floor?}
     G9 -- Order &lt; 10k IDR --> V9[VETO: Below Indodax Minimum Size]
-    G9 -- Passed --> ACC[✓ 100% PASSED: ORDER DISPATCHED TO EXCHANGE]
+    G9 -- Passed --> G10{Gate 10: Sector & Correlation Guard?}
+    G10 -- Sector Full / r &gt;= 0.85 --> V10[VETO: Correlated Cluster Stacking]
+    G10 -- Passed --> ACC[✓ 100% PASSED: ORDER DISPATCHED TO EXCHANGE]
 ```
 
 ### Gate-by-Gate Specification:
@@ -286,10 +294,11 @@ graph TD
 7. **Gate 7 — Slippage Budget:** Simulates full order execution against the top 5 levels of the Indodax orderbook, ensuring effective slippage does not exceed the `slippage_tolerance_percent` setting (default 0.8%; the conservative profile applies 0.5%).
 8. **Gate 8 — Technical Score Threshold:** Mandates that the composite technical setup score meets or exceeds the required threshold (per profile: 65 conservative / 60 balanced / 50 aggressive).
 9. **Gate 9 — Indodax Minimum Floor:** Verifies that after subtracting cash reserves, the net order value is **at least IDR 10,000**, fully satisfying Indodax exchange regulations.
+10. **Gate 10 — Sector Concentration & Return-Correlation Guard:** Classifies the candidate into one of nine crypto narratives (BTC macro, smart-contract L1/L2, DeFi, memecoin, AI/DePIN, gaming, exchange/infra, payments/RWA, emerging alts) and computes its rolling 15m **Pearson return correlation** against every open position. Entries are vetoed when a sector slot cap is exhausted (memecoins are hard-capped at 1) or when the highest pairwise correlation reaches `max_return_correlation` (default 0.85) — preventing a "diversified" 3-slot book from silently becoming one leveraged directional bet.
 
-### Institutional Protection Layer (wraps the 9 gates)
+### Institutional Protection Layer (wraps the 10 gates)
 
-The 9 gates decide *whether to enter*. A second, independent layer protects capital *around and after* every entry — critical because the Indodax Trade API v2 cannot host stop orders (`STOP_LIMIT` is rejected by `POST /api/v2/order`; verified against the official docs), so downside protection lives in this process:
+The 10 gates decide *whether to enter*. A second, independent layer protects capital *around and after* every entry — critical because the Indodax Trade API v2 cannot host stop orders (`STOP_LIMIT` is rejected by `POST /api/v2/order`; verified against the official docs), so downside protection lives in this process:
 
 1. **Drawdown Kill Switch:** Tracks the mode-scoped equity peak. If equity falls `max_drawdown_percent` (default 15%) below its peak, or below the absolute `equity_floor_idr`, auto-trading halts and the configured de-risk mode runs: `halt` (entries only), `halve` (sell 50% of every position), or `flatten` (liquidate all). There is **no automatic reset** — clearing it requires the manual `POST /api/trading/drawdown-reset` endpoint (or the Dashboard protection card), which re-bases the equity peak.
 2. **Exit Guard:** While any live position lacks a guaranteed exit plan (dust remainder below the exchange minimum, a sell failure, or balance ambiguity), new live entries are refused (`require_protective_orders=1`). Flags clear automatically after a clean reconciliation.
@@ -308,7 +317,7 @@ Three newer gates govern *how the bot rotates across the whole market*, all pure
 2. **Re-Entry Cooldown (`reentry_cooldown`):** a just-closed symbol cannot be re-bought for `reentry_cooldown_hours` (default 4) — **doubled after a losing trade** — so the bot rotates to fresh opportunities instead of chasing what it just sold.
 3. **Multi-Timeframe Alignment (`mtf_alignment`):** a 15m setup is only tradable when the 1h trend agrees (close ≥ EMA21 with a non-falling EMA). Candle-store first; at most 8 bounded fetches per cycle; missing data → pass with a warning, never a block.
 
-The whole-market ranking behind these gates is published live at `GET /api/market/radar` and rendered as the "Radar Pasar (Deterministik)" card in the Scanner tab — the dashboard's entry diagnostics now shows **12 gate cards** with plain-language explainers.
+The whole-market ranking behind these gates is published live at `GET /api/market/radar` and rendered as the "Radar Pasar (Deterministik)" card in the Scanner tab — the dashboard's entry diagnostics now shows the gate cards with plain-language explainers (including the new `portfolio_correlation` gate), alongside live **Portfolio Heat, sector exposure, pairwise correlation, and Payoff-Aware Half-Kelly** telemetry from `GET /api/trading/portfolio-risk`.
 
 ---
 
@@ -567,7 +576,7 @@ Scrape `GET /api/metrics` with Prometheus for positions by mode, unprotected liv
 | **UI Components** | `client/src/components/` | `DashboardView`, `BotsView`, `EntryDiagnosticsSection`, `SetupWizard`, `LiveReadinessCard`, `QuotaView`, `ReportView`. |
 | **Documentation & Assets** | `docs/` | `docs/assets/` (Vector SVGs), `PANDUAN_PENGGUNA.md` (Indonesian User Guide), and audit logs. |
 | **Quantitative Signals** | `src/services/signals/` | Deterministic Section 9 (`features`, `lexicon`, `threat`, `regime`, `scorer`). |
-| **Trading & Risk Guard** | `src/services/trading/` | 9 Risk Defense Gates (`riskGuard`), institutional protection layer (drawdown kill switch, exit guard, floored exits), order-intent journal, trailing ratchet, & capital auto-set engine. |
+| **Trading & Risk Guard** | `src/services/trading/` | 10 Risk Defense Gates (`riskGuard` + `portfolioRisk` correlation guard), institutional protection layer (drawdown kill switch, exit guard, floored exits), order-intent journal, trailing ratchet, & capital auto-set engine. |
 | **AI Swarm Intelligence** | `src/services/agents/` | 10 specialized intelligence analysts, read-only Portfolio Advisor, SQLite outbox Blackboard bus, & SHA-256 deduplication. |
 | **AI Prompt Registry** | `src/services/ai/prompts.ts` | Versioned prompts for every LLM role with per-call version audit trail (`ai_call_logs.prompt_version`) and the `npm run ai:eval` golden-scenario harness. |
 | **Research & Backtesting** | `src/services/backtest/`, `src/services/candles/`, `scripts/` | Single-symbol & portfolio backtest engines (concurrent slots, zero-lookahead stops, TP1+TP2 scale-outs) that prefer the local SQLite candle cache and tag each result `dataSource: 'cache'` or `'exchange'`, plus grid-search optimizer with walk-forward analysis. |
@@ -583,7 +592,7 @@ Scrape `GET /api/metrics` with Prometheus for positions by mode, unprotected liv
 
 > [!NOTE]
 > **Unified Full-Stack Architecture:**
-> - **`src/` (Backend Core):** Executes the deterministic Section 9 signal pipeline, applies the 9 risk gates, coordinates the AI swarm, manages SQLite persistence, and drives remote WhatsApp/Telegram bots.
+> - **`src/` (Backend Core):** Executes the deterministic Section 9 signal pipeline, applies the 10 risk gates, coordinates the AI swarm, manages SQLite persistence, and drives remote WhatsApp/Telegram bots.
 > - **`client/` (Frontend Dashboard):** The interactive web console available at `http://localhost:3001` — presenting candlestick charts, order controls, market scanners, quota monitors, and live gate diagnostics.
 > - Both modules are bundled and served harmoniously from a single consolidated server process via the 1-click launchers (`start.bat` / `start.sh`).
 
@@ -624,20 +633,25 @@ npm test
 ✔ Portfolio backtest simulator (concurrent slots, shared cash, zero-lookahead stops)
 ✔ Composite momentum entry scoring, TP2 scale-out & cache-first backtests
 ✔ Candle store round-trip & new indicators (MACD, Bollinger width, volume z-score)
-✔ Prompt version invariants & AI verdict parser golden cases
+✔ prompt version invariants & AI verdict parser golden cases
+✔ ADX(+DI/-DI), rolling VWAP, Bollinger %B & Pearson return correlation
+✔ Volatility Squeeze Breakout detection & multi-factor confluence scoring
+✔ Portfolio heat, sector taxonomy, correlation guard & continuous Half-Kelly
+✔ Institutional Sharpe/Sortino/Calmar/SQN metrics & seeded 1,000-path Monte Carlo
+✔ Tactical single-position close, breakeven lock & compounded Kelly×ATR sizing
 ---------------------------------------------------------------------------------
-ℹ tests 306 | suites 71 | pass 306 | fail 0 | cancelled 0
+i tests 319 | suites 76 | pass 319 | fail 0 | cancelled 0
 ---------------------------------------------------------------------------------
 ```
 
-Coverage on critical modules (`riskGuard`, `secrets`, indicators, signals) is enforced at **80% lines** — currently ~89.9%:
+Coverage on critical modules (`riskGuard`, `secrets`, indicators, signals) is enforced at **80% lines** — currently ~95.0%:
 
 ```bash
 npm run test:coverage            # full report (lcov + text)
 npm run test:coverage:critical   # hard 80% gate on critical modules
 ```
 
-The client ships its own vitest suite (`npm test` inside `client/`, 25 tests) covering token storage, connection-state events, live-readiness scoring, and EN/ID translation parity.
+The client ships its own vitest suite (`npm test` inside `client/`, 28 tests) covering token storage, connection-state events, live-readiness scoring, strategy attribution, and EN/ID translation parity.
 
 Production Build Verification:
 ```bash
@@ -650,7 +664,7 @@ Continuous Integration:
 # .github/workflows/ci.yml runs on every push/PR:
 npm ci && npm --prefix client ci
 npm run typecheck
-npm test                                 # backend suite (306 tests)
+npm test                                 # backend suite (319 tests)
 npm run test:coverage:critical           # 80% coverage gate on critical modules
 npm --prefix client test                 # client vitest suite
 npm --prefix client run build
@@ -661,7 +675,7 @@ npm --prefix client run build
 ## ❓ Frequently Asked Questions (FAQ) & Troubleshooting
 
 #### Q1: Why hasn't the bot entered any trades today?
-> **A:** This is clear evidence that the **9 Risk Gates** are actively protecting your capital. The bot never enters trades blindly. If the bid-ask spread is excessively wide, Bitcoin is trending downward, or target coins are in extreme overbought territory, entries are purposely withheld. You can view the exact evaluation diagnostics in the **Entry Diagnostics Section** on the dashboard.
+> **A:** This is clear evidence that the **10 Risk Gates** are actively protecting your capital. The bot never enters trades blindly. If the bid-ask spread is excessively wide, Bitcoin is trending downward, or target coins are in extreme overbought territory, entries are purposely withheld. You can view the exact evaluation diagnostics in the **Entry Diagnostics Section** on the dashboard.
 
 #### Q2: Does my computer need to remain powered on 24/7?
 > **A:** Yes for live trading. The Indodax Trade API v2 does not support placing stop orders (verified against the official docs), so all exit logic (trailing stop, take-profit, circuit breaker, drawdown kill switch) runs in this process. If the host goes down, open positions lose their automated exits — the engine sends a shutdown warning if live positions are open, and the deadman switch cancels any resting orders. Deploy to an always-on cloud VPS with a process supervisor (Docker `restart: unless-stopped` or the provided systemd unit) so downtime is seconds-to-minutes; on restart, startup reconciliation plus `clientOrderId`-based order-intent recovery verifies the exchange state before anything resumes, and auto-trading stays paused until that passes (or the opt-in `auto_resume_on_startup` policy allows it).
@@ -679,7 +693,7 @@ npm --prefix client run build
 
 ## ⚠️ Financial Risk Disclaimer
 
-1. **Market Volatility:** Cryptocurrency assets are subject to extreme price volatility. Although this software incorporates 9 risk defense gates and automated trailing stops, no algorithmic system can guarantee 100% profitability across all unforeseen market conditions.
+1. **Market Volatility:** Cryptocurrency assets are subject to extreme price volatility. Although this software incorporates 10 risk defense gates and automated trailing stops, no algorithmic system can guarantee 100% profitability across all unforeseen market conditions.
 2. **Mandatory Testing:** Users are strongly advised to thoroughly test strategies in **Demo Mode (Paper Trading)** for a minimum of 3 to 7 days before risking real funds.
 3. **Risk Capital:** Only deploy discretionary risk capital that you can comfortably afford to lose. Never trade with essential living funds.
 4. **User Responsibility:** The developers of this terminal accept no liability for individual trading decisions, losses incurred due to network failures, or negligence in securing exchange API credentials.
